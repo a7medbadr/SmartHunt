@@ -1,5 +1,6 @@
 from apscheduler.triggers.interval import IntervalTrigger
 
+from smarthunt.core.config import settings
 from smarthunt.scheduler import scheduler
 from smarthunt.scheduler.jobs import (
     discover_devops,
@@ -10,6 +11,10 @@ from smarthunt.scheduler.jobs import (
 
 class SchedulerService:
     def start(self):
+        # التحقق من الإعدادات أولاً قبل جدولة أي وظائف أو بدء التشغيل
+        if not settings.scheduler_enabled:
+            return
+
         scheduler.add_job(
             discover_python,
             IntervalTrigger(hours=1),

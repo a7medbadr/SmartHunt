@@ -1,39 +1,28 @@
-from functools import lru_cache
-from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
 
 class Settings(BaseSettings):
-    app_name: str
-    app_version: str
-    app_env: str
-    app_debug: bool
+    app_name: str = "SmartHunt"
 
-    api_host: str
-    api_port: int
+    debug: bool = True
 
     database_url: str
-    redis_url: str
 
-    openai_api_key: str = ""
+    jwt_secret_key: str
 
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
+    jwt_algorithm: str = "HS256"
 
-    # Security Settings
-    secret_key: str
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    access_token_expire_hours: int = 24
+
+    playwright_headless: bool = True
+
+    scheduler_enabled: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env",
+        env_file=".env",
+        case_sensitive=False,
         extra="ignore",
     )
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
+settings = Settings()

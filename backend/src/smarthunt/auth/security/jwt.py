@@ -8,17 +8,17 @@ from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.api.dependencies import get_db
+from smarthunt.core.config import settings
 from smarthunt.database.repositories.user_repository import UserRepository
-
-SECRET_KEY = "CHANGE_ME_IN_ENV"
-ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def create_access_token(
     data: dict,
-    expires_delta: timedelta = timedelta(hours=24),
+    expires_delta: timedelta = timedelta(
+        hours=settings.access_token_expire_hours,
+    ),
 ) -> str:
     """
     توليد توكن الـ JWT باستقبال قاموس يحتوي على البيانات (data).
@@ -31,8 +31,8 @@ def create_access_token(
 
     return jwt.encode(
         payload,
-        SECRET_KEY,
-        algorithm=ALGORITHM,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
     )
 
 
@@ -52,8 +52,8 @@ async def get_current_user(
     try:
         payload = jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
         )
 
         username = payload.get("sub")

@@ -1,5 +1,7 @@
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
+from smarthunt.core.config import settings
+
 
 class BrowserManager:
     def __init__(self):
@@ -10,7 +12,7 @@ class BrowserManager:
         self.playwright = await async_playwright().start()
 
         self.browser = await self.playwright.chromium.launch(
-            headless=True,
+            headless=settings.playwright_headless,
         )
 
         return self

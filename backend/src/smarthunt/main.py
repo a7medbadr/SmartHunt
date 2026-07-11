@@ -3,13 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from smarthunt.api.routes import auth_router, jobs_router, providers_router, scheduler_router
-from smarthunt.core.config import get_settings
+from smarthunt.core.config import settings
 from smarthunt.core.logging import configure_logging
 from smarthunt.services import SchedulerService
 
 configure_logging()
-
-settings = get_settings()
 
 
 @asynccontextmanager
@@ -20,9 +18,12 @@ async def lifespan(app: FastAPI):
 
 
 def create_application() -> FastAPI:
+    # استخدام قيمة افتراضية للـ version في حال عدم وجودها في الـ settings
+    app_version = getattr(settings, "app_version", "1.0.0")
+
     app = FastAPI(
         title=settings.app_name,
-        version=settings.app_version,
+        version=app_version,
         lifespan=lifespan,
     )
 
@@ -36,7 +37,7 @@ def create_application() -> FastAPI:
     async def root():
         return {
             "project": settings.app_name,
-            "version": settings.app_version,
+            "version": app_version,
             "status": "running",
         }
 

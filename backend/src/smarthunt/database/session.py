@@ -6,13 +6,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from smarthunt.core.config import get_settings
-
-settings = get_settings()
+from smarthunt.core.config import settings
 
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.app_debug,
+    echo=settings.debug,
     future=True,
     pool_pre_ping=True,
 )
