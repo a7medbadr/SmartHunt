@@ -10,7 +10,7 @@ from smarthunt.services import JobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-# الـ Alias النضيف للـ Dependency Injection
+# الـ Type Alias النظيف للـ Dependency Injection
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -18,6 +18,40 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 async def list_jobs(db: DB):
     """List all jobs."""
     return await JobService(db).list_jobs()
+
+
+@router.get("/filter", response_model=list[JobResponse])
+async def filter_jobs(
+    db: DB,
+    keyword: str | None = None,
+    company: str | None = None,
+    location: str | None = None,
+    source: str | None = None,
+    page: int = 1,
+    size: int = 20,
+):
+    """Filter jobs by multiple criteria."""
+    return await JobService(db).filter_jobs(
+        keyword,
+        company,
+        location,
+        source,
+        page,
+        size,
+    )
+
+
+@router.get("/sorted", response_model=list[JobResponse])
+async def sorted_jobs(
+    db: DB,
+    sort_by: str = "created_at",
+    order: str = "desc",
+):
+    """Get sorted jobs."""
+    return await JobService(db).sorted_jobs(
+        sort_by,
+        order,
+    )
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -56,20 +90,18 @@ async def delete_job(job_id: int, db: DB):
 
 
 @router.get("/search/", response_model=list[JobResponse])
-async def search_jobs(keyword: str = Query(..., min_length=2), db: DB = None):
+async def search_jobs(db: DB, keyword: str = Query(..., min_length=2)):
     """Search jobs by keyword."""
-    # تم إزالة الـ Depends التكراري هنا والاعتماد على الـ Annotation
     return await JobService(db).repository.search(keyword)
 
 
 @router.get("/page/", response_model=list[JobResponse])
 async def paginated_jobs(
+    db: DB,
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
-    db: DB = None,
 ):
     """Get a paginated list of jobs."""
-    # تم إزالة الـ Depends التكراري هنا والاعتماد على الـ Annotation
     return await JobService(db).repository.get_page(
         page=page,
         page_size=size,

@@ -47,3 +47,31 @@ class JobService:
         await self.repository.delete(job_id)
 
         return True
+
+    async def filter_jobs(
+        self,
+        keyword: str | None,
+        company: str | None,
+        location: str | None,
+        source: str | None,
+        page: int,
+        size: int,
+    ):
+        return await self.repository.filter_jobs(
+            keyword=keyword,
+            company=company,
+            location=location,
+            source=source,
+            page=page,
+            size=size,
+        )
+
+    async def sorted_jobs(
+        self,
+        sort_by: str,
+        order: str,
+    ):
+        return await self.repository.sorted_jobs(
+            sort_by,
+            order,
+        )
