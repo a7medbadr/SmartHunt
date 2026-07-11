@@ -19,7 +19,8 @@ class DiscoveryService:
         location: str | None = None,
     ):
 
-        discovered = await self.scraper.search(
+        # استدعاء الدالة الصحيحة من الـ ScraperService
+        discovered = await self.scraper.discover(
             keyword=keyword,
             location=location,
         )
