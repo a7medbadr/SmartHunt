@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserRegister(BaseModel):
@@ -22,5 +22,5 @@ class UserOut(BaseModel):
     username: str
     email: EmailStr
 
-    class Config:
-        from_attributes = True
+    # الأسلوب الحديث والمدعوم في Pydantic v2 لتجنب تحذيرات الـ Deprecation
+    model_config = ConfigDict(from_attributes=True)

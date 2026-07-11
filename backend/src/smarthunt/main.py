@@ -2,11 +2,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+# استيراد الـ HTTPException من starlette لضمان التقاط كل استثناءات الـ HTTP
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from smarthunt.api.routes import auth_router, jobs_router, providers_router, scheduler_router
 from smarthunt.core.config import settings
 from smarthunt.core.logging import configure_logging
 from smarthunt.middleware.request_logging import RequestLoggingMiddleware
 from smarthunt.services import SchedulerService
+from smarthunt.shared.exceptions import (
+    http_exception_handler,
+    unhandled_exception_handler,
+)
 from smarthunt.shared.logging import setup_logging
 
 configure_logging()
@@ -32,6 +39,16 @@ def create_application() -> FastAPI:
     # تهيئة نظام الـ Logging الجديد وإضافة الـ Middleware
     setup_logging()
     app.add_middleware(RequestLoggingMiddleware)
+
+    # تسجيل معالجات الاستثناءات (Exception Handlers) باستخدام StarletteHTTPException
+    app.add_exception_handler(
+        StarletteHTTPException,
+        http_exception_handler,
+    )
+    app.add_exception_handler(
+        Exception,
+        unhandled_exception_handler,
+    )
 
     # تسجيل الـ Routers تحت الـ prefix المحدد
     app.include_router(jobs_router, prefix="/api/v1")
