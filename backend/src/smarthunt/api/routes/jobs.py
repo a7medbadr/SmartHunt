@@ -6,12 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.api.dependencies import get_db
 from smarthunt.api.schemas import JobCreate, JobResponse
+from smarthunt.auth.security import get_current_user
+from smarthunt.database.models.user import User
 from smarthunt.services import DiscoveryService, JobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-# الـ Type Alias النظيف للـ Dependency Injection
 DB = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @router.get("", response_model=list[JobResponse])
@@ -22,6 +24,7 @@ async def list_jobs(db: DB):
 
 @router.get("/discover")
 async def discover_jobs(
+    current_user: CurrentUser,
     db: DB,
     keyword: str,
     location: str | None = None,
@@ -77,7 +80,11 @@ async def get_job(job_id: int, db: DB):
 
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
-async def create_job(payload: JobCreate, db: DB):
+async def create_job(
+    current_user: CurrentUser,
+    payload: JobCreate,
+    db: DB,
+):
     """Create a new job."""
     try:
         return await JobService(db).create_job(
@@ -87,15 +94,19 @@ async def create_job(payload: JobCreate, db: DB):
             source=payload.source,
             url=str(payload.url),
         )
-    except IntegrityError as err:
+    except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job already exists",
-        ) from err
+        ) from None
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_job(job_id: int, db: DB):
+async def delete_job(
+    current_user: CurrentUser,
+    job_id: int,
+    db: DB,
+):
     """Delete a job by ID."""
     deleted = await JobService(db).delete_job(job_id)
     if not deleted:

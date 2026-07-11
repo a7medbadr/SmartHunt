@@ -11,12 +11,14 @@ from smarthunt.auth.schemas.auth import (
     UserOut,
     UserRegister,
 )
+from smarthunt.auth.security import get_current_user
 from smarthunt.auth.services.auth_service import AuthService
+from smarthunt.database.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# تعريف الـ Dependency باستخدام Annotated لتفادي تحذيرات B008 ولأجل كود أنظف
 DatabaseSession = Annotated[AsyncSession, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -30,7 +32,6 @@ async def register(user_in: UserRegister, db: DatabaseSession):
         )
         return user
     except IntegrityError:
-        # إضافة from None أو from err لإرضاء قاعدة B904 ومنع الـ Exception Chaining المزعج
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username or Email already registered.",
@@ -52,3 +53,13 @@ async def login(user_in: UserLogin, db: DatabaseSession):
         )
 
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/me")
+async def me(current_user: CurrentUser):
+    """الحصول على بيانات المستخدم الحالي"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+    }
