@@ -30,13 +30,12 @@ dependencies = [
     "uvicorn[standard]>=0.35,<1.0",
     "sqlalchemy>=2.0,<3.0",
     "alembic>=1.16,<2.0",
-    "psycopg[binary]>=3.2,<4.0",
+    "asyncpg>=0.31,<1.0",
     "pydantic>=2.11,<3.0",
     "pydantic-settings>=2.10,<3.0",
     "httpx>=0.28,<1.0",
     "python-dotenv>=1.1,<2.0",
     "structlog>=25.4,<26.0",
-    "asyncpg>=0.31.0",
 ]
 
 [dependency-groups]
@@ -73,9 +72,7 @@ profile = "black"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
 python_files = ["test_*.py"]
-
 addopts = "-ra"
 
 [tool.coverage.run]
