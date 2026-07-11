@@ -5,7 +5,9 @@ from fastapi import FastAPI
 from smarthunt.api.routes import auth_router, jobs_router, providers_router, scheduler_router
 from smarthunt.core.config import settings
 from smarthunt.core.logging import configure_logging
+from smarthunt.middleware.request_logging import RequestLoggingMiddleware
 from smarthunt.services import SchedulerService
+from smarthunt.shared.logging import setup_logging
 
 configure_logging()
 
@@ -26,6 +28,10 @@ def create_application() -> FastAPI:
         version=app_version,
         lifespan=lifespan,
     )
+
+    # تهيئة نظام الـ Logging الجديد وإضافة الـ Middleware
+    setup_logging()
+    app.add_middleware(RequestLoggingMiddleware)
 
     # تسجيل الـ Routers تحت الـ prefix المحدد
     app.include_router(jobs_router, prefix="/api/v1")
