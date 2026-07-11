@@ -1,4 +1,5 @@
 from smarthunt.browser.base import JobResult
+from smarthunt.browser.core import BrowserManager
 from smarthunt.browser.providers.base import JobProvider
 
 
@@ -10,6 +11,17 @@ class MockProvider(JobProvider):
         keyword: str,
         location: str | None = None,
     ) -> list[JobResult]:
+        browser = await BrowserManager().start()
+
+        page = await browser.new_page()
+
+        await page.goto(
+            "https://example.com",
+            wait_until="networkidle",
+        )
+
+        await browser.stop()
+
         return [
             JobResult(
                 title=f"{keyword} Engineer",
