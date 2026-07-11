@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.api.dependencies import get_db
 from smarthunt.api.schemas import JobCreate, JobResponse
-from smarthunt.services import JobService
+from smarthunt.services import JobService, ScraperService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -18,6 +18,22 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 async def list_jobs(db: DB):
     """List all jobs."""
     return await JobService(db).list_jobs()
+
+
+@router.get("/discover")
+async def discover_jobs(
+    keyword: str,
+    location: str | None = None,
+):
+    """Discover new jobs using ScraperService."""
+    service = ScraperService()
+
+    jobs = await service.search(
+        keyword=keyword,
+        location=location,
+    )
+
+    return jobs
 
 
 @router.get("/filter", response_model=list[JobResponse])
