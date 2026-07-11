@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from smarthunt.api.routes import jobs_router, providers_router, scheduler_router
+from smarthunt.api.routes import auth_router, jobs_router, providers_router, scheduler_router
 from smarthunt.core.config import get_settings
 from smarthunt.core.logging import configure_logging
 from smarthunt.services import SchedulerService
@@ -30,6 +30,7 @@ def create_application() -> FastAPI:
     app.include_router(jobs_router, prefix="/api/v1")
     app.include_router(providers_router, prefix="/api/v1")
     app.include_router(scheduler_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
