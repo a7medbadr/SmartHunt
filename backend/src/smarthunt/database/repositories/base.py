@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 ModelType = TypeVar("ModelType")
 
 
-class BaseRepository(Generic[ModelType]):
+# التعديل هنا: استخدام الطريقة الحديثة المتوافقة مع UP046
+class BaseRepository[ModelType]:
     """Generic repository."""
 
     def __init__(

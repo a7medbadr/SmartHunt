@@ -1,0 +1,45 @@
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.api.dependencies import get_db
+from smarthunt.api.schemas import JobCreate, JobResponse
+from smarthunt.database.repositories.job_repository import JobRepository
+
+router = APIRouter(
+    prefix="/jobs",
+    tags=["Jobs"],
+)
+
+
+@router.post(
+    "",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_job(
+    payload: JobCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    repository = JobRepository(db)
+
+    job = await repository.create(
+        title=payload.title,
+        company=payload.company,
+        location=payload.location,
+        source=payload.source,
+        url=str(payload.url),
+    )
+
+    return job
+
+
+@router.get(
+    "",
+    response_model=list[JobResponse],
+)
+async def list_jobs(
+    db: AsyncSession = Depends(get_db),
+):
+    repository = JobRepository(db)
+
+    return await repository.get_all()

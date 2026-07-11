@@ -1,14 +1,13 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import smarthunt.database.models  # noqa: F401
+from alembic import context
 from smarthunt.core.config import get_settings
 from smarthunt.database.base import Base
-
-import smarthunt.database.models  # noqa: F401
 
 config = context.config
 
