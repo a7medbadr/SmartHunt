@@ -1,4 +1,4 @@
-from sqlalchemy import Select, func, select, asc, desc
+from sqlalchemy import Select, asc, desc, func, select
 
 from smarthunt.database.models.job import Job
 from smarthunt.database.repositories.base import BaseRepository
