@@ -1,5 +1,5 @@
-from smarthunt.browser.base import JobResult
 from smarthunt.browser.providers.base import JobProvider
+from smarthunt.domain import DiscoveredJob
 
 
 class MockProvider2(JobProvider):
@@ -9,17 +9,17 @@ class MockProvider2(JobProvider):
         self,
         keyword: str,
         location: str | None = None,
-    ) -> list[JobResult]:
+    ) -> list[DiscoveredJob]:
 
         return [
-            JobResult(
+            DiscoveredJob(
                 title=f"Lead {keyword}",
                 company="Microsoft",
                 location=location or "Remote",
                 source="Mock2",
                 url="https://example.com/mock2/job1",
             ),
-            JobResult(
+            DiscoveredJob(
                 title=f"Principal {keyword}",
                 company="Amazon",
                 location=location or "Dubai",

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from smarthunt.browser.base import JobResult
+from smarthunt.domain import DiscoveredJob
 
 
 class JobProvider(ABC):
@@ -11,5 +11,5 @@ class JobProvider(ABC):
         self,
         keyword: str,
         location: str | None = None,
-    ) -> list[JobResult]:
+    ) -> list[DiscoveredJob]:
         raise NotImplementedError

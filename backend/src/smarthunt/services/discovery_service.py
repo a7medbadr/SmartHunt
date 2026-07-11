@@ -1,9 +1,12 @@
+import asyncio
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.browser.provider_executor import ProviderExecutor
+from smarthunt.browser.registry import ProviderRegistry
 from smarthunt.domain import DiscoveredJob
 from smarthunt.services.job_service import JobService
-from smarthunt.services.scraper_service import ScraperService
 
 
 class DiscoveryService:
@@ -11,7 +14,7 @@ class DiscoveryService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.jobs = JobService(db)
-        self.scraper = ScraperService()
+        self.registry = ProviderRegistry()
 
     async def discover(
         self,
@@ -19,19 +22,26 @@ class DiscoveryService:
         location: str | None = None,
     ):
 
-        # استدعاء الدالة الصحيحة من الـ ScraperService
-        discovered = await self.scraper.discover(
-            keyword=keyword,
-            location=location,
-        )
+        # إعداد الـ Executor والتنفيذ بالتوازي
+        executor = ProviderExecutor(timeout=20)
+        tasks = [
+            executor.execute(provider, keyword, location) for provider in self.registry.get_all()
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # تجميع الوظائف من الـ نتائج الناجحة فقط
+        all_jobs = []
+        for result in results:
+            if not result.success:
+                continue
+            all_jobs.extend(result.jobs)
 
         inserted = 0
         duplicates = 0
-
         saved: list[DiscoveredJob] = []
 
-        for job in discovered:
-
+        # الفلترة والحفظ في قاعدة البيانات
+        for job in all_jobs:
             try:
                 db_job = await self.jobs.create_job(
                     title=job.title.strip() if job.title else "",
@@ -58,7 +68,7 @@ class DiscoveryService:
                 duplicates += 1
 
         return {
-            "total_found": len(discovered),
+            "total_found": len(all_jobs),
             "inserted": inserted,
             "duplicates": duplicates,
             "jobs": saved,
