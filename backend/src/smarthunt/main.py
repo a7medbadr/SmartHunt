@@ -5,7 +5,13 @@ from fastapi import FastAPI
 # استيراد الـ HTTPException من starlette لضمان التقاط كل استثناءات الـ HTTP
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from smarthunt.api.routes import auth_router, jobs_router, providers_router, scheduler_router
+from smarthunt.api.routes import (
+    auth_router,
+    health_router,
+    jobs_router,
+    providers_router,
+    scheduler_router,
+)
 from smarthunt.core.config import settings
 from smarthunt.core.logging import configure_logging
 from smarthunt.middleware.request_logging import RequestLoggingMiddleware
@@ -55,6 +61,7 @@ def create_application() -> FastAPI:
     app.include_router(providers_router, prefix="/api/v1")
     app.include_router(scheduler_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(health_router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
