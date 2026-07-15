@@ -1,83 +1,16 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
+from smarthunt.core.lifecycle import lifespan
 
-# استيراد الـ HTTPException من starlette لضمان التقاط كل استثناءات الـ HTTP
-from starlette.exceptions import HTTPException as StarletteHTTPException
+# المسارات الصحيحة للـ routers
+from smarthunt.api.routes.auth import router as auth_router
+from smarthunt.api.routes.jobs import router as jobs_router
+from smarthunt.api.routes.providers import router as providers_router
+from smarthunt.api.routes.health import router as health_router
 
-from smarthunt.api.routes import (
-    auth_router,
-    health_router,
-    jobs_router,
-    providers_router,
-    scheduler_router,
-)
-from smarthunt.core.config import settings
-from smarthunt.core.logging import configure_logging
-from smarthunt.middleware.request_logging import RequestLoggingMiddleware
-from smarthunt.services import SchedulerService
-from smarthunt.shared.exceptions import (
-    http_exception_handler,
-    unhandled_exception_handler,
-)
-from smarthunt.shared.logging import setup_logging
+app = FastAPI(lifespan=lifespan)
 
-configure_logging()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # تشغيل الـ Scheduler عند بدء التطبيق
-    SchedulerService().start()
-    yield
-
-
-def create_application() -> FastAPI:
-    # استخدام قيمة افتراضية للـ version في حال عدم وجودها في الـ settings
-    app_version = getattr(settings, "app_version", "1.0.0")
-
-    app = FastAPI(
-        title=settings.app_name,
-        version=app_version,
-        lifespan=lifespan,
-    )
-
-    # تهيئة نظام الـ Logging الجديد وإضافة الـ Middleware
-    setup_logging()
-    app.add_middleware(RequestLoggingMiddleware)
-
-    # تسجيل معالجات الاستثناءات (Exception Handlers) باستخدام StarletteHTTPException
-    app.add_exception_handler(
-        StarletteHTTPException,
-        http_exception_handler,
-    )
-    app.add_exception_handler(
-        Exception,
-        unhandled_exception_handler,
-    )
-
-    # تسجيل الـ Routers تحت الـ prefix المحدد
-    app.include_router(jobs_router, prefix="/api/v1")
-    app.include_router(providers_router, prefix="/api/v1")
-    app.include_router(scheduler_router, prefix="/api/v1")
-    app.include_router(auth_router, prefix="/api/v1")
-    app.include_router(health_router, prefix="/api/v1")
-
-    @app.get("/")
-    async def root():
-        return {
-            "project": settings.app_name,
-            "version": app_version,
-            "status": "running",
-        }
-
-    @app.get("/health")
-    async def health():
-        return {
-            "status": "healthy",
-        }
-
-    return app
-
-
-app = create_application()
+# تسجيل الـ routers
+app.include_router(auth_router, prefix="/api/v1/auth")
+app.include_router(jobs_router, prefix="/api/v1/jobs")
+app.include_router(providers_router, prefix="/api/v1/providers")
+app.include_router(health_router, prefix="/api/v1/health")

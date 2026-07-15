@@ -17,7 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 def create_access_token(
     data: dict,
     expires_delta: timedelta = timedelta(
-        hours=settings.access_token_expire_hours,
+        minutes=settings.access_token_expire_minutes,
     ),
 ) -> str:
     """

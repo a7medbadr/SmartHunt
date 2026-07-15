@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
+from smarthunt.database.session import create_engine, close_engine
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
+    await create_engine()
     yield
+    await close_engine()

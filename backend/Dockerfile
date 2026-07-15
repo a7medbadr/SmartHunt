@@ -2,17 +2,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# نسخ ملف الـ requirements أولاً للاستفادة من الـ Docker Cache
+# نسخ ملف الاعتماديات أولاً لاستغلال الـ Cache
 COPY requirements.txt .
 
-# تثبيت المكتبات باستخدام pip المدمج في الصورة
+# تثبيت المكتبات الخارجية
 RUN pip install --no-cache-dir -r requirements.txt
 
-# نسخ باقي ملفات المشروع
+# نسخ بقية ملفات المشروع بالكامل
 COPY . .
 
-# فتح المنفذ 8000
+# حل مشكلة hatchling: إنشاء ملف README.md في المجلد الأب لكي يجده محرك البناء
+RUN touch ../README.md
+
+# تثبيت مشروعك محلياً بدون تحميل أي اعتماديات مجدداً
+RUN pip install --no-deps .
+
 EXPOSE 8000
 
-# أمر تشغيل السيرفر مباشرة عبر uvicorn
-CMD ["python", "-m", "uvicorn", "smarthunt.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# تشغيل uvicorn بشكل مباشر
+CMD ["uvicorn", "smarthunt.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -10,7 +10,7 @@ from smarthunt.auth.security import get_current_user
 from smarthunt.database.models.user import User
 from smarthunt.services import DiscoveryService, JobService
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(tags=["jobs"])
 
 DB = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]

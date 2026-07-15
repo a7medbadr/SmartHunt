@@ -1,42 +1,58 @@
-import logging
 import time
 import uuid
+import structlog
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-
-logger = logging.getLogger("smarthunt")
+logger = structlog.get_logger("smarthunt")
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
+class RequestLoggingMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
 
-        # توليد وحفظ الـ Request ID داخل الـ state لتسهيل الوصول إليه في أي مكان
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         request_id = str(uuid.uuid4())
-        request.state.request_id = request_id
+        scope.setdefault("state", {})
+        scope["state"]["request_id"] = request_id
 
-        # تسجيل تفاصيل الطلب الوارد مع الـ ID
-        logger.info(
-            f"Incoming request: {request.method} {request.url.path} [Request ID: {request_id}]"
+        path = scope.get("path", "")
+        method = scope.get("method", "")
+
+        await logger.ainfo(
+            "Incoming request", method=method, path=path, request_id=request_id
         )
 
-        try:
-            response = await call_next(request)
-            process_time = (time.time() - start_time) * 1000
+        start_time = time.perf_counter()
 
-            # تسجيل تفاصيل الرد ووقت المعالجة
-            logger.info(
-                f"Completed request: {request.method} {request.url.path} "
-                f"- Status: {response.status_code} - Process Time: {process_time:.2f}ms"
-            )
-            # إضافة الـ ID إلى الـ Headers الخاصة بالرد
-            response.headers["X-Request-ID"] = request.state.request_id
-            return response
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                process_time = (time.perf_counter() - start_time) * 1000
+
+                await logger.ainfo(
+                    "Request completed",
+                    method=method,
+                    path=path,
+                    process_time_ms=f"{process_time:.2f}",
+                    request_id=request_id,
+                )
+
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
         except Exception as e:
-            process_time = (time.time() - start_time) * 1000
-            logger.error(
-                f"Failed request: {request.method} {request.url.path} "
-                f"- Error: {str(e)} - Process Time: {process_time:.2f}ms"
+            process_time = (time.perf_counter() - start_time) * 1000
+
+            await logger.aerror(
+                "Request failed",
+                error=str(e),
+                method=method,
+                path=path,
+                process_time_ms=f"{process_time:.2f}",
+                request_id=request_id,
             )
-            raise e
+            raise

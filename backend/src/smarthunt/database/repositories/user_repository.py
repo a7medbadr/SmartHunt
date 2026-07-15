@@ -9,5 +9,7 @@ class UserRepository(BaseRepository[User]):
         super().__init__(session, User)
 
     async def get_by_username(self, username: str):
-        result = await self.session.execute(select(User).where(User.username == username))
+        result = await self.session.execute(
+            select(User).where(User.username == username)
+        )
         return result.scalar_one_or_none()

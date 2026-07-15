@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: smarthunt-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=smarthunt
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  valkey:
+    image: valkey/valkey:8
+    container_name: smarthunt-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smarthunt-backend-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - valkey
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+
+volumes:
+  postgres_data:
