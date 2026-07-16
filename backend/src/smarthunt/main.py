@@ -1,6 +1,7 @@
 import structlog
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from smarthunt.middleware.request_id import RequestIDMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .core.config import settings
@@ -35,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.add_middleware(RequestIDMiddleware)
 
 # Include API Routers
 app.include_router(api_router, prefix=API_V1_STR)
