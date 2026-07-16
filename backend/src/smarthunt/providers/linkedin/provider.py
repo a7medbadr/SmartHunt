@@ -1,14 +1,19 @@
 from smarthunt.providers.base.provider import BaseProvider
+from typing import Any
 
 class LinkedInProvider(BaseProvider):
     name = "linkedin"
+    supports_login = True
+    supports_apply = True
+    supports_resume_upload = True
+    supports_cover_letter = True
 
-    async def search(self, query=None, location=None, page=1, limit=10):
-        return [{
-            "id": 1,
-            "title": "Senior Linux System Administrator",
-            "provider": self.name,
-            "location": "Riyadh",
-            "salary": 15000,
-            "score": 91,
-        }]
+    async def search(
+        self,
+        query: str | None,
+        location: str | None,
+        page: int,
+        limit: int,
+    ) -> Any:
+        # TODO: Implement actual LinkedIn search logic
+        return {"provider": self.name, "results": [], "page": page, "limit": limit}

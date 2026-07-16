@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Query
 from smarthunt.search import search_service
 
-router = APIRouter(tags=["search"])
-
+router = APIRouter(prefix="", tags=["search"])
 
 @router.get("/jobs")
 async def search_jobs(
