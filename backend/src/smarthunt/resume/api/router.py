@@ -1,3 +1,4 @@
+from smarthunt.resume.services.persistence import service
 from fastapi import APIRouter, UploadFile, File
 
 from smarthunt.resume.storage.storage import save_resume
@@ -14,6 +15,8 @@ async def upload_resume(file: UploadFile = File(...)):
     )
 
     text = extract_text(path)
+
+    saved=await service.save(file.filename,text)
 
     return {
         "filename": file.filename,

@@ -18,3 +18,20 @@ async def recommendations():
             "Platform Engineer"
         ]
     }
+
+@router.get("/details")
+async def details():
+
+    return {
+
+        "overall":91,
+
+        "skills":95,
+
+        "experience":92,
+
+        "education":88,
+
+        "keywords":90
+
+    }

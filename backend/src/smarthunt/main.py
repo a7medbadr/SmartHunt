@@ -7,6 +7,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from .core.config import settings
 from smarthunt.logging.config import configure_logging
 from .api.routes import auth, health, jobs, providers
+from .api.routes.system import router as system_router
 from smarthunt.matching.api.router import router as matching_router
 from smarthunt.resume.api import list_router
 from smarthunt.resume.api.router import router as resume_router
@@ -51,7 +52,8 @@ app.add_middleware(
 app.add_middleware(RequestIDMiddleware)
 
 # Include API Routers (كل شيء تحت /api/v1)
-app.include_router(api_router, prefix=API_V1_STR)
+app.include_router(api_router,prefix=API_V1_STR)
+app.include_router(system_router,prefix=f"{API_V1_STR}/system",tags=["System"])
 
 # Initialize and expose Prometheus Metrics safely without crashing on nested routers
 Instrumentator(
