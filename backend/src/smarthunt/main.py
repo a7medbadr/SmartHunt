@@ -1,16 +1,58 @@
-from fastapi import FastAPI
-from smarthunt.core.lifecycle import lifespan
+import structlog
+from fastapi import FastAPI, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
-# المسارات الصحيحة للـ routers
-from smarthunt.api.routes.auth import router as auth_router
-from smarthunt.api.routes.jobs import router as jobs_router
-from smarthunt.api.routes.providers import router as providers_router
-from smarthunt.api.routes.health import router as health_router
+from .core.config import settings
+from .api.routes import auth, health, jobs, providers
 
-app = FastAPI(lifespan=lifespan)
+logger = structlog.get_logger()
 
-# تسجيل الـ routers
-app.include_router(auth_router, prefix="/api/v1/auth")
-app.include_router(jobs_router, prefix="/api/v1/jobs")
-app.include_router(providers_router, prefix="/api/v1/providers")
-app.include_router(health_router, prefix="/api/v1/health")
+# Default API Version Prefix
+API_V1_STR = "/api/v1"
+
+# Create a master router
+api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(health.router, prefix="/health", tags=["health"])
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    openapi_url=f"{API_V1_STR}/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# Configure CORS
+allow_origins = ["*"] if settings.app_debug else []
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API Routers
+app.include_router(api_router, prefix=API_V1_STR)
+
+# Initialize and expose Prometheus Metrics safely without crashing on nested routers
+Instrumentator(
+    should_group_untemplated=False, 
+    should_ignore_untemplated=True
+).instrument(app).expose(
+    app,
+    endpoint=f"{API_V1_STR}/metrics",
+    tags=["Metrics"]
+)
+
+@app.on_event("startup")
+async def startup_event():
+    await logger.ainfo("Starting up SmartHunt Backend Application", project_name=settings.app_name)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await logger.ainfo("Shutting down SmartHunt Backend Application")
