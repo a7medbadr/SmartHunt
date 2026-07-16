@@ -3,9 +3,11 @@ from fastapi import APIRouter, UploadFile, File
 
 from smarthunt.resume.storage.storage import save_resume
 from smarthunt.resume.parser.parser import extract_text
+from smarthunt.resume.api.stats_router import router as stats_router
 
 router = APIRouter()
 
+router.include_router(stats_router)
 
 @router.post("/upload")
 async def upload_resume(file: UploadFile = File(...)):
