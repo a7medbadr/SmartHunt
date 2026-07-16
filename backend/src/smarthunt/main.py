@@ -7,6 +7,8 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from .core.config import settings
 from smarthunt.logging.config import configure_logging
 from .api.routes import auth, health, jobs, providers
+from smarthunt.matching.api.router import router as matching_router
+from smarthunt.resume.api import list_router
 from smarthunt.resume.api.router import router as resume_router
 
 logger = structlog.get_logger()
@@ -21,6 +23,10 @@ api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
 api_router.include_router(resume_router, prefix="/resume", tags=["resume"])
+
+# إضافة المسارات الجديدة داخل الـ Master Router المركزي لتجنب مشاكل الـ Prefixes
+api_router.include_router(matching_router, prefix="/matching", tags=["Matching"])
+api_router.include_router(list_router.router, prefix="/resumes", tags=["Resume"])
 
 configure_logging()
 
@@ -44,7 +50,7 @@ app.add_middleware(
 
 app.add_middleware(RequestIDMiddleware)
 
-# Include API Routers
+# Include API Routers (كل شيء تحت /api/v1)
 app.include_router(api_router, prefix=API_V1_STR)
 
 # Initialize and expose Prometheus Metrics safely without crashing on nested routers
