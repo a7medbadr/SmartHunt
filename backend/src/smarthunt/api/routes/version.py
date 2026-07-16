@@ -5,8 +5,9 @@ router = APIRouter()
 @router.get("")
 async def version():
     return {
-        "application": "SmartHunt",
+        "name": "SmartHunt",
         "version": "1.0.0",
-        "api": "v1",
-        "status": "stable"
+        "git": "latest",
+        "environment": "sandbox",
+        "python": "3.12"
     }
