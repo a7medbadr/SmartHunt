@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any
+import sys
 from smarthunt.providers.registry.registry import ProviderRegistry
 
 class SearchService:
@@ -33,12 +34,21 @@ class SearchService:
                     page=page,
                     limit=limit,
                 )
-                jobs.extend(result)
-            except Exception:
+                # التأكد الصارم أن النتيجة عبارة عن قائمة (List)
+                if result and isinstance(result, list):
+                    for job in result:
+                        # والتأكد أن كل وظيفة عبارة عن Dictionary وليس String أو أي شيء آخر
+                        if isinstance(job, dict):
+                            jobs.extend([job])
+                        else:
+                            print(f"--> [WARNING] Provider {p.name} returned a non-dict item: {type(job)}", file=sys.stderr, flush=True)
+            except BaseException as e:
+                print(f"--> [DEBUG] Provider {p.name} failed with error: {str(e)}", file=sys.stderr, flush=True)
                 continue
 
+        # الترتيب بأمان الآن بعد ضمان أن كل العناصر قواميس ولديها دالة get
         jobs.sort(
-            key=lambda x: x.get("score", 0),
+            key=lambda x: x.get("score", 0) if isinstance(x, dict) else 0,
             reverse=True,
         )
 
