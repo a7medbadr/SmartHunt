@@ -69,3 +69,5 @@ rendered.yaml
 __pycache__/
 *.pyc
 
+
+github-secrets.md

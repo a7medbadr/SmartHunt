@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smarthunt-backend-fixed
+  namespace: a-badr-dev
+  labels:
+    app: smarthunt
+    component: backend
+spec:
+  containers:
+  - name: backend
+    image: image-registry.openshift-image-registry.svc:5000/a-badr-dev/smarthunt-backend:latest
+    ports:
+    - containerPort: 8000
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    envFrom:
+    - configMapRef:
+        name: smarthunt-config
+    - secretRef:
+        name: smarthunt-secret
