@@ -25,8 +25,9 @@ api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
 api_router.include_router(resume_router, prefix="/resume", tags=["resume"])
+api_router.include_router(version_router, prefix="/version", tags=["version"])
 
-# إضافة المسارات الجديدة داخل الـ Master Router المركزي لتجنب مشاكل الـ Prefixes
+# Include secondary routers into master router
 api_router.include_router(matching_router, prefix="/matching", tags=["Matching"])
 api_router.include_router(list_router.router, prefix="/resumes", tags=["Resume"])
 
@@ -52,12 +53,11 @@ app.add_middleware(
 
 app.add_middleware(RequestIDMiddleware)
 
-# Include API Routers (كل شيء تحت /api/v1)
-app.include_router(api_router,prefix=API_V1_STR)
-app.include_router(system_router,prefix=f"{API_V1_STR}/system",tags=["System"])
-app.include_router(version_router,prefix=f"{API_V1_STR}/version",tags=["Version"])
+# Include API Routers under /api/v1 prefix
+app.include_router(api_router, prefix=API_V1_STR)
+app.include_router(system_router, prefix=f"{API_V1_STR}/system", tags=["System"])
 
-# Initialize and expose Prometheus Metrics safely without crashing on nested routers
+# Initialize and expose Prometheus Metrics safely
 Instrumentator(
     should_group_untemplated=False,
     should_ignore_untemplated=True
