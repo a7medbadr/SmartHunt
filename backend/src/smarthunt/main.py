@@ -7,6 +7,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from .core.config import settings
 from smarthunt.logging.config import configure_logging
 from .api.routes import auth, health, jobs, providers
+from smarthunt.resume.api import router as resume_router
 
 logger = structlog.get_logger()
 
@@ -19,6 +20,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
+api_router.include_router(resume_router.router, prefix="/resume", tags=["resume"])
 
 
 configure_logging()
