@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from smarthunt.shared.pagination import PaginationMeta
 
 class JobItem(BaseModel):
     id: int
@@ -10,5 +11,4 @@ class JobItem(BaseModel):
 
 class SearchResponse(BaseModel):
     items: List[JobItem]
-    count: int
-    page: int
+    pagination: PaginationMeta
