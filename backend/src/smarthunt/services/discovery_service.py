@@ -25,8 +25,7 @@ class DiscoveryService:
         # إعداد الـ Executor والتنفيذ بالتوازي
         executor = ProviderExecutor(timeout=20)
         tasks = [
-            executor.execute(provider, keyword, location)
-            for provider in self.registry.get_all()
+            executor.execute(provider, keyword, location) for provider in self.registry.get_all()
         ]
         results = await asyncio.gather(*tasks)
 

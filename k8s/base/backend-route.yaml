@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: smarthunt-backend
+  labels:
+    app: smarthunt
+    component: backend
+spec:
+  to:
+    kind: Service
+    name: smarthunt-backend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

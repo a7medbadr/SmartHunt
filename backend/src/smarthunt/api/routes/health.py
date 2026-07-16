@@ -1,13 +1,7 @@
-from datetime import UTC, datetime
-
 from fastapi import APIRouter
+from datetime import datetime
 
-from smarthunt.api.schemas.health import HealthResponse
-
-router = APIRouter(
-    prefix="/health",
-    tags=["health"],
-)
+router = APIRouter(tags=["health"])
 
 
 @router.get("/live")
@@ -20,14 +14,11 @@ async def ready():
     return {"status": "ready"}
 
 
-@router.get(
-    "/info",
-    response_model=HealthResponse,
-)
+@router.get("/info")
 async def info():
-    return HealthResponse(
-        status="ok",
-        service="SmartHunt",
-        version="1.0.0",
-        timestamp=datetime.now(UTC),
-    )
+    return {
+        "status": "ok",
+        "service": "smarthunt-backend",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+    }

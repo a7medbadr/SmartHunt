@@ -22,9 +22,7 @@ class RequestLoggingMiddleware:
         path = scope.get("path", "")
         method = scope.get("method", "")
 
-        await logger.ainfo(
-            "Incoming request", method=method, path=path, request_id=request_id
-        )
+        await logger.ainfo("Incoming request", method=method, path=path, request_id=request_id)
 
         start_time = time.perf_counter()
 

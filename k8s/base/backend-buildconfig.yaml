@@ -1,0 +1,23 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: smarthunt-backend
+  labels:
+    app: smarthunt
+    component: backend
+
+spec:
+  runPolicy: Serial
+
+  source:
+    type: Binary
+
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: backend/Dockerfile
+
+  output:
+    to:
+      kind: ImageStreamTag
+      name: smarthunt-backend:latest

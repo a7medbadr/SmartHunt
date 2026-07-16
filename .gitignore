@@ -49,3 +49,23 @@ coverage.xml
 
 # Misc
 .cache/
+
+# Helm
+dist/
+rendered.yaml
+
+# Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# VSCode
+.vscode/
+
+# IDE
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+

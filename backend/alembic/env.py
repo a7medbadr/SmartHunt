@@ -15,9 +15,7 @@ if config.config_file_name is not None:
 target_metadata = None
 
 # قراءة الرابط مباشرة من البيئة
-db_url = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/smarthunt"
-)
+db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/smarthunt")
 
 
 def run_migrations_offline() -> None:

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ include "smarthunt.fullname" . }}
+
+  labels:
+{{ include "smarthunt.labels" . | indent 4 }}
+
+spec:
+
+  replicas: {{ .Values.replicaCount }}
+
+  revisionHistoryLimit: 5
+
+  selector:
+    matchLabels:
+{{ include "smarthunt.labels" . | indent 6 }}
+
+  template:
+
+    metadata:
+      labels:
+{{ include "smarthunt.labels" . | indent 8 }}
+
+    spec:
+
+      containers:
+
+      - name: backend
+
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+        ports:
+
+        - containerPort: {{ .Values.containerPort }}
+
+        envFrom:
+
+        - configMapRef:
+            name: smarthunt-config
+
+        - secretRef:
+            name: smarthunt-secret
+
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health/live
+            port: {{ .Values.containerPort }}
+
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health/ready
+            port: {{ .Values.containerPort }}
+
+        startupProbe:
+          httpGet:
+            path: /api/v1/health/live
+            port: {{ .Values.containerPort }}
+          failureThreshold: 30
+          periodSeconds: 5

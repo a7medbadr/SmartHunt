@@ -1,0 +1,41 @@
+replicaCount: 1
+
+image:
+
+  repository: image-registry.openshift-image-registry.svc:5000/a-badr-dev/smarthunt-backend
+
+  tag: latest
+
+  pullPolicy: Always
+
+service:
+
+  type: ClusterIP
+
+  port: 80
+
+containerPort: 8000
+
+resources:
+
+  requests:
+
+    cpu: 100m
+
+    memory: 256Mi
+
+  limits:
+
+    cpu: 500m
+
+    memory: 512Mi
+
+route:
+
+  enabled: true
+
+config:
+
+  APP_ENV: production
+
+  LOG_LEVEL: INFO

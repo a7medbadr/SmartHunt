@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+
+  name: {{ include "smarthunt.fullname" . }}
+
+spec:
+
+  selector:
+{{ include "smarthunt.labels" . | indent 4 }}
+
+  ports:
+
+  - port: {{ .Values.service.port }}
+
+    targetPort: {{ .Values.containerPort }}
+
+  type: {{ .Values.service.type }}
