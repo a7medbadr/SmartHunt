@@ -1,76 +1,41 @@
-import structlog
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from smarthunt.middleware.request_id import RequestIDMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from .core.config import settings
-from smarthunt.logging.config import configure_logging
-from .api.routes import auth, health, jobs, providers
-from .api.routes.system import router as system_router
-from .api.routes.version import router as version_router
-from smarthunt.matching.api.router import router as matching_router
-from smarthunt.resume.api import list_router
-from smarthunt.resume.api.router import router as resume_router
-
-logger = structlog.get_logger()
-
-# Default API Version Prefix
-API_V1_STR = "/api/v1"
-
-# Create a master router
-api_router = APIRouter()
-api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(health.router, prefix="/health", tags=["health"])
-api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
-api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
-api_router.include_router(resume_router, prefix="/resume", tags=["resume"])
-api_router.include_router(version_router, prefix="/version", tags=["version"])
-
-# Include secondary routers into master router
-api_router.include_router(matching_router, prefix="/matching", tags=["Matching"])
-api_router.include_router(list_router.router, prefix="/resumes", tags=["Resume"])
-
-configure_logging()
+from smarthunt.api.routes import auth, health, jobs, providers, resume, system, matching
+from smarthunt.search.router import router as search_router
 
 app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
-    openapi_url=f"{API_V1_STR}/openapi.json",
+    title="SmartHunt API",
+    version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc",
+    redoc_url="/redoc"
 )
 
-# Configure CORS
-allow_origins = ["*"] if settings.app_debug else []
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.add_middleware(RequestIDMiddleware)
+# تسجيل الـ Routers الأساسية
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
+app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
+app.include_router(providers.router, prefix="/api/v1/providers", tags=["Providers"])
+app.include_router(resume.router, prefix="/api/v1/resume", tags=["Resume"])
+app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
+app.include_router(matching.router, prefix="/api/v1/matching", tags=["Matching"])
 
-# Include API Routers under /api/v1 prefix
-app.include_router(api_router, prefix=API_V1_STR)
-app.include_router(system_router, prefix=f"{API_V1_STR}/system", tags=["System"])
+# تسجيل موديول البحث الجديد
+app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 
-# Initialize and expose Prometheus Metrics safely
-Instrumentator(
-    should_group_untemplated=False,
-    should_ignore_untemplated=True
-).instrument(app).expose(
-    app,
-    endpoint=f"{API_V1_STR}/metrics",
-    tags=["Metrics"]
-)
-
-@app.on_event("startup")
-async def startup_event():
-    await logger.ainfo("Starting up SmartHunt Backend Application", project_name=settings.app_name)
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await logger.ainfo("Shutting down SmartHunt Backend Application")
+@app.get("/api/v1/version")
+async def get_version():
+    return {
+        "name": "SmartHunt",
+        "version": "1.0.0",
+        "git": "latest",
+        "environment": "sandbox",
+        "python": "3.12"
+    }
