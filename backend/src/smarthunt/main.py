@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from smarthunt.api.routes import auth, health, jobs, providers, resume, system, matching
+from smarthunt.api.routes import auth, health, jobs, providers, system, matching
 from smarthunt.search.router import router as search_router
 
 app = FastAPI(
@@ -23,7 +23,6 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 app.include_router(providers.router, prefix="/api/v1/providers", tags=["Providers"])
-app.include_router(resume.router, prefix="/api/v1/resume", tags=["Resume"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
 app.include_router(matching.router, prefix="/api/v1/matching", tags=["Matching"])
 
