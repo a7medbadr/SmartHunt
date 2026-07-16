@@ -1,29 +1,20 @@
 from fastapi import APIRouter, Query
-from typing import Optional
-from smarthunt.search.service import search_service
-from smarthunt.search.schemas import SearchResponse
+from smarthunt.search import search_service
 
-router = APIRouter()
+router = APIRouter(prefix="/search", tags=["search"])
 
-@router.get("/jobs", response_model=SearchResponse)
+@router.get("/jobs")
 async def search_jobs(
-    title: Optional[str] = Query(None),
-    location: Optional[str] = Query(None),
-    provider: Optional[str] = Query(None),
+    title: str | None = Query(None, alias="title"),
+    location: str | None = Query(None),
+    provider: str | None = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1),
+    limit: int = Query(10, ge=1, le=100),
 ):
-    result = await search_service.search_jobs(
-        title=title,
+    return await search_service.search(
+        query=title,
         location=location,
         provider=provider,
         page=page,
         limit=limit,
     )
-    return {
-        "items": result.items,
-        "total": result.total,
-        "page": result.page,
-        "limit": result.limit,
-        "pages": result.pages,
-    }

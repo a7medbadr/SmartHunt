@@ -1,71 +1,55 @@
-from smarthunt.providers import registry
-from smarthunt.search.deduplication import DeduplicationEngine
-from smarthunt.search.ranking import RankingEngine
-from smarthunt.search.models import SearchJobItem, SearchResult
+from __future__ import annotations
+from typing import Any
+from smarthunt.providers.registry.registry import ProviderRegistry
 
 class SearchService:
-    async def search_jobs(
+    def __init__(self) -> None:
+        self.registry = ProviderRegistry()
+
+    async def search(
         self,
-        title: str | None,
-        location: str | None,
-        provider: str | None,
-        page: int,
-        limit: int,
-    ) -> SearchResult:
-        providers = registry.all()
+        query: str | None = None,
+        location: str | None = None,
+        provider: str | None = None,
+        page: int = 1,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+
+        jobs = []
+        providers = self.registry.providers()
+
         if provider:
-            providers = [p for p in providers if p.name == provider]
+            providers = [
+                p
+                for p in providers
+                if p.name.lower() == provider.lower()
+            ]
 
-        raw_jobs = []
         for p in providers:
-            raw_jobs.extend(
-                await p.search(
-                    keyword=title or "",
-                    location=location,
-                )
-            )
-
-        unique_jobs = DeduplicationEngine.deduplicate(raw_jobs)
-        ranked_jobs = RankingEngine.rank_jobs(unique_jobs)
-
-        mapped_items = []
-        for idx, (job, score, details) in enumerate(ranked_jobs, start=1):
             try:
-                sal_val = int(job.salary) if job.salary else None
-            except ValueError:
-                sal_val = None
-
-            mapped_items.append(
-                SearchJobItem(
-                    id=idx,
-                    title=job.title,
-                    location=job.location,
-                    provider=job.provider,
-                    salary=sal_val,
-                    experience="senior" if "senior" in job.title.lower() else "mid",
-                    remote=job.remote,
-                    onsite=not job.remote,
-                    hybrid=False,
-                    country=job.country,
-                    city=job.city,
-                    score=score,
-                    match_details=details
+                result = await p.search(
+                    query=query,
+                    location=location,
+                    page=page,
+                    limit=limit,
                 )
-            )
+                jobs.extend(result)
+            except Exception:
+                continue
 
-        if location:
-            mapped_items = [item for item in mapped_items if location.lower() in item.location.lower()]
-
-        total = len(mapped_items)
-        start = (page - 1) * limit
-        end = start + limit
-        items = mapped_items[start:end]
-
-        return SearchResult(
-            items=items,
-            total=total,
-            page=page,
-            limit=limit,
+        jobs.sort(
+            key=lambda x: x.get("score", 0),
+            reverse=True,
         )
 
-search_service = SearchService()
+        total = len(jobs)
+        start = (page - 1) * limit
+        end = start + limit
+
+        return {
+            "items": jobs[start:end],
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": (total + limit - 1) // limit,
+        }

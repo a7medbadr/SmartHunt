@@ -1,8 +1,14 @@
-from smarthunt.providers.base.provider import JobProvider
-from smarthunt.providers.models.job import Job
+from smarthunt.providers.base.provider import BaseProvider
 
-class WuzzufProvider(JobProvider):
+class WuzzufProvider(BaseProvider):
     name = "wuzzuf"
 
-    async def search(self, keyword: str, location: str | None = None) -> list[Job]:
-        return []
+    async def search(self, query=None, location=None, page=1, limit=10):
+        return [{
+            "id": 5,
+            "title": "Python Backend Developer (FastAPI)",
+            "provider": self.name,
+            "location": "Cairo",
+            "salary": 45000,
+            "score": 82,
+        }]

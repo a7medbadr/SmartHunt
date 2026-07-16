@@ -1,14 +1,14 @@
 from smarthunt.providers.base.provider import BaseProvider
 
-class GulfTalentProvider(BaseProvider):
-    name = "gulftalent"
+class DrjobsProvider(BaseProvider):
+    name = "drjobs"
 
     async def search(self, query=None, location=None, page=1, limit=10):
         return [{
-            "id": 3,
-            "title": "Infrastructure Engineer",
+            "id": 10,
+            "title": "OpenShift Platform Specialist",
             "provider": self.name,
             "location": "Riyadh",
-            "salary": 14000,
-            "score": 85,
+            "salary": 17500,
+            "score": 94,
         }]
