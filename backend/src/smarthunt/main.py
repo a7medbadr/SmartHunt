@@ -5,6 +5,7 @@ from smarthunt.middleware.request_id import RequestIDMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .core.config import settings
+from smarthunt.logging.config import configure_logging
 from .api.routes import auth, health, jobs, providers
 
 logger = structlog.get_logger()
@@ -18,6 +19,9 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(providers.router, prefix="/providers", tags=["providers"])
+
+
+configure_logging()
 
 app = FastAPI(
     title=settings.app_name,
