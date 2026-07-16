@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+
+metadata:
+  name: smarthunt
+
+spec:
+
+  project: default
+
+  source:
+
+    repoURL: https://github.com/a7medbadr/SmartHunt.git
+
+    targetRevision: master
+
+    path: helm/smarthunt
+
+    helm: {}
+
+  destination:
+
+    server: https://kubernetes.default.svc
+
+    namespace: a-badr-dev
+
+  syncPolicy:
+
+    automated:
+
+      prune: true
+
+      selfHeal: true
+
+    syncOptions:
+
+      - CreateNamespace=true

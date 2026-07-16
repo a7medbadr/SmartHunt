@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+
+kind: AppProject
+
+metadata:
+
+  name: smarthunt
+
+spec:
+
+  description: SmartHunt Platform
+
+  sourceRepos:
+
+    - '*'
+
+  destinations:
+
+    - namespace: '*'
+      server: '*'
+
+  clusterResourceWhitelist:
+
+    - group: '*'
+      kind: '*'
