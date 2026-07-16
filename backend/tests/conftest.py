@@ -2,6 +2,7 @@ import os
 import sys
 import pytest
 from httpx import AsyncClient, ASGITransport
+from asgi_lifespan import LifespanManager
 
 # إضافة المسار الصحيح للـ backend/src
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -13,8 +14,9 @@ from smarthunt.main import app  # noqa: E402
 
 @pytest.fixture
 async def client():
-    # تشغيل الـ lifespan الخاص بالتطبيق يدوياً لضمان بناء وإغلاق قاعدة البيانات
-    async with app.router.lifespan_context(app):
-        transport = ASGITransport(app=app)
+    # LifespanManager بيبعت startup/shutdown events للـ app
+    # (لازم لو عندك DB connection أو أي حاجة بتتظبط في startup)
+    async with LifespanManager(app) as manager:
+        transport = ASGITransport(app=manager.app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac

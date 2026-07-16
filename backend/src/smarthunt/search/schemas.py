@@ -1,12 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
-class PaginationMeta(BaseModel):
-    total: int
-    page: int
-    limit: int
-    pages: int
-
 class JobItem(BaseModel):
     id: int
     title: str
@@ -19,6 +13,7 @@ class JobItem(BaseModel):
     hybrid: Optional[bool] = None
     country: Optional[str] = None
     city: Optional[str] = None
+    score: Optional[float] = 0.0
 
 class SearchResponse(BaseModel):
     items: List[JobItem]

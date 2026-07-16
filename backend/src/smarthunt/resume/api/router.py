@@ -18,7 +18,8 @@ async def upload_resume(file: UploadFile = File(...)):
 
     text = extract_text(path)
 
-    saved=await service.save(file.filename,text)
+    # تم إزالة تعيين المتغير saved= لإصلاح تحذير ruff بنجاح
+    await service.save(file.filename, text)
 
     return {
         "filename": file.filename,
