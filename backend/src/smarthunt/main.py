@@ -13,13 +13,12 @@ from smarthunt.api.routes import (
 )
 from smarthunt.search.router import router as search_router
 from smarthunt.providers.api.router import router as new_providers_router
+from smarthunt.providers.health.router import router as provider_health_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # عند تشغيل التطبيق: تهيئة قاعدة البيانات
     await db_session.create_engine()
     yield
-    # عند إغلاق التطبيق: قفل الاتصال بقاعدة البيانات
     await db_session.close_engine()
 
 app = FastAPI(
@@ -44,6 +43,8 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(jobs_router, prefix="/api/v1/jobs", tags=["Jobs"])
 app.include_router(old_providers_router, prefix="/api/v1/providers_old", tags=["Providers_Old"])
 app.include_router(scheduler_router, prefix="/api/v1/scheduler", tags=["Scheduler"])
-
 app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
+
+# تسجيل الـ Providers المطور والـ Health بتاعه جنبه بالظبط
 app.include_router(new_providers_router, prefix="/api/v1/providers", tags=["Providers"])
+app.include_router(provider_health_router, prefix="/api/v1/providers", tags=["Provider Health"])

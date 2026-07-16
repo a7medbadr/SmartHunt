@@ -25,7 +25,7 @@ async def search_jobs(
     except Exception as e:
         # هنطبع الـ stack trace كامل في الترمنال عشان نشوف السطر اللي ضرب فين بالظبط
         print("="*60, file=sys.stderr)
-        print(f"!!! [CRITICAL ERROR] In /search/jobs:", file=sys.stderr)
+        print("!!! [CRITICAL ERROR] In /search/jobs:", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         print("="*60, file=sys.stderr)
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
