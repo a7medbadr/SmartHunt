@@ -1,7 +1,8 @@
 from pathlib import Path
 from uuid import uuid4
 
-UPLOAD_DIR = Path("uploads/resumes")
+# استخدام /tmp لتفادي مشاكل صلاحيات الكتابة في بيئة OpenShift
+UPLOAD_DIR = Path("/tmp/uploads/resumes")
 
 
 def save_resume(filename: str, content: bytes) -> Path:
