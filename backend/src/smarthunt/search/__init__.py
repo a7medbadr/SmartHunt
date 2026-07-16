@@ -1,3 +1,1 @@
-from smarthunt.search.service import SearchService
-
-service = SearchService()
+from smarthunt.search.service import search_service

@@ -15,3 +15,5 @@ class SearchService:
                 )
             )
         return jobs
+
+search_service = SearchService()
