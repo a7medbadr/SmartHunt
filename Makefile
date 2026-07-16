@@ -1,20 +1,23 @@
-lint:
-	cd backend && uv run ruff check .
+build:
+	oc start-build smarthunt-backend --from-dir=. --wait
 
-format-check:
-	cd backend && uv run black .
+deploy:
+	oc rollout restart deployment/smarthunt-backend
 
-test:
-	cd backend && uv run pytest --envfile=../.env
+status:
+	oc rollout status deployment/smarthunt-backend
 
-compile:
-	cd backend && uv run python -m compileall src
+logs:
+	oc logs deployment/smarthunt-backend -f
 
-helm-lint:
-	helm lint helm/smarthunt
+pods:
+	oc get pods
 
-helm-template:
-	helm template smarthunt helm/smarthunt >/dev/null
+route:
+	oc get route
 
-docker-build:
-	docker build -t smarthunt-backend:latest backend
+health:
+	curl -k https://$(shell oc get route smarthunt-backend -o jsonpath='{.spec.host}')/api/v1/health/live
+
+metrics:
+	curl -k https://$(shell oc get route smarthunt-backend -o jsonpath='{.spec.host}')/api/v1/metrics

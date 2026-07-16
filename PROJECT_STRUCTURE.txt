@@ -1,0 +1,319 @@
+.
+├── Abdelrazek_Badr_CV.pdf
+├── assets
+├── backend
+│   ├── alembic
+│   │   ├── env.py
+│   │   ├── .env.py.swo
+│   │   ├── .env.py.swp
+│   │   ├── README
+│   │   ├── script.py.mako
+│   │   └── versions
+│   │       ├── b8d5d9f1d8a9_create_users_table.py
+│   │       ├── bb20af5a7c5f_create_jobs_table.py
+│   │       └── e2fdd783e4aa_create_resumes_table.py
+│   ├── alembic.ini
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── .gitignore
+│   ├── migrations
+│   ├── pyproject.toml
+│   ├── .pytest_cache
+│   │   ├── CACHEDIR.TAG
+│   │   ├── .gitignore
+│   │   ├── README.md
+│   │   └── v
+│   │       └── cache
+│   │           └── nodeids
+│   ├── pytest.ini
+│   ├── requirements.txt
+│   ├── .ruff_cache
+│   │   ├── 0.15.21
+│   │   │   ├── 11218984381829417024
+│   │   │   ├── 11627740700175912496
+│   │   │   ├── 11666772584895682351
+│   │   │   ├── 12024666434496511441
+│   │   │   ├── 13309902544089389098
+│   │   │   ├── 14788421528089103709
+│   │   │   ├── 1516706664361736024
+│   │   │   ├── 15778885747496958502
+│   │   │   ├── 17183392511417903769
+│   │   │   ├── 18044884469921517653
+│   │   │   ├── 2006467198830251241
+│   │   │   ├── 2111867200994312619
+│   │   │   ├── 2342975581808755704
+│   │   │   ├── 2489423187653652823
+│   │   │   ├── 2532277269039256272
+│   │   │   ├── 2782205995820348364
+│   │   │   ├── 2806222375770917006
+│   │   │   ├── 3331333978984908113
+│   │   │   ├── 3874624860227644233
+│   │   │   ├── 4355431257010737287
+│   │   │   ├── 6706385979364428990
+│   │   │   ├── 8970261479146041649
+│   │   │   └── 9470193270421495651
+│   │   ├── 0.15.22
+│   │   │   ├── 1069734586401461412
+│   │   │   ├── 10975846551601951682
+│   │   │   ├── 13513904221906871321
+│   │   │   ├── 14601735913726120233
+│   │   │   ├── 14840069064890385036
+│   │   │   ├── 15112419386108398405
+│   │   │   ├── 2083487773249783889
+│   │   │   ├── 2747691778074437061
+│   │   │   ├── 2952472059726212911
+│   │   │   ├── 4592057622498983028
+│   │   │   ├── 625107097024887535
+│   │   │   ├── 6272437897636708381
+│   │   │   ├── 6613802053717591385
+│   │   │   ├── 7997067136222973746
+│   │   │   └── 934277521627533171
+│   │   ├── CACHEDIR.TAG
+│   │   └── .gitignore
+│   ├── scripts
+│   │   ├── test_browser.py
+│   │   ├── test_database.py
+│   │   ├── test_password.py
+│   │   ├── test_provider.py
+│   │   └── test_settings.py
+│   ├── src
+│   │   ├── smarthunt
+│   │   │   ├── agents
+│   │   │   │   └── __init__.py
+│   │   │   ├── ai
+│   │   │   │   └── __init__.py
+│   │   │   ├── analytics
+│   │   │   │   └── __init__.py
+│   │   │   ├── api
+│   │   │   │   ├── dependencies
+│   │   │   │   │   ├── database.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── routes
+│   │   │   │   │   ├── auth.py
+│   │   │   │   │   ├── health.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── jobs.py
+│   │   │   │   │   ├── providers.py
+│   │   │   │   │   ├── scheduler.py
+│   │   │   │   │   ├── system.py
+│   │   │   │   │   └── version.py
+│   │   │   │   └── schemas
+│   │   │   │       ├── common.py
+│   │   │   │       ├── health.py
+│   │   │   │       ├── __init__.py
+│   │   │   │       ├── job.py
+│   │   │   │       ├── provider.py
+│   │   │   │       └── search.py
+│   │   │   ├── auth
+│   │   │   │   ├── schemas
+│   │   │   │   │   ├── auth.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── security
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── jwt.py
+│   │   │   │   │   └── password.py
+│   │   │   │   └── services
+│   │   │   │       └── auth_service.py
+│   │   │   ├── browser
+│   │   │   │   ├── base.py
+│   │   │   │   ├── core
+│   │   │   │   │   ├── browser.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── provider_executor.py
+│   │   │   │   ├── provider_result.py
+│   │   │   │   ├── providers
+│   │   │   │   │   ├── base.py
+│   │   │   │   │   ├── example_provider.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── mock_provider2.py
+│   │   │   │   │   └── mock_provider.py
+│   │   │   │   └── registry
+│   │   │   │       ├── __init__.py
+│   │   │   │       └── registry.py
+│   │   │   ├── core
+│   │   │   │   ├── config.py
+│   │   │   │   ├── constants.py
+│   │   │   │   ├── exceptions.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── lifecycle.py
+│   │   │   │   └── logging.py
+│   │   │   ├── cover_letter
+│   │   │   │   └── __init__.py
+│   │   │   ├── database
+│   │   │   │   ├── base.py
+│   │   │   │   ├── health.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── models
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── job.py
+│   │   │   │   │   ├── resume.py
+│   │   │   │   │   └── user.py
+│   │   │   │   ├── repositories
+│   │   │   │   │   ├── base.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── job_repository.py
+│   │   │   │   │   └── user_repository.py
+│   │   │   │   └── session.py
+│   │   │   ├── debug_settings.py
+│   │   │   ├── domain
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── job.py
+│   │   │   ├── __init__.py
+│   │   │   ├── integrations
+│   │   │   │   └── __init__.py
+│   │   │   ├── logging
+│   │   │   │   └── config.py
+│   │   │   ├── main.py
+│   │   │   ├── matching
+│   │   │   │   ├── api
+│   │   │   │   │   └── router.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── services
+│   │   │   │       ├── recommendation.py
+│   │   │   │       └── scoring.py
+│   │   │   ├── metrics
+│   │   │   │   ├── business.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── instrumentation.py
+│   │   │   ├── middleware
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── request_id.py
+│   │   │   │   └── request_logging.py
+│   │   │   ├── notifications
+│   │   │   │   └── __init__.py
+│   │   │   ├── recruitment
+│   │   │   │   └── __init__.py
+│   │   │   ├── resume
+│   │   │   │   ├── api
+│   │   │   │   │   ├── list_router.py
+│   │   │   │   │   ├── router.py
+│   │   │   │   │   └── stats_router.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── parser
+│   │   │   │   │   └── parser.py
+│   │   │   │   ├── repositories
+│   │   │   │   │   └── repository.py
+│   │   │   │   ├── services
+│   │   │   │   │   └── persistence.py
+│   │   │   │   └── storage
+│   │   │   │       └── storage.py
+│   │   │   ├── scheduler
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── jobs.py
+│   │   │   │   └── scheduler.py
+│   │   │   ├── services
+│   │   │   │   ├── discovery_service.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── init.py
+│   │   │   │   ├── job_service.py
+│   │   │   │   ├── provider_service.py
+│   │   │   │   ├── scheduler_service.py
+│   │   │   │   └── scraper_service.py
+│   │   │   ├── shared
+│   │   │   │   ├── exceptions.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── logging.py
+│   │   │   │   └── observability
+│   │   │   │       └── context.py
+│   │   │   └── tracing
+│   │   │       ├── __init__.py
+│   │   │       └── tracer.py
+│   │   └── smarthunt_backend.egg-info
+│   │       ├── dependency_links.txt
+│   │       ├── PKG-INFO
+│   │       ├── requires.txt
+│   │       ├── SOURCES.txt
+│   │       └── top_level.txt
+│   ├── tests
+│   │   ├── conftest.py
+│   │   ├── test_auth.py
+│   │   └── test_jobs.py
+│   ├── uploads
+│   │   └── resumes
+│   └── uv.lock
+├── backend-naked-pod.yaml
+├── CHANGELOG.md
+├── configs
+├── docker
+├── docker-compose.yml
+├── docs
+│   ├── adr
+│   ├── api
+│   ├── architecture
+│   ├── database
+│   ├── diagrams
+│   └── runbooks
+├── .editorconfig
+├── .env
+├── .env.example
+├── frontend
+├── get_helm.sh
+├── .gitattributes
+├── .github
+│   ├── CODEOWNERS
+│   ├── ISSUE_TEMPLATE
+│   ├── PULL_REQUEST_TEMPLATE
+│   └── workflows
+│       ├── ci.yml
+│       └── container.yml
+├── github-secrets.md
+├── .gitignore
+├── gitops
+│   ├── apps
+│   │   └── smarthunt.yaml
+│   ├── base
+│   ├── projects
+│   │   └── smarthunt-project.yaml
+│   └── README.md
+├── helm
+│   └── smarthunt
+│       ├── Chart.yaml
+│       ├── templates
+│       │   ├── configmap.yaml
+│       │   ├── deployment.yaml
+│       │   ├── _helpers.tpl
+│       │   ├── route.yaml
+│       │   └── service.yaml
+│       └── values.yaml
+├── k8s
+│   └── base
+│       ├── backend-buildconfig.yaml
+│       ├── backend-configmap.yaml
+│       ├── backend-deployment.yaml
+│       ├── backend-imagestream.yaml
+│       ├── backend-route.yaml
+│       ├── backend-secret.yaml
+│       ├── backend-service.yaml
+│       └── github-actions-serviceaccount.yaml
+├── LICENSE
+├── Makefile
+├── monitoring
+│   ├── grafana
+│   │   └── provisioning
+│   │       └── datasources
+│   │           └── prometheus.yaml
+│   ├── loki
+│   └── prometheus
+│       └── prometheus.yml
+├── PROJECT_STRUCTURE.txt
+├── pyproject.toml
+├── .pytest_cache
+│   ├── CACHEDIR.TAG
+│   ├── .gitignore
+│   ├── README.md
+│   └── v
+│       └── cache
+│           ├── lastfailed
+│           └── nodeids
+├── README.md
+├── rendered.yaml
+├── .ruff_cache
+│   ├── 0.15.21
+│   ├── CACHEDIR.TAG
+│   └── .gitignore
+├── scripts
+└── uv.lock
+
+95 directories, 222 files
