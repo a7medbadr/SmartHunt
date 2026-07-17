@@ -1,4 +1,3 @@
-from smarthunt.search.service import SearchService
-from .repository import JobRepository as JobRepository
+from smarthunt.search.service import search_service
 
-search_service = SearchService()
+__all__ = ["search_service"]

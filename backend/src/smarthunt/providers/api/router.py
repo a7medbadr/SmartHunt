@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from smarthunt.providers.registry.registry import ProviderRegistry
+from smarthunt.providers.registry import ProviderRegistry
 from smarthunt.providers.statistics import provider_stats
 
 router = APIRouter()

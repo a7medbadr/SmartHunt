@@ -1,3 +1,3 @@
-from smarthunt.providers.registry.registry import ProviderRegistry
+from smarthunt.providers.registry import ProviderRegistry, provider_registry
 
-registry = ProviderRegistry()
+__all__ = ["ProviderRegistry", "provider_registry"]

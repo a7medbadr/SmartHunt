@@ -39,39 +39,4 @@ class JobService:
             raise
 
     async def delete_job(self, job_id: int) -> bool:
-        job = await self.repository.get(job_id)
-
-        if job is None:
-            return False
-
-        await self.repository.delete(job_id)
-
-        return True
-
-    async def filter_jobs(
-        self,
-        keyword: str | None,
-        company: str | None,
-        location: str | None,
-        source: str | None,
-        page: int,
-        size: int,
-    ):
-        return await self.repository.filter_jobs(
-            keyword=keyword,
-            company=company,
-            location=location,
-            source=source,
-            page=page,
-            size=size,
-        )
-
-    async def sorted_jobs(
-        self,
-        sort_by: str,
-        order: str,
-    ):
-        return await self.repository.sorted_jobs(
-            sort_by,
-            order,
-        )
+        return await self.repository.delete(job_id)

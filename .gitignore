@@ -73,3 +73,8 @@ __pycache__/
 github-secrets.md
 backend/uploads/
 *.pdf
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/

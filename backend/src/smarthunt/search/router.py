@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, Depends, HTTPException
 import traceback
 import sys
-from smarthunt.search import search_service
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.database.session import get_db
+from smarthunt.services.search_service import SearchService
 
 router = APIRouter(prefix="", tags=["search"])
+
 
 @router.get("/jobs")
 async def search_jobs(
@@ -12,8 +16,10 @@ async def search_jobs(
     provider: str | None = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
+    session: AsyncSession = Depends(get_db),
 ):
     try:
+        search_service = SearchService(session)
         res = await search_service.search(
             query=title,
             location=location,
@@ -23,9 +29,10 @@ async def search_jobs(
         )
         return res
     except Exception as e:
-        # هنطبع الـ stack trace كامل في الترمنال عشان نشوف السطر اللي ضرب فين بالظبط
-        print("="*60, file=sys.stderr)
+        print("=" * 60, file=sys.stderr)
         print("!!! [CRITICAL ERROR] In /search/jobs:", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        print("="*60, file=sys.stderr)
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        print("=" * 60, file=sys.stderr)
+        raise HTTPException(
+            status_code=500, detail=f"Internal Server Error: {str(e)}"
+        )

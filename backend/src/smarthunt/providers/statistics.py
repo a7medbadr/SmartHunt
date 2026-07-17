@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from smarthunt.providers.registry.registry import ProviderRegistry
+from smarthunt.providers.registry import ProviderRegistry
 
 
 class ProviderStatistics:
