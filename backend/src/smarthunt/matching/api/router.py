@@ -1,37 +1,21 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
+from smarthunt.matching.services.matcher import match
 
-router = APIRouter()
+router = APIRouter(prefix="/matching", tags=["matching"])
 
-@router.get("/score")
-async def score():
-    return {
-        "score":91,
-        "status":"excellent"
-    }
 
-@router.get("/recommendations")
-async def recommendations():
-    return {
-        "recommendations":[
-            "Senior Linux Engineer",
-            "OpenShift Administrator",
-            "Platform Engineer"
-        ]
-    }
+class MatchRequest(BaseModel):
+    resume: str
+    job: str
 
-@router.get("/details")
-async def details():
 
-    return {
+class MatchResponse(BaseModel):
+    score: int
+    matched_skills: list[str]
+    missing_skills: list[str]
 
-        "overall":91,
 
-        "skills":95,
-
-        "experience":92,
-
-        "education":88,
-
-        "keywords":90
-
-    }
+@router.post("", response_model=MatchResponse)
+async def match_resume_to_job(payload: MatchRequest):
+    return match(resume_text=payload.resume, job_text=payload.job)

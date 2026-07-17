@@ -1,5 +1,4 @@
 import io
-import pytest
 from fastapi.testclient import TestClient
 from smarthunt.main import app
 
