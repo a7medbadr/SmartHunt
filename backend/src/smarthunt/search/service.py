@@ -37,10 +37,25 @@ class SearchService:
                 result = await item.search(
                     query=query,
                     location=location,
+                    page=page,
+                    limit=limit,
                 )
 
-                if result:
-                    jobs.extend(result)
+                # Providers currently return one of two shapes:
+                #   - a dict: {"provider": ..., "results": [...], ...}
+                #   - a bare list: [{...}, {...}]
+                # Normalize both into a plain list of job dicts.
+                if isinstance(result, dict):
+                    provider_jobs = result.get("results") or []
+                elif isinstance(result, list):
+                    provider_jobs = result
+                else:
+                    provider_jobs = []
+
+                for job in provider_jobs:
+                    job.setdefault("provider", provider_name)
+
+                jobs.extend(provider_jobs)
 
                 self.monitor.success(provider_name)
 

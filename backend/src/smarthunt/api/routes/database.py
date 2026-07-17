@@ -16,7 +16,7 @@ async def database_jobs():
             "items": [
                 {
                     "id": x.id,
-                    "provider": x.provider,
+                    "provider": getattr(x, "source", None),
                     "title": x.title,
                     "location": x.location,
                     "salary": x.salary,
