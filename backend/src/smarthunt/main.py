@@ -17,6 +17,9 @@ from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.search.history_router import router as search_history_router
 from smarthunt.search.database_router import router as database_jobs_router
 from smarthunt.api.routes.database import router as database_router
+from smarthunt.api.routes.provider_statistics import router as provider_statistics_router
+from smarthunt.api.routes.search_metrics import router as search_metrics_router
+from smarthunt.api.routes.database_statistics import router as database_statistics_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +52,9 @@ app.include_router(scheduler_router, prefix="/api/v1/scheduler", tags=["Schedule
 app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 app.include_router(new_providers_router, prefix="/api/v1/providers", tags=["Providers"])
 app.include_router(provider_health_router, prefix="/api/v1/providers", tags=["Provider Health"])
+app.include_router(provider_statistics_router, prefix="/api/v1")
+app.include_router(search_metrics_router, prefix="/api/v1")
+app.include_router(database_statistics_router, prefix="/api/v1")
 app.include_router(search_history_router)
 app.include_router(database_jobs_router)
 app.include_router(database_router, prefix="/api/v1")

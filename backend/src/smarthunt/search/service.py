@@ -6,6 +6,7 @@ from smarthunt.database import session as db_session
 from smarthunt.database.repositories.job_repository import JobRepository
 from smarthunt.providers.registry.registry import ProviderRegistry
 from smarthunt.providers.health.monitor import monitor
+from smarthunt.search.metrics import increment
 
 
 class SearchService:
@@ -42,8 +43,8 @@ class SearchService:
                 )
 
                 # Providers currently return one of two shapes:
-                #   - a dict: {"provider": ..., "results": [...], ...}
-                #   - a bare list: [{...}, {...}]
+                #    - a dict: {"provider": ..., "results": [...], ...}
+                #    - a bare list: [{...}, {...}]
                 # Normalize both into a plain list of job dicts.
                 if isinstance(result, dict):
                     provider_jobs = result.get("results") or []
@@ -91,6 +92,8 @@ class SearchService:
                 repo = JobRepository(session)
 
                 await repo.save_many(paged)
+
+        increment()
 
         return {
             "jobs": paged,
