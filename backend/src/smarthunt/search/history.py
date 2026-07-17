@@ -1,17 +1,11 @@
-from collections import deque
-
-_HISTORY = deque(maxlen=100)
-
-
-def save(query: str, provider: str, results: int):
-    _HISTORY.append(
-        {
-            "query": query,
-            "provider": provider,
-            "results": results,
-        }
-    )
-
+# قائمة/كائن حفظ السجل المؤقت
+_history = []
 
 def all():
-    return list(_HISTORY)
+    return _history
+
+def add(item):
+    _history.append(item)
+
+def clear():
+    _history.clear()

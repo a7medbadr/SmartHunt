@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from smarthunt.search.history import all
+from smarthunt.search.history import all, clear
 
 router = APIRouter(
     prefix="/api/v1/search",
@@ -10,7 +10,18 @@ router = APIRouter(
 
 @router.get("/history")
 async def history():
+    items = all()
     return {
-        "items": all(),
-        "count": len(all()),
+        "items": items,
+        "count": len(items),
+    }
+
+
+@router.delete("/history")
+async def clear_history():
+    clear()
+    items = all()
+    return {
+        "status": "cleared",
+        "searches": len(items),
     }
