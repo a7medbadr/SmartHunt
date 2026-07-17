@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import Any
 import sys
 from smarthunt.providers.registry.registry import ProviderRegistry
-from smarthunt.providers.health.monitor import ProviderHealthMonitor
+from smarthunt.providers.health.monitor import monitor
 
 class SearchService:
     def __init__(self) -> None:
         self.registry = ProviderRegistry()
-        self.monitor = ProviderHealthMonitor()
+        self.monitor = monitor
 
     async def search(
         self,
@@ -43,12 +43,10 @@ class SearchService:
                         else:
                             print(f"--> [WARNING] Provider {p.name} returned a non-dict item: {type(job)}", file=sys.stderr, flush=True)
                 
-                # [خطوة 3]: تسجيل النجاح في الـ Monitor
                 self.monitor.success(p.name)
 
             except BaseException as e:
                 print(f"--> [DEBUG] Provider {p.name} failed with error: {str(e)}", file=sys.stderr, flush=True)
-                # [خطوة 4]: تسجيل الفشل في الـ Monitor عند حدوث Exception
                 self.monitor.failure(p.name)
                 continue
 
