@@ -6,8 +6,8 @@ from smarthunt.database import session as db_session
 from smarthunt.database.repositories.job_repository import JobRepository
 from smarthunt.providers.registry.registry import ProviderRegistry
 from smarthunt.providers.health.monitor import monitor
-from smarthunt.search.metrics import increment
 from smarthunt.search.cache import cache
+from smarthunt.search.metrics import metrics
 
 
 class SearchService:
@@ -25,10 +25,14 @@ class SearchService:
     ) -> dict[str, Any]:
 
         key = f"{query}:{location}:{provider}:{page}:{limit}"
+        metrics.search()
+
         cached = cache.get(key)
         if cached:
+            metrics.cache_hit()
             return cached
 
+        metrics.provider_call()
         jobs: list[dict] = []
 
         providers = self.registry.providers()
@@ -94,8 +98,6 @@ class SearchService:
                 repo = JobRepository(session)
 
                 await repo.save_many(paged)
-
-        increment()
 
         response_data = {
             "jobs": paged,

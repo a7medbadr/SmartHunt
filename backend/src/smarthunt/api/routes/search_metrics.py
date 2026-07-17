@@ -1,12 +1,10 @@
 from fastapi import APIRouter
 
-from smarthunt.search.metrics import total
+from smarthunt.search.metrics import metrics
 
-router = APIRouter(prefix="/search", tags=["Search Metrics"])
+router = APIRouter(tags=["Search Metrics"])
 
 
-@router.get("/metrics")
-async def metrics():
-    return {
-        "total_searches": total()
-    }
+@router.get("/search/metrics")
+async def get_search_metrics():
+    return {"total_searches": metrics.total_searches}

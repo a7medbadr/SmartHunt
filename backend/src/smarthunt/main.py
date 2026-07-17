@@ -16,6 +16,7 @@ from smarthunt.search.history_router import router as search_history_router
 from smarthunt.search.database_router import router as database_jobs_router
 from smarthunt.search.cache_router import router as cache_router
 from smarthunt.search.cache_admin_router import router as cache_admin_router
+from smarthunt.search.metrics_router import router as search_metrics_details_router
 from smarthunt.providers.api.router import router as new_providers_router
 from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.api.routes.database import router as database_router
@@ -61,4 +62,5 @@ app.include_router(search_history_router)
 app.include_router(database_jobs_router)
 app.include_router(cache_router, prefix="/api/v1")
 app.include_router(cache_admin_router, prefix="/api/v1")
+app.include_router(search_metrics_details_router, prefix="/api/v1")
 app.include_router(database_router, prefix="/api/v1")
