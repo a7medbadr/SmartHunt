@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
 
 
@@ -17,7 +17,7 @@ class ProviderHealthMonitor:
 
             self._status[provider] = {
                 "healthy": True,
-                "last_success": datetime.utcnow().isoformat(),
+                "last_success": datetime.now(timezone.utc).isoformat(),
                 "last_failure": self._status.get(provider, {}).get("last_failure"),
             }
 
@@ -28,7 +28,7 @@ class ProviderHealthMonitor:
             self._status[provider] = {
                 "healthy": False,
                 "last_success": self._status.get(provider, {}).get("last_success"),
-                "last_failure": datetime.utcnow().isoformat(),
+                "last_failure": datetime.now(timezone.utc).isoformat(),
             }
 
     def status(self):

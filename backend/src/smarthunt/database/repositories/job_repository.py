@@ -7,10 +7,10 @@ class JobRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def exists(self, provider: str, title: str, location: str) -> bool:
+    async def exists(self, source: str, title: str, location: str) -> bool:
         result = await self.session.execute(
             select(Job).where(
-                Job.provider == provider,
+                Job.source == source,
                 Job.title == title,
                 Job.location == location,
             )
@@ -19,21 +19,48 @@ class JobRepository:
 
     async def save_many(self, jobs: list[dict]) -> int:
         inserted = 0
+        valid_columns = Job.__table__.columns.keys()
+
         for item in jobs:
+            job_data = item.copy()
+
+            # Remove explicit 'id' if present so database manages auto-increment primary key
+            job_data.pop("id", None)
+
+            # Map 'provider' to 'source' if needed
+            if "provider" in job_data and "source" not in job_data:
+                job_data["source"] = job_data.pop("provider")
+
+            # Fallback for required non-null fields
+            if not job_data.get("company"):
+                job_data["company"] = "N/A"
+
+            # Fallback for url if missing or empty
+            if not job_data.get("url"):
+                source = job_data.get("source", "unknown")
+                title_slug = job_data.get("title", "job").lower().replace(" ", "-")
+                job_data["url"] = f"https://{source}.com/jobs/{title_slug}-{inserted}"
+
+            # Check existence
             if await self.exists(
-                item["provider"],
-                item["title"],
-                item["location"],
+                job_data.get("source", ""),
+                job_data.get("title", ""),
+                job_data.get("location", ""),
             ):
                 continue
-            self.session.add(Job(**item))
+
+            # Filter data to only include valid columns for the Job model
+            clean_data = {k: v for k, v in job_data.items() if k in valid_columns}
+
+            self.session.add(Job(**clean_data))
             inserted += 1
+
         await self.session.commit()
         return inserted
 
     async def list_all(self):
         result = await self.session.execute(
-            select(Job).order_by(Job.score.desc())
+            select(Job).order_by(Job.id.desc())
         )
         return result.scalars().all()
 
