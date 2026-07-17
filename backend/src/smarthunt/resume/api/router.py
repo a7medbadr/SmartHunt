@@ -1,29 +1,19 @@
-from smarthunt.resume.services.persistence import service
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, File, UploadFile
+from smarthunt.resume.services.persistence import resume_service
 
-from smarthunt.resume.storage.storage import save_resume
-from smarthunt.resume.parser.parser import extract_text
-from smarthunt.resume.api.stats_router import router as stats_router
+router = APIRouter(tags=["Resume"])
 
-router = APIRouter()
-
-router.include_router(stats_router)
 
 @router.post("/upload")
 async def upload_resume(file: UploadFile = File(...)):
-    path = save_resume(
-        file.filename,
-        await file.read(),
-    )
+    return await resume_service.upload_resume(file)
 
-    text = extract_text(path)
 
-    # تم إزالة تعيين المتغير saved= لإصلاح تحذير ruff بنجاح
-    await service.save(file.filename, text)
+@router.get("")
+async def get_resume():
+    return resume_service.get_resume()
 
-    return {
-        "filename": file.filename,
-        "stored_as": str(path),
-        "characters": len(text),
-        "preview": text[:500],
-    }
+
+@router.delete("")
+async def delete_resume():
+    return resume_service.delete_resume()

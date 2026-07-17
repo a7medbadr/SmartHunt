@@ -24,6 +24,7 @@ from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.api.routes.database import router as database_router
 from smarthunt.api.routes.search_metrics import router as search_metrics_router
 from smarthunt.api.routes.database_statistics import router as database_statistics_router
+from smarthunt.resume.api.router import router as resume_router
 
 
 @asynccontextmanager
@@ -70,6 +71,7 @@ app.include_router(scheduler_router, prefix="/api/v1/scheduler", tags=["Schedule
 app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 app.include_router(new_providers_router, prefix="/api/v1/providers", tags=["Providers"])
 app.include_router(provider_health_router, prefix="/api/v1/providers", tags=["Provider Health"])
+app.include_router(resume_router, prefix="/api/v1/resume", tags=["Resume"])
 app.include_router(search_metrics_router, prefix="/api/v1")
 app.include_router(database_statistics_router, prefix="/api/v1")
 app.include_router(search_history_router)

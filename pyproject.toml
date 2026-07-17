@@ -12,6 +12,7 @@ dependencies = [
     # ربط الـ backend كـ dependency محلي ومباشر لدمج كافة مكتباته في البيئة الموحدة
     "smarthunt-backend",
     "asgi-lifespan>=2.1.0",
+    "python-multipart>=0.0.32",
 ]
 
 [tool.uv]
