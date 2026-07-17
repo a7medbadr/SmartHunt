@@ -1,29 +1,50 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Core Routes
-from smarthunt.api.routes.auth import router as auth_router
-from smarthunt.api.routes.jobs import router as jobs_router
-
-# Feature Routers
+from smarthunt.api.routes import health
+from smarthunt.core.config import settings
+from smarthunt.database.session import close_db, init_db
 from smarthunt.matching.api.router import router as matching_router
-from smarthunt.resume.api.router import router as resume_router
-from smarthunt.search.router import router as search_router
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting SmartHunt application...")
+    await init_db()
+    yield
+    logger.info("Shutting down SmartHunt application...")
+    await close_db()
+
 
 app = FastAPI(
-    title="SmartHunt API",
-    version="0.1.0",
-    docs_url="/docs",
-    openapi_url="/api/v1/openapi.json",
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
-# Register Routers with full prefixes
-app.include_router(auth_router, prefix="/api/v1/auth")
-app.include_router(jobs_router, prefix="/api/v1/jobs")
-app.include_router(matching_router, prefix="/api/v1")
-app.include_router(resume_router, prefix="/api/v1/resume")
-app.include_router(search_router, prefix="/api/v1/search")
+if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.include_router(health.router, prefix=settings.API_V1_STR, tags=["health"])
+app.include_router(matching_router, prefix=settings.API_V1_STR, tags=["matching"])
 
 
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok"}
+@app.get("/")
+async def root():
+    return {
+        "message": "Welcome to SmartHunt API",
+        "docs": "/docs",
+        "health": f"{settings.API_V1_STR}/health/live",
+    }
