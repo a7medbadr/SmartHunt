@@ -1,48 +1,50 @@
-import asyncio
 import logging
-from typing import List, Optional
-from smarthunt.browser.registry import ProviderRegistry
-from smarthunt.database.models.job import Job
+from typing import Dict, List, Optional, Any
+from smarthunt.providers.base.provider import BaseProvider
 
 logger = logging.getLogger(__name__)
 
 
 class ProviderManager:
-    def __init__(self, registry: Optional[ProviderRegistry] = None):
-        self.registry = registry or ProviderRegistry()
+    """Manager class to handle registry and lifecycle of job providers."""
 
-    async def search_all(
-        self,
-        query: Optional[str] = None,
-        location: Optional[str] = None,
-    ) -> List[Job]:
-        # التوافق مع Property أو Method
-        providers_attr = getattr(self.registry, "providers", [])
-        providers = providers_attr() if callable(providers_attr) else providers_attr
+    def __init__(self) -> None:
+        self._providers: Dict[str, BaseProvider] = {}
 
-        if not providers:
-            logger.info("No providers found in registry.")
-            return []
+    def register_provider(self, provider: BaseProvider) -> None:
+        """Register a new job provider instance."""
+        if not provider.name:
+            raise ValueError("Provider name cannot be empty")
+        self._providers[provider.name] = provider
+        logger.info(f"Registered provider: {provider.name}")
 
-        tasks = [
-            provider.search(
-                query=query,
-                location=location,
-            )
-            for provider in providers
+    def get_provider(self, name: str) -> Optional[BaseProvider]:
+        """Get provider by name."""
+        return self._providers.get(name)
+
+    def get_all_providers(self) -> List[Dict[str, Any]]:
+        """Get summary info for all registered providers."""
+        return [
+            {
+                "name": p.name,
+                "supports_login": getattr(p, "supports_login", False),
+                "supports_apply": getattr(p, "supports_apply", False),
+                "supports_resume_upload": getattr(p, "supports_resume_upload", False),
+                "supports_cover_letter": getattr(p, "supports_cover_letter", False),
+            }
+            for p in self._providers.values()
         ]
 
-        results = await asyncio.gather(
-            *tasks,
-            return_exceptions=True,
-        )
+    def get_statistics(self) -> Dict[str, int]:
+        """Get capability statistics across registered providers."""
+        providers = list(self._providers.values())
+        return {
+            "total": len(providers),
+            "supports_login": sum(1 for p in providers if getattr(p, "supports_login", False)),
+            "supports_apply": sum(1 for p in providers if getattr(p, "supports_apply", False)),
+            "supports_resume_upload": sum(1 for p in providers if getattr(p, "supports_resume_upload", False)),
+            "supports_cover_letter": sum(1 for p in providers if getattr(p, "supports_cover_letter", False)),
+        }
 
-        all_jobs: List[Job] = []
-        for result in results:
-            if isinstance(result, Exception):
-                logger.warning(f"Provider search raised exception: {result}")
-                continue
-            if isinstance(result, list):
-                all_jobs.extend(result)
 
-        return all_jobs
+provider_manager = ProviderManager()
