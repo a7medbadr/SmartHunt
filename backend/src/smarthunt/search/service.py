@@ -22,7 +22,7 @@ class SearchService:
         
         # 1. شغل كود البحث الأصلي
         jobs = []
-        providers = self.registry.providers()
+        # providers = self.registry.providers()
         
         # 2. حفظ الـ jobs الناتجة جوه الـ Database باستخدام الـ Factory المتاح
         if jobs and db_session.AsyncSessionLocal:
