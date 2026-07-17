@@ -15,6 +15,7 @@ from smarthunt.search.router import router as search_router
 from smarthunt.providers.api.router import router as new_providers_router
 from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.search.history_router import router as search_history_router
+from smarthunt.search.database_router import router as database_jobs_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,5 +51,8 @@ app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 app.include_router(new_providers_router, prefix="/api/v1/providers", tags=["Providers"])
 app.include_router(provider_health_router, prefix="/api/v1/providers", tags=["Provider Health"])
 
-# ربط الـ Search History Router المطلوب
+# ربط الـ Search History Router
 app.include_router(search_history_router)
+
+# ربط الـ Database Jobs Router الجديد المطلوب
+app.include_router(database_jobs_router)
