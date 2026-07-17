@@ -8,6 +8,9 @@ router = APIRouter(prefix="/database", tags=["Database Statistics"])
 
 @router.get("/statistics")
 async def database_statistics():
+    if not AsyncSessionLocal:
+        return {"jobs": 0}
+
     async with AsyncSessionLocal() as session:
         repo = JobRepository(session)
         jobs = await repo.get_all()
