@@ -1,35 +1,45 @@
-from collections.abc import AsyncGenerator
+import os
+from typing import AsyncGenerator
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from smarthunt.core.config import settings
+from sqlalchemy.orm import DeclarativeBase
 
-engine = None
-AsyncSessionLocal = None
+load_dotenv()
 
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt")
 
-async def create_engine():
-    global engine, AsyncSessionLocal
+# Async Engine
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True
+)
 
-    engine = create_async_engine(
-        settings.database_url,
-        echo=settings.app_debug,
-        future=True,
-        pool_pre_ping=True,
-    )
+# Async Session Factory
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
 
-    AsyncSessionLocal = async_sessionmaker(
-        bind=engine,
-        autoflush=False,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+# Base Class for SQLAlchemy Models
+class Base(DeclarativeBase):
+    pass
 
-
-async def close_engine():
-    global engine
-    if engine:
-        await engine.dispose()
-
-
+# Dependency for FastAPI
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+async def close_engine() -> None:
+    """Called on app shutdown to dispose the engine cleanly."""
+    await engine.dispose()

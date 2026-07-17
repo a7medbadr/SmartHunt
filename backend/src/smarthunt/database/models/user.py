@@ -1,7 +1,11 @@
+from typing import TYPE_CHECKING, List
 from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from smarthunt.database.base import Base
+
+if TYPE_CHECKING:
+    from smarthunt.database.models.search_history import SearchHistory
 
 
 class User(Base):
@@ -24,4 +28,11 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+    )
+
+    # العلاقة التي تتوافق مع SearchHistory
+    search_histories: Mapped[List["SearchHistory"]] = relationship(
+        "SearchHistory",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )

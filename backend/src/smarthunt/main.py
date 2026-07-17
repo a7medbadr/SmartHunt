@@ -28,7 +28,6 @@ from smarthunt.api.routes.database_statistics import router as database_statisti
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db_session.create_engine()
     yield
     await db_session.close_engine()
 

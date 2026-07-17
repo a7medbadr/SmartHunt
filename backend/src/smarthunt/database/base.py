@@ -1,7 +1,3 @@
-from sqlalchemy.orm import DeclarativeBase
+from smarthunt.database.session import Base
 
-
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
-
-    pass
+__all__ = ["Base"]

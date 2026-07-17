@@ -12,7 +12,7 @@ class JobCreate(BaseModel):
 
 
 class JobResponse(BaseModel):
-    id: int
+    id: str
     title: str
     company: str
     location: str

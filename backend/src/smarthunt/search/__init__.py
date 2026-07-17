@@ -1,3 +1,1 @@
-from smarthunt.search.service import search_service
-
-__all__ = ["search_service"]
+# Keep empty or export only non-dependent objects to prevent circular imports
