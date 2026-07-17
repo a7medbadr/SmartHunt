@@ -19,8 +19,8 @@ async def database_jobs():
                     "provider": getattr(x, "source", None),
                     "title": x.title,
                     "location": x.location,
-                    "salary": x.salary,
-                    "score": x.score,
+                    "salary": getattr(x, "salary", None),
+                    "score": getattr(x, "score", None),
                 }
                 for x in rows
             ],

@@ -19,8 +19,8 @@ async def jobs():
                     "provider": getattr(job, "source", None),
                     "title": job.title,
                     "location": job.location,
-                    "salary": job.salary,
-                    "score": job.score,
+                    "salary": getattr(job, "salary", None),
+                    "score": getattr(job, "score", None),
                 }
                 for job in rows
             ],
