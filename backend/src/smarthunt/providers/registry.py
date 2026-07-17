@@ -1,45 +1,38 @@
-import asyncio
-import logging
-from typing import List, Dict, Any
+from __future__ import annotations
 
-logger = logging.getLogger("smarthunt.providers")
+from typing import List
+
+from smarthunt.providers.base.provider import BaseProvider
+from smarthunt.providers.bayt.provider import BaytProvider
+from smarthunt.providers.drjobs.provider import DrjobsProvider
+from smarthunt.providers.forasnagulf.provider import ForasnagulfProvider
+from smarthunt.providers.gulftalent.provider import GulfTalentProvider
+from smarthunt.providers.indeed.provider import IndeedProvider
+from smarthunt.providers.linkedin.provider import LinkedInProvider
+from smarthunt.providers.monstergulf.provider import MonstergulfProvider
+from smarthunt.providers.naukrigulf.provider import NaukrigulfProvider
+from smarthunt.providers.tanqeeb.provider import TanqeebProvider
+from smarthunt.providers.wuzzuf.provider import WuzzufProvider
+from smarthunt.providers.wzayef.provider import WzayefProvider
 
 
 class ProviderRegistry:
-    def __init__(self):
-        self._providers = {}
-        self._health_status = {}
-
-    def register(self, name: str, provider_instance):
-        self._providers[name] = provider_instance
-        self._health_status[name] = {"healthy": True, "last_error": None}
-
-    async def fetch_from_provider_safe(self, name: str, instance) -> List[Dict[str, Any]]:
-        try:
-            # Execute provider fetch
-            if hasattr(instance, "fetch_jobs"):
-                return await instance.fetch_jobs()
-            return []
-        except Exception as exc:
-            logger.error(f"Provider '{name}' failed: {exc}. Marking unhealthy and returning empty gracefully.")
-            self._health_status[name] = {"healthy": False, "last_error": str(exc)}
-            return []
-
-    async def fetch_all_jobs_safe(self) -> List[Dict[str, Any]]:
-        tasks = [
-            self.fetch_from_provider_safe(name, instance)
-            for name, instance in self._providers.items()
+    def providers(self) -> List[BaseProvider]:
+        """Returns a list of all registered job search providers."""
+        return [
+            LinkedInProvider(),
+            IndeedProvider(),
+            GulfTalentProvider(),
+            BaytProvider(),
+            WuzzufProvider(),
+            NaukrigulfProvider(),
+            MonstergulfProvider(),
+            WzayefProvider(),
+            TanqeebProvider(),
+            DrjobsProvider(),
+            ForasnagulfProvider(),
         ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        all_jobs = []
-        for res in results:
-            if isinstance(res, list):
-                all_jobs.extend(res)
-        return all_jobs
-
-    def get_health_status(self) -> Dict[str, Any]:
-        return self._health_status
 
 
+# Backward-compatible singleton instance (some modules import this name directly)
 provider_registry = ProviderRegistry()

@@ -1,4 +1,5 @@
 from typing import List, Tuple, Any
+
 from sqlalchemy import select, func, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +32,55 @@ class JobRepository:
             return True
         return False
 
+    async def exists(self, source: str, title: str, location: str | None) -> bool:
+        result = await self.session.execute(
+            select(Job).where(
+                Job.source == source,
+                Job.title == title,
+                Job.location == location,
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def save_many(self, jobs: list[dict]) -> int:
+        """Persist job dicts coming from providers. Skips duplicates
+        (same source + title + location) and maps 'provider' -> 'source'."""
+        inserted = 0
+        valid_columns = Job.__table__.columns.keys()
+
+        for item in jobs:
+            job_data = item.copy()
+
+            # id is auto-generated (UUID default) — never accept an external id
+            job_data.pop("id", None)
+
+            # Map 'provider' to 'source' since the Job model only has 'source'
+            if "provider" in job_data:
+                job_data["source"] = job_data.pop("provider")
+
+            if not job_data.get("company"):
+                job_data["company"] = "N/A"
+
+            if not job_data.get("url"):
+                source = job_data.get("source", "unknown")
+                title_slug = str(job_data.get("title", "job")).lower().replace(" ", "-")
+                job_data["url"] = f"https://{source}.com/jobs/{title_slug}-{inserted}"
+
+            if await self.exists(
+                job_data.get("source", ""),
+                job_data.get("title", ""),
+                job_data.get("location"),
+            ):
+                continue
+
+            clean_data = {k: v for k, v in job_data.items() if k in valid_columns}
+
+            self.session.add(Job(**clean_data))
+            inserted += 1
+
+        await self.session.commit()
+        return inserted
+
     async def search_jobs(self, params: Any) -> Tuple[List[Job], int]:
         query = select(Job)
 
@@ -41,8 +91,9 @@ class JobRepository:
             query = query.where(Job.company.ilike(f"%{params.company}%"))
         if getattr(params, "location", None):
             query = query.where(Job.location.ilike(f"%{params.location}%"))
-        if getattr(params, "provider", None) and hasattr(Job, "provider"):
-            query = query.where(Job.provider == params.provider.lower())
+        # Job has 'source', not 'provider' — filter provider queries against it
+        if getattr(params, "provider", None):
+            query = query.where(Job.source.ilike(f"%{params.provider}%"))
 
         # Count total matches before applying offset/limit
         count_query = select(func.count()).select_from(query.subquery())
@@ -68,5 +119,4 @@ class JobRepository:
 
         result = await self.session.execute(query)
         jobs = result.scalars().all()
-
         return list(jobs), total_count
