@@ -1,135 +1,116 @@
+from typing import Optional, List, Dict, Any
 from types import SimpleNamespace
-from typing import Any, Dict
-
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from smarthunt.database.repositories.job_repository import JobRepository
-from smarthunt.database.repositories.search_history_repository import SearchHistoryRepository
-from smarthunt.providers.registry import ProviderRegistry
-from smarthunt.providers.health.monitor import monitor
 
 
 class SearchService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Optional[AsyncSession] = None):
         self.session = session
-        self.repository = JobRepository(session)
-        self.history_repo = SearchHistoryRepository(session)
-        self.registry = ProviderRegistry()
-        self.monitor = monitor
-
-    async def _fetch_from_providers(
-        self,
-        query: str | None,
-        location: str | None,
-        provider: str | None,
-        page: int,
-        limit: int,
-    ) -> list[dict]:
-        """Calls every registered provider, normalizes their response shape,
-        and returns a flat list of job dicts. Never raises — failures are
-        recorded in the health monitor instead."""
-        collected: list[dict] = []
-
-        for item in self.registry.providers():
-            provider_name = item.name.lower()
-
-            if provider and provider_name != provider.lower():
-                continue
-
-            try:
-                result = await item.search(
-                    query=query,
-                    location=location,
-                    page=page,
-                    limit=limit,
-                )
-
-                # Providers currently return one of two shapes:
-                #   - a dict: {"provider": ..., "results": [...], ...}
-                #   - a bare list: [{...}, {...}]
-                if isinstance(result, dict):
-                    provider_jobs = result.get("results") or []
-                elif isinstance(result, list):
-                    provider_jobs = result
-                else:
-                    provider_jobs = []
-
-                for job in provider_jobs:
-                    job.setdefault("provider", provider_name)
-
-                collected.extend(provider_jobs)
-                self.monitor.success(provider_name)
-
-            except Exception:
-                self.monitor.failure(provider_name)
-
-        return collected
+        self.job_repo = JobRepository(session) if session else JobRepository()
 
     async def search(
         self,
         query: str | None = None,
+        company: str | None = None,
         location: str | None = None,
         provider: str | None = None,
+        salary_min: int | None = None,
+        salary_max: int | None = None,
+        score_min: int | None = None,
+        score_max: int | None = None,
+        sort: str = "score",
+        order: str = "desc",
         page: int = 1,
         limit: int = 10,
     ) -> Dict[str, Any]:
 
-        # 1. Pull fresh results from providers and persist any new ones
-        fresh_jobs = await self._fetch_from_providers(
-            query=query,
-            location=location,
-            provider=provider,
-            page=page,
-            limit=limit,
-        )
-        if fresh_jobs:
-            await self.repository.save_many(fresh_jobs)
-
-        # 2. Serve the paginated result set from the database
-        #    (single source of truth after providers have written into it)
+        # 1. إعداد الـ params كـ Namespace لتوافق مع JobRepository.search_jobs(params)
         params = SimpleNamespace(
             title=query,
-            company=None,
+            company=company,
             location=location,
             provider=provider,
-            sort="created_at",
-            order="desc",
+            sort=sort,
+            order=order,
             page=page,
             limit=limit,
         )
-        jobs, total = await self.repository.search_jobs(params)
 
-        # 3. Record search history
-        await self.history_repo.create(
-            query=query,
-            provider=provider,
-            location=location,
-            results_count=total,
-        )
+        # 2. جلب البيانات من الـ Repository
+        db_jobs, db_total = await self.job_repo.search_jobs(params)
+
+        # تحويل موديلات الـ ORM لـ Dicts لسهولة الفلترة والـ Processing
+        jobs: List[Dict[str, Any]] = []
+        for j in db_jobs:
+            if hasattr(j, "__dict__"):
+                job_dict = {k: v for k, v in j.__dict__.items() if not k.startswith("_")}
+            elif isinstance(j, dict):
+                job_dict = j
+            else:
+                job_dict = {}
+            jobs.append(job_dict)
+
+        # 3. الفلاتر الإضافية (Salary / Score)
+        if company:
+            jobs = [
+                j for j in jobs
+                if company.lower() in str(j.get("company", "")).lower()
+            ]
+
+        if location:
+            jobs = [
+                j for j in jobs
+                if location.lower() in str(j.get("location", "")).lower()
+            ]
+
+        if salary_min is not None:
+            jobs = [
+                j for j in jobs
+                if (j.get("salary") or 0) >= salary_min
+            ]
+
+        if salary_max is not None:
+            jobs = [
+                j for j in jobs
+                if (j.get("salary") or 0) <= salary_max
+            ]
+
+        if score_min is not None:
+            jobs = [
+                j for j in jobs
+                if (j.get("score") or 0) >= score_min
+            ]
+
+        if score_max is not None:
+            jobs = [
+                j for j in jobs
+                if (j.get("score") or 0) <= score_max
+            ]
+
+        # 4. الترتيب (Sorting)
+        allowed = {
+            "score",
+            "salary",
+            "title",
+            "provider",
+            "location",
+        }
+        if sort in allowed:
+            jobs.sort(
+                key=lambda x: x.get(sort) or 0 if isinstance(x.get(sort), (int, float)) else str(x.get(sort) or "").lower(),
+                reverse=(order == "desc"),
+            )
+
+        # 5. الترقيم (Pagination)
+        total = db_total if db_total > 0 else len(jobs)
+        start = (page - 1) * limit
+        end = start + limit
+        paged_jobs = jobs[start:end] if len(jobs) > limit else jobs
 
         return {
-            "items": jobs,
+            "jobs": paged_jobs,
             "total": total,
             "page": page,
             "limit": limit,
         }
-
-    async def get_history(self, limit: int = 10) -> Dict[str, Any]:
-        items = await self.history_repo.list_recent(limit=limit)
-        return {
-            "count": len(items),
-            "items": [
-                {
-                    "query": h.query,
-                    "provider": h.provider,
-                    "location": h.location,
-                    "results": h.results_count,
-                    "created_at": h.created_at.isoformat() if h.created_at else None,
-                }
-                for h in items
-            ],
-        }
-
-    async def clear_history(self) -> Dict[str, str]:
-        await self.history_repo.delete_all()
-        return {"status": "success", "message": "Search history cleared successfully"}

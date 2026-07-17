@@ -12,8 +12,15 @@ router = APIRouter(prefix="", tags=["search"])
 @router.get("/jobs")
 async def search_jobs(
     title: str | None = Query(None, alias="title"),
+    company: str | None = Query(None),
     location: str | None = Query(None),
     provider: str | None = Query(None),
+    salary_min: int | None = Query(None, ge=0),
+    salary_max: int | None = Query(None, ge=0),
+    score_min: int | None = Query(None, ge=0, le=100),
+    score_max: int | None = Query(None, ge=0, le=100),
+    sort: str = Query("score"),
+    order: str = Query("desc"),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
@@ -22,8 +29,15 @@ async def search_jobs(
         search_service = SearchService(session)
         res = await search_service.search(
             query=title,
+            company=company,
             location=location,
             provider=provider,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            score_min=score_min,
+            score_max=score_max,
+            sort=sort,
+            order=order,
             page=page,
             limit=limit,
         )
