@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from smarthunt.api.routes import health
 from smarthunt.core.config import settings
-from smarthunt.database.session import close_db, init_db
+from smarthunt.database.session import engine
 from smarthunt.matching.api.router import router as matching_router
 
 logger = logging.getLogger(__name__)
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting SmartHunt application...")
-    await init_db()
     yield
     logger.info("Shutting down SmartHunt application...")
-    await close_db()
+    if engine:
+        await engine.dispose()
 
 
 app = FastAPI(
