@@ -25,10 +25,10 @@ class SearchService:
     ) -> dict[str, Any]:
 
         key = f"{query}:{location}:{provider}:{page}:{limit}"
-        metrics.search()
 
         cached = cache.get(key)
         if cached:
+            metrics.search(results_count=len(cached.get("jobs", [])))
             metrics.cache_hit()
             return cached
 
@@ -38,7 +38,6 @@ class SearchService:
         providers = self.registry.providers()
 
         for item in providers:
-
             provider_name = item.name.lower()
 
             if provider and provider_name != provider.lower():
@@ -63,13 +62,12 @@ class SearchService:
                     job.setdefault("provider", provider_name)
 
                 jobs.extend(provider_jobs)
-
                 self.monitor.success(provider_name)
 
             except Exception:
                 self.monitor.failure(provider_name)
 
-        # Remove duplicates
+        # Distinct
         unique = {}
         for job in jobs:
             key_item = (
@@ -80,23 +78,15 @@ class SearchService:
             unique[key_item] = job
 
         jobs = list(unique.values())
-
-        jobs.sort(
-            key=lambda x: x.get("score", 0),
-            reverse=True,
-        )
+        jobs.sort(key=lambda x: x.get("score", 0), reverse=True)
 
         start = (page - 1) * limit
         end = start + limit
-
         paged = jobs[start:end]
 
         if paged and db_session.AsyncSessionLocal:
-
             async with db_session.AsyncSessionLocal() as session:
-
                 repo = JobRepository(session)
-
                 await repo.save_many(paged)
 
         response_data = {
@@ -106,6 +96,7 @@ class SearchService:
             "limit": limit,
         }
 
+        metrics.search(results_count=len(paged))
         cache.set(key, response_data)
 
         return response_data

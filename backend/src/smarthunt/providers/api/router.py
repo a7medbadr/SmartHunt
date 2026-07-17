@@ -1,20 +1,17 @@
 from fastapi import APIRouter
+
 from smarthunt.providers.registry.registry import ProviderRegistry
+from smarthunt.providers.statistics import provider_stats
 
 router = APIRouter()
-registry = ProviderRegistry()
 
-@router.get("/")
-async def providers():
-    items = []
-    for provider in registry.providers():
-        items.append(
-            {
-                "name": provider.name,
-                "supports_login": provider.supports_login,
-                "supports_apply": provider.supports_apply,
-                "supports_resume_upload": provider.supports_resume_upload,
-                "supports_cover_letter": provider.supports_cover_letter,
-            }
-        )
-    return {"items": items}
+
+@router.get("")
+async def list_providers():
+    registry = ProviderRegistry()
+    return [p.name.lower() for p in registry.providers()]
+
+
+@router.get("/statistics")
+async def get_provider_statistics():
+    return provider_stats.get_summary()
