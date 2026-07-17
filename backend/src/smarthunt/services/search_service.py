@@ -35,7 +35,7 @@ class SearchService:
         limit: int = 10,
     ) -> Dict[str, Any]:
 
-        # 1. إعداد الـ params للتوافق مع DB Repository
+        # 1. إعداد الـ params للـ DB Repository
         params = SimpleNamespace(
             title=query,
             company=company,
@@ -50,19 +50,16 @@ class SearchService:
         # 2. جلب الوظائف المحفوظة في قاعدة البيانات
         db_jobs, db_total = await self.job_repo.search_jobs(params)
 
-        # 3. استدعاء الـ Providers في الخلفية إذا طُلب ذلك أو لدمج النتائج
-        live_jobs = []
-        if self.provider_manager.providers:
-            live_jobs = await self.provider_manager.search_all(
-                query=query,
-                location=location,
-                provider_name=provider
-            )
+        # 3. استدعاء جميع الـ Providers بالتوازي عبر ProviderManager
+        live_jobs = await self.provider_manager.search_all(
+            query=query,
+            location=location,
+        )
 
         # 4. تجميع وتحويل الكائنات إلى Dicts
         jobs: List[Dict[str, Any]] = []
 
-        # إضافة نتائج قاعدة البيانات
+        # نتائج قاعدة البيانات
         for j in db_jobs:
             if hasattr(j, "__dict__"):
                 job_dict = {k: v for k, v in j.__dict__.items() if not k.startswith("_")}
@@ -72,7 +69,7 @@ class SearchService:
                 job_dict = {}
             jobs.append(job_dict)
 
-        # إضافة نتائج الـ Live Providers إن وجدت مع تجنب التكرار
+        # نتائج الـ Live Providers مع تلافي التكرار حسب الـ URL
         existing_urls = {j.get("url") for j in jobs if j.get("url")}
         for lj in live_jobs:
             lj_url = getattr(lj, "url", None) or (lj.get("url") if isinstance(lj, dict) else None)
@@ -88,7 +85,7 @@ class SearchService:
 
             jobs.append(lj_dict)
 
-        # 5. التصفية الإضافية (Company, Salary, Score)
+        # 5. الفلترة
         if company:
             jobs = [j for j in jobs if company.lower() in str(j.get("company", "")).lower()]
 
@@ -107,7 +104,7 @@ class SearchService:
         if score_max is not None:
             jobs = [j for j in jobs if (j.get("score") or 0) <= score_max]
 
-        # 6. الترتيب (Sorting)
+        # 6. الترتيب
         allowed_sorts = {"score", "salary", "title", "provider", "location"}
         if sort in allowed_sorts:
             jobs.sort(
