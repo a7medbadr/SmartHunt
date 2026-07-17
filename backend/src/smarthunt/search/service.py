@@ -7,6 +7,7 @@ from smarthunt.database.repositories.job_repository import JobRepository
 from smarthunt.providers.registry.registry import ProviderRegistry
 from smarthunt.providers.health.monitor import monitor
 from smarthunt.search.metrics import increment
+from smarthunt.search.cache import cache
 
 
 class SearchService:
@@ -22,6 +23,11 @@ class SearchService:
         page: int = 1,
         limit: int = 10,
     ) -> dict[str, Any]:
+
+        key = f"{query}:{location}:{provider}:{page}:{limit}"
+        cached = cache.get(key)
+        if cached:
+            return cached
 
         jobs: list[dict] = []
 
@@ -42,10 +48,6 @@ class SearchService:
                     limit=limit,
                 )
 
-                # Providers currently return one of two shapes:
-                #    - a dict: {"provider": ..., "results": [...], ...}
-                #    - a bare list: [{...}, {...}]
-                # Normalize both into a plain list of job dicts.
                 if isinstance(result, dict):
                     provider_jobs = result.get("results") or []
                 elif isinstance(result, list):
@@ -66,12 +68,12 @@ class SearchService:
         # Remove duplicates
         unique = {}
         for job in jobs:
-            key = (
+            key_item = (
                 job.get("provider"),
                 job.get("title"),
                 job.get("location"),
             )
-            unique[key] = job
+            unique[key_item] = job
 
         jobs = list(unique.values())
 
@@ -95,9 +97,13 @@ class SearchService:
 
         increment()
 
-        return {
+        response_data = {
             "jobs": paged,
             "total": len(jobs),
             "page": page,
             "limit": limit,
         }
+
+        cache.set(key, response_data)
+
+        return response_data
