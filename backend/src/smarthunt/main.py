@@ -45,6 +45,6 @@ app.include_router(old_providers_router, prefix="/api/v1/providers_old", tags=["
 app.include_router(scheduler_router, prefix="/api/v1/scheduler", tags=["Scheduler"])
 app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 
-# تسجيل الـ Providers المطور والـ Health بتاعه جنبه بالظبط
+# ربط الـ New Providers والـ Provider Health بالشكل الصحيح هندسياً
 app.include_router(new_providers_router, prefix="/api/v1/providers", tags=["Providers"])
 app.include_router(provider_health_router, prefix="/api/v1/providers", tags=["Provider Health"])
