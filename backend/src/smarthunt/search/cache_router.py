@@ -10,6 +10,4 @@ router = APIRouter(
 
 @router.get("/cache")
 async def cache_info():
-    return {
-        "cached_queries": len(cache._cache),
-    }
+    return cache.statistics()
