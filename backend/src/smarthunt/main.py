@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from smarthunt.core.config import settings
 from smarthunt.database import session as db_session
+from smarthunt.logging.logger import logger
 from smarthunt.api.routes import (
     auth_router,
     health_router,
@@ -23,11 +25,13 @@ from smarthunt.api.routes.database import router as database_router
 from smarthunt.api.routes.search_metrics import router as search_metrics_router
 from smarthunt.api.routes.database_statistics import router as database_statistics_router
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db_session.create_engine()
     yield
     await db_session.close_engine()
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -45,6 +49,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception occurred on path %s: %s", request.url.path, str(exc))
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "message": "Unexpected server error.",
+        },
+    )
+
 
 app.include_router(health_router, prefix="/api/v1/health")
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])

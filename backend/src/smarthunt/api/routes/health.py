@@ -1,24 +1,13 @@
-from fastapi import APIRouter
-from datetime import datetime
+from fastapi import APIRouter, status
 
 router = APIRouter(tags=["health"])
 
 
-@router.get("/live")
-async def live():
-    return {"status": "alive"}
+@router.get("/live", status_code=status.HTTP_200_OK)
+async def liveness():
+    return {"status": "ok"}
 
 
-@router.get("/ready")
-async def ready():
-    return {"status": "ready"}
-
-
-@router.get("/info")
-async def info():
-    return {
-        "status": "ok",
-        "service": "smarthunt-backend",
-        "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
+@router.get("/ready", status_code=status.HTTP_200_OK)
+async def readiness():
+    return {"status": "ok"}

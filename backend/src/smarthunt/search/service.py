@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from smarthunt.database import session as db_session
 from smarthunt.database.repositories.job_repository import JobRepository
-from smarthunt.providers.registry.registry import ProviderRegistry
+from smarthunt.logging.logger import logger
 from smarthunt.providers.health.monitor import monitor
+from smarthunt.providers.registry.registry import ProviderRegistry
 from smarthunt.search.cache import cache
 from smarthunt.search.metrics import metrics
 
@@ -24,12 +26,18 @@ class SearchService:
         limit: int = 10,
     ) -> dict[str, Any]:
 
+        start_time = time.time()
+        logger.info("Search started | query=%s, location=%s, provider=%s, page=%s, limit=%s", query, location, provider, page, limit)
+
         key = f"{query}:{location}:{provider}:{page}:{limit}"
 
         cached = cache.get(key)
         if cached:
-            metrics.search(results_count=len(cached.get("jobs", [])))
+            duration = round(time.time() - start_time, 4)
+            jobs_count = len(cached.get("jobs", []))
+            metrics.search(results_count=jobs_count)
             metrics.cache_hit()
+            logger.info("Search finished | cache_hit=True, provider=%s, jobs=%s, duration=%.4fs", provider or "all", jobs_count, duration)
             return cached
 
         metrics.provider_call()
@@ -64,8 +72,9 @@ class SearchService:
                 jobs.extend(provider_jobs)
                 self.monitor.success(provider_name)
 
-            except Exception:
+            except Exception as e:
                 self.monitor.failure(provider_name)
+                logger.exception("Failed to fetch jobs from provider=%s error=%s", provider_name, str(e))
 
         # Distinct
         unique = {}
@@ -96,7 +105,10 @@ class SearchService:
             "limit": limit,
         }
 
+        duration = round(time.time() - start_time, 4)
         metrics.search(results_count=len(paged))
         cache.set(key, response_data)
+
+        logger.info("Search finished | cache_hit=False, provider=%s, jobs=%s, duration=%.4fs", provider or "all", len(paged), duration)
 
         return response_data
