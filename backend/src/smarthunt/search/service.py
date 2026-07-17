@@ -42,7 +42,7 @@ class SearchService:
                             jobs.extend([job])
                         else:
                             print(f"--> [WARNING] Provider {p.name} returned a non-dict item: {type(job)}", file=sys.stderr, flush=True)
-                
+
                 self.monitor.success(p.name)
 
             except BaseException as e:
@@ -59,8 +59,14 @@ class SearchService:
         start = (page - 1) * limit
         end = start + limit
 
+        # تجميع الـ items المرجعة للصفحة الحالية لتسجيل العدد الفعلي للـ نتائج المرجعة
+        items = jobs[start:end]
+
+        from smarthunt.search.history import save
+        save(query or "", provider or "all", len(items))
+
         return {
-            "items": jobs[start:end],
+            "items": items,
             "total": total,
             "page": page,
             "limit": limit,
