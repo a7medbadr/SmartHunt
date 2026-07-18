@@ -1,8 +1,8 @@
-# BUILD_MARKER_1784374188
 from fastapi import APIRouter
 
+from smarthunt.api.routes.auth import router as auth_router
 from smarthunt.api.routes.health import router as health_router
-from smarthunt.auth.router import router as auth_router
+from smarthunt.api.routes.jobs import router as jobs_router
 from smarthunt.career.router import router as career_router
 from smarthunt.cover_letter.api import router as cover_letter_router
 from smarthunt.cover_letter.reviewer.router import router as cover_letter_reviewer_router
@@ -18,11 +18,12 @@ api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(recruitment_router, prefix="", tags=["recruitment"])
+api_router.include_router(jobs_router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(recommendation_router, prefix="", tags=["recommendation"])
 api_router.include_router(cover_letter_router, prefix="/cover-letter", tags=["cover-letter"])
 api_router.include_router(cover_letter_reviewer_router, prefix="/cover-letter", tags=["cover-letter"])
 api_router.include_router(matching_router, prefix="/matching", tags=["matching"])
 api_router.include_router(career_router, prefix="/career", tags=["career"])
-api_router.include_router(recommendation_router, prefix="/recommendation", tags=["recommendation"])
 api_router.include_router(resume_router, prefix="/resume", tags=["resume"])
 api_router.include_router(resume_reviewer_router, prefix="/resume", tags=["resume"])
 api_router.include_router(search_router, prefix="/search", tags=["search"])

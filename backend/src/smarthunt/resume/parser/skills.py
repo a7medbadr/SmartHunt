@@ -15,6 +15,7 @@ KNOWN_SKILLS = [
     "jenkins",
     "prometheus",
     "grafana",
+    "kafka",
 ]
 
 

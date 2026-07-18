@@ -120,3 +120,4 @@ class JobRepository:
         result = await self.session.execute(query)
         jobs = result.scalars().all()
         return list(jobs), total_count
+

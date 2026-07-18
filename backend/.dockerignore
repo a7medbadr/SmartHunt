@@ -1,22 +1,45 @@
+# Git
 .git
 .gitignore
 
-.venv
-__pycache__
-.pytest_cache
+# Python virtual environment
+.venv/
 
-.mypy_cache
-
-.coverage
-
-tests
-
-alembic/versions/__pycache__
-
-*.pyc
+# Python cache
+__pycache__/
+*.py[cod]
 *.pyo
 *.pyd
 
-.env
+# Build artifacts
+build/
+dist/
+*.egg-info/
 
+# Test caches
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
 output.txt
+
+# Alembic cache
+alembic/versions/__pycache__/
+
+# Frontend dependencies (if copied accidentally)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

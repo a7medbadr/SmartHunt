@@ -19,3 +19,4 @@ class Job(Base):
     source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

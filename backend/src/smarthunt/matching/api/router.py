@@ -1,31 +1,38 @@
-from typing import Dict, Any
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
+
+from smarthunt.matching.services.matcher import match
 
 router = APIRouter()
 
+
+class MatchRequest(BaseModel):
+    resume: str = Field(..., description="Resume text or key skills")
+    job: str = Field(..., description="Job description or requirements")
+
+
+class MatchResponse(BaseModel):
+    score: float = Field(..., description="Matching score between 0 and 100")
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+
+
+def _run_match(payload: MatchRequest) -> MatchResponse:
+    if not payload.resume.strip() or not payload.job.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both resume and job fields must contain text.",
+        )
+    result = match(payload.resume, payload.job)
+    return MatchResponse(**result)
+
+
 @router.post("", status_code=status.HTTP_200_OK)
 @router.post("/", status_code=status.HTTP_200_OK)
-async def match_resume_job(payload: Dict[str, Any]):
-    return {
-        "score": 50,
-        "matched_skills": ["docker", "linux"],
-        "missing_skills": ["aws", "terraform"],
-        "details": "Match successful"
-    }
+def match_resume_job(payload: MatchRequest) -> MatchResponse:
+    return _run_match(payload)
+
 
 @router.post("/analyze", status_code=status.HTTP_200_OK)
-async def analyze_match(payload: Dict[str, Any]):
-    job_text = payload.get("job", "")
-    if "No technical skills" in job_text:
-        return {
-            "score": 0,
-            "matched_skills": [],
-            "missing_skills": [],
-            "analysis": "No skills match"
-        }
-    return {
-        "score": 50,
-        "matched_skills": ["docker", "linux"],
-        "missing_skills": ["aws", "terraform"],
-        "analysis": "Detailed match analysis"
-    }
+def analyze_match(payload: MatchRequest) -> MatchResponse:
+    return _run_match(payload)

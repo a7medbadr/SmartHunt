@@ -20,12 +20,8 @@ def create_access_token(
         minutes=settings.access_token_expire_minutes,
     ),
 ) -> str:
-    """
-    توليد توكن الـ JWT باستقبال قاموس يحتوي على البيانات (data).
-    """
     expire = datetime.now(UTC) + expires_delta
 
-    # نأخذ نسخة من القاموس الممرر لتجنب التعديل على الكائن الأصلي
     payload = data.copy()
     payload.update({"exp": expire})
 
@@ -70,3 +66,4 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+

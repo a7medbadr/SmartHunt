@@ -40,3 +40,4 @@ class JobService:
 
     async def delete_job(self, job_id: int) -> bool:
         return await self.repository.delete(job_id)
+

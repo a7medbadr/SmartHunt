@@ -1,37 +1,45 @@
-import pytest_asyncio
 from typing import AsyncGenerator
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+
+from smarthunt.api.dependencies import get_db
+from smarthunt.database.session import DATABASE_URL
 from smarthunt.main import app
-from smarthunt.database.base import Base
-from smarthunt.database.session import get_db
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# NullPool: كل session بتاخد connection جديدة تمامًا بدل ما تتشارك
+# connection قديمة اتعملها في event loop مختلف من test تاني (ده سبب
+# "another operation is in progress" / "Task pending" اللي كنا شايفينهم)
+test_engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
+TestSessionLocal = async_sessionmaker(
+    bind=test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestingSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def prepare_database():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
 @pytest_asyncio.fixture
-async def db() -> AsyncGenerator[AsyncSession, None]:
-    async with TestingSessionLocal() as session:
-        yield session
-
-@pytest_asyncio.fixture
-async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db():
-        yield db
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with TestSessionLocal() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
         yield ac
+
     app.dependency_overrides.clear()
+    await test_engine.dispose()
