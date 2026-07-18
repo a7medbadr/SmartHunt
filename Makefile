@@ -1,23 +1,35 @@
 build:
-	oc start-build smarthunt-backend --from-dir=. --wait
+	oc start-build smarthunt-backend --from-dir=. --follow --wait
 
 deploy:
 	oc rollout restart deployment/smarthunt-backend
-
-status:
 	oc rollout status deployment/smarthunt-backend
 
 logs:
-	oc logs deployment/smarthunt-backend -f
+	oc logs -f deployment/smarthunt-backend
 
-pods:
+status:
 	oc get pods
-
-route:
+	oc get builds
+	oc get deployment
 	oc get route
 
-health:
-	curl -k https://$(shell oc get route smarthunt-backend -o jsonpath='{.spec.host}')/api/v1/health/live
+test:
+	ROUTE=$$(oc get route smarthunt-backend -o jsonpath='{.spec.host}'); \
+	echo "=== Jobs Recommendation ==="; \
+	curl -sk -X POST \
+	-H "Content-Type: application/json" \
+	-d '{"resume":"Linux Docker Python OpenShift AWS"}' \
+	https://$$ROUTE/api/v1/jobs/recommend; \
+	echo; \
+	echo "=========================="; \
+	echo "=== Career Advice ==="; \
+	curl -sk -X POST \
+	-H "Content-Type: application/json" \
+	-d '{"resume":"Linux Docker Python"}' \
+	https://$$ROUTE/api/v1/career/advice; \
+	echo; \
+	echo "=========================="; \
+	curl -sk https://$$ROUTE/api/v1/openapi.json | python3 -m json.tool >/dev/null && echo "OPENAPI_OK"
 
-metrics:
-	curl -k https://$(shell oc get route smarthunt-backend -o jsonpath='{.spec.host}')/api/v1/metrics
+all: build deploy test
