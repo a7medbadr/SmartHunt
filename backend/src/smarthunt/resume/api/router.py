@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from smarthunt.resume.parser.parser import extract_text
 from smarthunt.resume.parser.skills import extract_skills
+from smarthunt.resume.reviewer.router import router as reviewer_router
 from smarthunt.resume.services.generator import generate_resume
 from smarthunt.resume.storage.storage import (
     STORAGE_DIR,
@@ -11,6 +12,7 @@ from smarthunt.resume.storage.storage import (
 )
 
 router = APIRouter()
+router.include_router(reviewer_router)
 
 
 class ResumeGenerateRequest(BaseModel):
@@ -43,10 +45,9 @@ def upload_resume(file: UploadFile = File(...)):
             detail="Only PDF files are allowed",
         )
 
-    # Read content to get exact byte size before saving
     content = file.file.read()
     file.file.seek(0)
-    
+
     resume_storage.save_resume(file.file)
     return {
         "status": "uploaded",
