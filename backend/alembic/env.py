@@ -21,6 +21,7 @@ sys.path.insert(0, str(BACKEND_DIR / "src"))
 
 # 3. استدعاء الـ Base والموديلات (مع تعطيل فحص ruff E402 لأن تعديل sys.path مطلوب أولاً)
 from smarthunt.database.base import Base  # noqa: E402
+from smarthunt.database import models  # noqa: E402,F401
 
 config = context.config
 
