@@ -35,5 +35,6 @@ DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt"
 dev = [
     "aiosqlite>=0.22.1",
     "black>=26.5.1",
+    "httpx2>=2.9.1",
     "ruff>=0.15.21",
 ]

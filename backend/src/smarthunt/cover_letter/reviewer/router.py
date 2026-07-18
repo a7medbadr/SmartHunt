@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter
 
 from smarthunt.cover_letter.reviewer.schemas import (
     CoverLetterReviewRequest,
@@ -6,20 +6,11 @@ from smarthunt.cover_letter.reviewer.schemas import (
 )
 from smarthunt.cover_letter.reviewer.service import CoverLetterReviewer
 
-router = APIRouter(prefix="/api/v1/cover-letter", tags=["cover-letter-reviewer"])
+router = APIRouter()
+
+_reviewer = CoverLetterReviewer()
 
 
-def get_cover_letter_reviewer() -> CoverLetterReviewer:
-    return CoverLetterReviewer()
-
-
-@router.post(
-    "/review",
-    response_model=CoverLetterReviewResponse,
-    status_code=status.HTTP_200_OK,
-)
-def review_cover_letter(
-    payload: CoverLetterReviewRequest,
-    reviewer: CoverLetterReviewer = Depends(get_cover_letter_reviewer),
-) -> CoverLetterReviewResponse:
-    return reviewer.review_cover_letter(payload.cover_letter)
+@router.post("/review", response_model=CoverLetterReviewResponse)
+def review_cover_letter(request: CoverLetterReviewRequest) -> CoverLetterReviewResponse:
+    return _reviewer.review_cover_letter(request.cover_letter)
