@@ -1,5 +1,3 @@
-import tempfile
-
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from smarthunt.resume.parser.extractor import extract_text
@@ -35,11 +33,7 @@ async def analyze_resume(file: UploadFile = File(...)):
         )
 
     contents = await file.read()
-
-    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-        tmp.write(contents)
-        tmp.flush()
-        text = extract_text(tmp.name)
+    text = extract_text(contents)
 
     skills = extract_skills(text)
     return {"skills": skills}
