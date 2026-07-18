@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from smarthunt.matching.services.matcher import JobMatcher
+from smarthunt.matching.services.matcher import match
 
 router = APIRouter()
 
@@ -13,7 +13,7 @@ class MatchRequest(BaseModel):
 
 class MatchResponse(BaseModel):
     score: float = Field(..., description="Matching score between 0 and 100")
-    matching_skills: list[str] = Field(
+    matched_skills: list[str] = Field(
         default_factory=list, description="Skills present in both resume and job"
     )
     missing_skills: list[str] = Field(
@@ -34,6 +34,9 @@ async def match_resume_to_job(payload: MatchRequest) -> MatchResponse:
             detail="Both resume and job fields must contain text.",
         )
 
-    matcher = JobMatcher()
-    result = matcher.match(payload.resume, payload.job)
-    return MatchResponse(**result)
+    result = match(payload.resume, payload.job)
+    return MatchResponse(
+        score=result["score"],
+        matched_skills=result["matched_skills"],
+        missing_skills=result["missing_skills"],
+    )

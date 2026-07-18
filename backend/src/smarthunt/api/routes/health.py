@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-router = APIRouter(tags=["health"])
+router = APIRouter(prefix="/health", tags=["health"])
 
 
 @router.get("/live", status_code=status.HTTP_200_OK)

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
 
+    # --- Fields required by main.py (kept UPPER_CASE to match its usage) ---
+    PROJECT_NAME: str = "SmartHunt"
+    VERSION: str = "0.1.0"
+    API_V1_STR: str = "/api/v1"
+    BACKEND_CORS_ORIGINS: list[str] = []
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
