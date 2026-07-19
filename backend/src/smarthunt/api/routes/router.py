@@ -11,6 +11,7 @@ from smarthunt.job_tags.api import router as job_tags_router
 from smarthunt.matching.api.router import router as matching_router
 from smarthunt.recommendation.router import router as recommendation_router
 from smarthunt.recruitment.api import router as recruitment_router
+from smarthunt.recruitment.auto_apply_worker import router as apply_worker_router
 from smarthunt.resume.api.router import router as resume_router
 from smarthunt.resume.reviewer.router import router as resume_reviewer_router
 from smarthunt.search.router import router as search_router
@@ -24,6 +25,7 @@ from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.scheduler.history.router import router as scheduler_history_router
 from smarthunt.apply_queue.router import router as apply_queue_router
 from smarthunt.browser.session.router import router as browser_session_router
+from smarthunt.browser.playwright.router import router as playwright_router
 
 api_router = APIRouter()
 
@@ -51,3 +53,5 @@ api_router.include_router(provider_health_router, prefix="/providers/health", ta
 api_router.include_router(scheduler_history_router, prefix="/scheduler/history", tags=["scheduler-history"])
 api_router.include_router(apply_queue_router, prefix="/apply-queue", tags=["apply-queue"])
 api_router.include_router(browser_session_router, prefix="/browser/session", tags=["browser-session"])
+api_router.include_router(playwright_router, prefix="/browser/playwright", tags=["playwright"])
+api_router.include_router(apply_worker_router, prefix="/apply-worker", tags=["apply-worker"])
