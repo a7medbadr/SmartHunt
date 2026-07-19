@@ -2,7 +2,6 @@ import os
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -37,25 +36,11 @@ SessionLocal = async_sessionmaker(
 TestSessionLocal = SessionLocal
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def prepare_database():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    yield
-
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def clean_database():
-    async with engine.begin() as conn:
-        for table in reversed(Base.metadata.sorted_tables):
-            await conn.execute(
-                text(
-                    f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE'
-                )
-            )
     yield
 
 
@@ -65,6 +50,8 @@ async def db_session():
         try:
             yield session
         finally:
+            if session.in_transaction():
+                await session.rollback()
             await session.close()
 
 
@@ -72,12 +59,7 @@ async def db_session():
 async def client(db_session: AsyncSession):
 
     async def override_get_db():
-        try:
-            yield db_session
-            await db_session.commit()
-        except Exception:
-            await db_session.rollback()
-            raise
+        yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
 
