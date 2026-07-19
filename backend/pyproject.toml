@@ -3,6 +3,7 @@ name = "smarthunt-backend"
 version = "0.1.0"
 description = "SmartHunt Backend Service"
 requires-python = ">=3.12"
+
 dependencies = [
     "fastapi>=0.116.0",
     "uvicorn[standard]>=0.30.0",
@@ -38,12 +39,11 @@ dependencies = [
 testpaths = ["backend/tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "-ra"
-norecursedirs = ["backend/scripts", "scripts", ".venv", "node_modules", "backend/.venv"]
 
 [tool.pytest_env]
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt"
+APP_ENV = "test"
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,41 @@
+.git
+.gitignore
+
+# Python
+backend/.venv
+backend/__pycache__
+backend/**/*.pyc
+backend/**/*.pyo
+
+# Build artifacts
+backend/build
+backend/dist
+backend/*.egg-info
+
+# Tests
+backend/.pytest_cache
+backend/.mypy_cache
+backend/.coverage
+backend/htmlcov
+
+# Env
+.env
+backend/.env
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Frontend
+frontend/node_modules
+frontend/dist
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large files
+*.pdf

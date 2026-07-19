@@ -5,7 +5,7 @@ from sqlalchemy import delete
 
 from smarthunt.database.models.job import Job
 from smarthunt.job_notes.models import JobNote
-from conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal
 
 
 @pytest_asyncio.fixture

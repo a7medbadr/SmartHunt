@@ -4,8 +4,6 @@ Revision ID: create_dashboard_tables
 Revises: a1f9c3d7e2b4
 """
 
-from collections.abc import Sequence
-
 import sqlalchemy as sa
 from alembic import op
 

@@ -1,34 +1,48 @@
 import os
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from pathlib import Path
+
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[4]
+load_dotenv(ROOT_DIR / ".env", override=False)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt",
+)
 
-# Async Engine
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt_test",
+)
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    future=True
+    pool_pre_ping=True,
+    future=True,
 )
 
-# Async Session Factory
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
     autocommit=False,
-    autoflush=False
+    autoflush=False,
 )
 
-# Base Class for SQLAlchemy Models
+
 class Base(DeclarativeBase):
     pass
 
-# Dependency for FastAPI
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
@@ -40,6 +54,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         finally:
             await session.close()
 
+
 async def close_engine() -> None:
-    """Called on app shutdown to dispose the engine cleanly."""
     await engine.dispose()

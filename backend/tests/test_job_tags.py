@@ -3,7 +3,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import delete
 
-from conftest import TestSessionLocal
+from tests.conftest import TestSessionLocal
 from smarthunt.database.models.job import Job
 from smarthunt.job_tags.models import JobTag
 
