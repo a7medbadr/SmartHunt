@@ -1,7 +1,10 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Enum as SQLEnum
 import enum
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, Integer, String, DateTime, Text, Enum as SQLEnum
+
 from smarthunt.database.session import Base
+
 
 class ActivityType(str, enum.Enum):
     RESUME_UPLOADED = "resume_uploaded"
@@ -10,6 +13,7 @@ class ActivityType(str, enum.Enum):
     SAVED_SEARCH_CREATED = "saved_search_created"
     COVER_LETTER_GENERATED = "cover_letter_generated"
 
+
 class Activity(Base):
     __tablename__ = "activities"
 
@@ -17,4 +21,9 @@ class Activity(Base):
     type = Column(SQLEnum(ActivityType), nullable=False)
     title = Column(String(255), nullable=False)
     details = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        nullable=False,
+        index=True,
+    )

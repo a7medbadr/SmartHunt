@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class DashboardStatisticsResponse(BaseModel):
     jobs: int = Field(default=0, ge=0, description="Total number of available jobs")
@@ -7,5 +8,4 @@ class DashboardStatisticsResponse(BaseModel):
     saved_searches: int = Field(default=0, ge=0, description="Total saved search queries")
     providers: int = Field(default=0, ge=0, description="Total active job providers")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
