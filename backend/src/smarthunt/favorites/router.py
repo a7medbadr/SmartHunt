@@ -1,38 +1,36 @@
-from fastapi import APIRouter, HTTPException, status
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.api.dependencies import get_db
 from smarthunt.favorites.schemas import FavoriteJobCreate, FavoriteJobResponse
-from smarthunt.favorites.service import favorites_service, FavoriteAlreadyExistsError
+from smarthunt.favorites.service import (
+    FavoriteAlreadyExistsError,
+    FavoriteNotFoundError,
+    favorites_service,
+)
 
 router = APIRouter(prefix="", tags=["favorites"])
 
 
 @router.post("", response_model=FavoriteJobResponse, status_code=status.HTTP_201_CREATED)
-async def add_favorite(payload: FavoriteJobCreate):
-    if not payload.title or not payload.title.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Job title cannot be empty",
-        )
+async def add_favorite(payload: FavoriteJobCreate, db: AsyncSession = Depends(get_db)):
     try:
-        return favorites_service.add_favorite(payload)
+        return await favorites_service.add_favorite(db, payload)
     except FavoriteAlreadyExistsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("", response_model=List[FavoriteJobResponse])
-async def list_favorites():
-    return favorites_service.list_favorites()
+async def list_favorites(db: AsyncSession = Depends(get_db)):
+    return await favorites_service.list_favorites(db)
 
 
-@router.delete("/{fav_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_favorite(fav_id: str):
-    success = favorites_service.delete_favorite(fav_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Favorite with id or job_id '{fav_id}' not found",
-        )
-    return None
+@router.delete("/{job_id}")
+async def delete_favorite(job_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        await favorites_service.delete_favorite(db, job_id)
+    except FavoriteNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return {"status": "deleted"}

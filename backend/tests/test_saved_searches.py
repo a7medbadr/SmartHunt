@@ -1,55 +1,64 @@
 import pytest
-from smarthunt.saved_searches.schemas import SavedSearchCreate
-from smarthunt.saved_searches.service import saved_search_service
+import pytest_asyncio
+from httpx import AsyncClient
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.saved_searches.models import SavedSearch
 
 
-@pytest.fixture(autouse=True)
-def reset_service():
-    saved_search_service.clear()
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup(db_session: AsyncSession):
+    await db_session.execute(delete(SavedSearch))
+    await db_session.commit()
+
+    yield
+
+    await db_session.execute(delete(SavedSearch))
+    await db_session.commit()
 
 
-def test_create_saved_search():
-    data = SavedSearchCreate(
-        name="Linux in Riyadh",
-        keyword="linux",
-        location="riyadh",
-        source="linkedin",
+@pytest.mark.asyncio
+async def test_create_saved_search(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/saved-searches",
+        json={"name": "Linux Saudi", "keyword": "linux", "location": "Saudi Arabia"},
     )
-    res = saved_search_service.create(data)
-    assert res["id"] == 1
-    assert res["name"] == "Linux in Riyadh"
-    assert res["keyword"] == "linux"
-    assert res["location"] == "riyadh"
-    assert res["source"] == "linkedin"
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["name"] == "Linux Saudi"
+    assert data["keyword"] == "linux"
+    assert data["location"] == "Saudi Arabia"
 
 
-def test_list_saved_searches():
-    data1 = SavedSearchCreate(name="Search 1", keyword="python")
-    data2 = SavedSearchCreate(name="Search 2", keyword="devops")
-    saved_search_service.create(data1)
-    saved_search_service.create(data2)
+@pytest.mark.asyncio
+async def test_list_saved_searches(client: AsyncClient):
+    await client.post("/api/v1/saved-searches", json={"name": "Search 1", "keyword": "python"})
+    await client.post("/api/v1/saved-searches", json={"name": "Search 2", "keyword": "devops"})
 
-    items = saved_search_service.list_all()
-    assert len(items) == 2
-    assert items[0]["name"] == "Search 1"
-    assert items[1]["name"] == "Search 2"
+    response = await client.get("/api/v1/saved-searches")
 
-
-def test_delete_saved_search():
-    data = SavedSearchCreate(name="To Delete", keyword="docker")
-    created = saved_search_service.create(data)
-    search_id = created["id"]
-
-    # Delete existing
-    deleted = saved_search_service.delete(search_id)
-    assert deleted is True
-    assert len(saved_search_service.list_all()) == 0
-
-    # Delete non-existing
-    deleted_again = saved_search_service.delete(999)
-    assert deleted_again is False
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
 
 
-def test_invalid_request():
-    with pytest.raises(Exception):
-        SavedSearchCreate()
+@pytest.mark.asyncio
+async def test_delete_saved_search(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/saved-searches", json={"name": "To Delete", "keyword": "docker"}
+    )
+    search_id = response.json()["id"]
+
+    response = await client.delete(f"/api/v1/saved-searches/{search_id}")
+    assert response.status_code == 204
+
+    response = await client.get("/api/v1/saved-searches")
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_delete_nonexistent_saved_search(client: AsyncClient):
+    response = await client.delete("/api/v1/saved-searches/999999")
+    assert response.status_code == 404

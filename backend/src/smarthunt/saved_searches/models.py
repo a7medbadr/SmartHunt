@@ -1,19 +1,19 @@
 from datetime import datetime, timezone
+from typing import Optional
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import DateTime, String
+from sqlalchemy.orm import Mapped, mapped_column
 
-from smarthunt.database.session import Base
+from smarthunt.database.base import Base
 
 
 class SavedSearch(Base):
     __tablename__ = "saved_searches"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    keyword = Column(String, nullable=True)
-    location = Column(String, nullable=True)
-    source = Column(String, nullable=True)
-    created_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    keyword: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

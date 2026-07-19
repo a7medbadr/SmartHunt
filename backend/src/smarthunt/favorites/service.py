@@ -1,5 +1,9 @@
-from datetime import datetime, timezone
 from typing import List
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.favorites.models import FavoriteJob
 from smarthunt.favorites.schemas import FavoriteJobCreate
 
 
@@ -7,43 +11,38 @@ class FavoriteAlreadyExistsError(Exception):
     pass
 
 
+class FavoriteNotFoundError(Exception):
+    pass
+
+
 class FavoritesService:
-    def __init__(self):
-        self._favorites: List[dict] = []
-        self._counter = 1
+    async def add_favorite(self, db: AsyncSession, data: FavoriteJobCreate) -> FavoriteJob:
+        result = await db.execute(
+            select(FavoriteJob).where(FavoriteJob.job_id == data.job_id)
+        )
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            raise FavoriteAlreadyExistsError(
+                f"Job with id {data.job_id} is already in favorites"
+            )
 
-    def add_favorite(self, data: FavoriteJobCreate) -> dict:
-        str_job_id = str(data.job_id)
-        for fav in self._favorites:
-            if str(fav["job_id"]) == str_job_id:
-                raise FavoriteAlreadyExistsError(f"Job with id {str_job_id} is already in favorites")
+        favorite = FavoriteJob(job_id=data.job_id)
+        db.add(favorite)
+        await db.flush()
+        await db.refresh(favorite)
+        return favorite
 
-        item = {
-            "id": self._counter,
-            "job_id": str_job_id,
-            "title": data.title,
-            "company": data.company or "N/A",
-            "source": data.source or "N/A",
-            "created_at": datetime.now(timezone.utc),
-        }
-        self._counter += 1
-        self._favorites.append(item)
-        return item
+    async def list_favorites(self, db: AsyncSession) -> List[FavoriteJob]:
+        result = await db.execute(select(FavoriteJob).order_by(FavoriteJob.created_at))
+        return list(result.scalars().all())
 
-    def list_favorites(self) -> List[dict]:
-        return self._favorites
-
-    def delete_favorite(self, fav_id: str) -> bool:
-        str_id = str(fav_id)
-        for i, item in enumerate(self._favorites):
-            if str(item["id"]) == str_id or str(item["job_id"]) == str_id:
-                self._favorites.pop(i)
-                return True
-        return False
-
-    def clear(self):
-        self._favorites.clear()
-        self._counter = 1
+    async def delete_favorite(self, db: AsyncSession, job_id: int) -> None:
+        result = await db.execute(select(FavoriteJob).where(FavoriteJob.job_id == job_id))
+        favorite = result.scalar_one_or_none()
+        if favorite is None:
+            raise FavoriteNotFoundError(f"Favorite with job_id {job_id} not found")
+        await db.delete(favorite)
+        await db.flush()
 
 
 favorites_service = FavoritesService()

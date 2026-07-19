@@ -1,56 +1,84 @@
 import pytest
-from smarthunt.favorites.schemas import FavoriteJobCreate
-from smarthunt.favorites.service import favorites_service, FavoriteAlreadyExistsError
+import pytest_asyncio
+from httpx import AsyncClient
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.database.models.job import Job
+from smarthunt.favorites.models import FavoriteJob
 
 
-@pytest.fixture(autouse=True)
-def reset_service():
-    favorites_service.clear()
+@pytest_asyncio.fixture
+async def test_job(db_session: AsyncSession):
+    await db_session.execute(delete(FavoriteJob))
+    await db_session.execute(delete(Job))
+    await db_session.commit()
 
-
-def test_add_favorite():
-    data = FavoriteJobCreate(
-        job_id="101",
-        title="Senior Linux Engineer",
-        company="RedHat",
-        source="LinkedIn",
+    job = Job(
+        title="Senior Linux Administrator",
+        company="SmartHunt Test Co",
+        location="Riyadh",
+        description="Test job for favorites",
+        requirements="Linux, RHEL",
+        source="test",
+        url="http://example.com/job/1",
     )
-    res = favorites_service.add_favorite(data)
-    assert res["id"] == 1
-    assert res["job_id"] == "101"
-    assert res["title"] == "Senior Linux Engineer"
+
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    yield job.id
+
+    await db_session.execute(delete(FavoriteJob))
+    await db_session.execute(delete(Job))
+    await db_session.commit()
 
 
-def test_list_favorites():
-    fav1 = FavoriteJobCreate(job_id=1, title="Job 1")
-    fav2 = FavoriteJobCreate(job_id=2, title="Job 2")
-    favorites_service.add_favorite(fav1)
-    favorites_service.add_favorite(fav2)
+@pytest.mark.asyncio
+async def test_add_favorite(client: AsyncClient, test_job: int):
+    response = await client.post("/api/v1/favorites", json={"job_id": test_job})
 
-    items = favorites_service.list_favorites()
-    assert len(items) == 2
-    assert items[0]["title"] == "Job 1"
-    assert items[1]["title"] == "Job 2"
+    assert response.status_code == 201
+    data = response.json()
+    assert data["job_id"] == test_job
+    assert "id" in data
 
 
-def test_delete_favorite():
-    fav = FavoriteJobCreate(job_id="202", title="DevOps Role")
-    created = favorites_service.add_favorite(fav)
+@pytest.mark.asyncio
+async def test_add_duplicate_favorite(client: AsyncClient, test_job: int):
+    await client.post("/api/v1/favorites", json={"job_id": test_job})
+    response = await client.post("/api/v1/favorites", json={"job_id": test_job})
 
-    success = favorites_service.delete_favorite(created["id"])
-    assert success is True
-    assert len(favorites_service.list_favorites()) == 0
-
-
-def test_duplicate_favorite():
-    fav1 = FavoriteJobCreate(job_id="303", title="FastAPI Engineer")
-    favorites_service.add_favorite(fav1)
-
-    fav_duplicate = FavoriteJobCreate(job_id="303", title="FastAPI Engineer Duplicate")
-    with pytest.raises(FavoriteAlreadyExistsError):
-        favorites_service.add_favorite(fav_duplicate)
+    assert response.status_code == 400
 
 
-def test_invalid_request():
-    with pytest.raises(Exception):
-        FavoriteJobCreate(job_id="404")
+@pytest.mark.asyncio
+async def test_list_favorites(client: AsyncClient, test_job: int):
+    await client.post("/api/v1/favorites", json={"job_id": test_job})
+
+    response = await client.get("/api/v1/favorites")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["job_id"] == test_job
+
+
+@pytest.mark.asyncio
+async def test_delete_favorite(client: AsyncClient, test_job: int):
+    await client.post("/api/v1/favorites", json={"job_id": test_job})
+
+    response = await client.delete(f"/api/v1/favorites/{test_job}")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "deleted"}
+
+    response = await client.get("/api/v1/favorites")
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_delete_nonexistent_favorite(client: AsyncClient):
+    response = await client.delete("/api/v1/favorites/999999")
+    assert response.status_code == 404
