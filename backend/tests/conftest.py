@@ -6,18 +6,34 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from smarthunt.api.dependencies import get_db
-from smarthunt.database.session import DATABASE_URL
+from smarthunt.database.session import DATABASE_URL, Base
 from smarthunt.main import app
 
-# NullPool: كل session بتاخد connection جديدة تمامًا بدل ما تتشارك
-# connection قديمة اتعملها في event loop مختلف من test تاني (ده سبب
-# "another operation is in progress" / "Task pending" اللي كنا شايفينهم)
+# استيراد مديولات الموديلز لتسجل نفسها في Base.metadata
+import smarthunt.activity.models
+import smarthunt.favorites.models
+import smarthunt.recruitment.models
+import smarthunt.saved_searches.models
+import smarthunt.search.models
+
+# NullPool: كل session بتاخد connection جديدة تمامًا
 test_engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
 TestSessionLocal = async_sessionmaker(
     bind=test_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def setup_test_database():
+    """إنشاء جميع الجداول في داتابيز الاختبارات قبل بداية الـ Tests وتنظيفها بعد الانتهاء"""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest_asyncio.fixture
