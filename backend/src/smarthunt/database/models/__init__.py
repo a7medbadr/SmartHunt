@@ -8,6 +8,8 @@ from smarthunt.favorites.models import FavoriteJob
 from smarthunt.saved_searches.models import SavedSearch
 from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
+from smarthunt.notifications.models import Notification
+from smarthunt.settings.models import UserSettings
 
 __all__ = [
     "Application",
@@ -20,4 +22,6 @@ __all__ = [
     "SavedSearch",
     "JobNote",
     "JobTag",
+    "Notification",
+    "UserSettings",
 ]

@@ -18,6 +18,8 @@ from smarthunt.saved_searches.router import router as saved_searches_router
 from smarthunt.favorites.router import router as favorites_router
 from smarthunt.dashboard.api import router as dashboard_router
 from smarthunt.activity.api import router as activity_router
+from smarthunt.notifications.router import router as notifications_router
+from smarthunt.settings.router import router as settings_router
 
 api_router = APIRouter()
 
@@ -39,3 +41,5 @@ api_router.include_router(saved_searches_router, prefix="/saved-searches", tags=
 api_router.include_router(favorites_router, prefix="/favorites", tags=["favorites"])
 api_router.include_router(dashboard_router, tags=["dashboard"])
 api_router.include_router(activity_router, tags=["activity"])
+api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(settings_router, prefix="/settings", tags=["settings"])
