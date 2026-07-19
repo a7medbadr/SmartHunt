@@ -1,13 +1,17 @@
 from typing import Dict, Optional
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    async_playwright,
+)
 
 
 class BrowserManager:
     """
-    Singleton responsible for the real Playwright browser lifecycle and a
-    per-provider pool of BrowserContext/Page pairs, so each provider (LinkedIn,
-    Indeed, ...) gets an isolated browsing context instead of sharing state.
+    Singleton responsible for managing the Playwright browser lifecycle.
     """
 
     _instance: Optional["BrowserManager"] = None
@@ -21,9 +25,12 @@ class BrowserManager:
     def __init__(self):
         if self._initialized:
             return
+
         self._initialized = True
+
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
+
         self.contexts: Dict[str, BrowserContext] = {}
         self.pages: Dict[str, Page] = {}
 
@@ -34,15 +41,41 @@ class BrowserManager:
     async def launch(self, headless: bool = True) -> None:
         if self.browser is not None:
             return
+
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=headless)
+
+        self.browser = await self.playwright.chromium.launch(
+            headless=headless,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
 
     async def get_page(self, provider: str) -> Page:
         if self.browser is None:
             raise RuntimeError("Browser is not started. Call launch() first.")
 
         if provider not in self.contexts:
-            self.contexts[provider] = await self.browser.new_context()
+            context = await self.browser.new_context(
+                ignore_https_errors=True,
+                viewport={
+                    "width": 1366,
+                    "height": 768,
+                },
+                user_agent=(
+                    "Mozilla/5.0 (X11; Linux x86_64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/138.0.0.0 Safari/537.36"
+                ),
+            )
+
+            context.set_default_timeout(30000)
+            context.set_default_navigation_timeout(60000)
+
+            self.contexts[provider] = context
 
         if provider not in self.pages or self.pages[provider].is_closed():
             self.pages[provider] = await self.contexts[provider].new_page()
@@ -53,10 +86,12 @@ class BrowserManager:
         for page in self.pages.values():
             if not page.is_closed():
                 await page.close()
+
         self.pages.clear()
 
         for context in self.contexts.values():
             await context.close()
+
         self.contexts.clear()
 
         if self.browser is not None:
