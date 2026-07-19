@@ -1,11 +1,8 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base
 
-try:
-    from smarthunt.database.session import Base
-except ImportError:
-    Base = declarative_base()
+from sqlalchemy import Column, DateTime, Integer, String
+
+from smarthunt.database.session import Base
 
 
 class SavedSearch(Base):
@@ -16,4 +13,7 @@ class SavedSearch(Base):
     keyword = Column(String, nullable=True)
     location = Column(String, nullable=True)
     source = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )

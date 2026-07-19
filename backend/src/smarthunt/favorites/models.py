@@ -1,11 +1,8 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base
 
-try:
-    from smarthunt.database.session import Base
-except ImportError:
-    Base = declarative_base()
+from sqlalchemy import Column, DateTime, Integer, String
+
+from smarthunt.database.session import Base
 
 
 class FavoriteJob(Base):
@@ -16,4 +13,7 @@ class FavoriteJob(Base):
     title = Column(String, nullable=False)
     company = Column(String, nullable=True, default="N/A")
     source = Column(String, nullable=True, default="N/A")
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
