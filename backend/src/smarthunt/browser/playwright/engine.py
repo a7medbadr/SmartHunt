@@ -1,3 +1,6 @@
+from pathlib import Path
+import tempfile
+
 from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.browser.providers.linkedin.login import linkedin_login
 
@@ -18,6 +21,7 @@ class PlaywrightEngine:
         if provider.lower() == "linkedin":
             if not self.manager.is_running:
                 await self.manager.launch()
+
             page = await self.manager.get_page(provider)
             result = await linkedin_login(page)
             return {**result, "provider": provider}
@@ -30,11 +34,23 @@ class PlaywrightEngine:
     async def apply(self, job_url: str) -> dict:
         return {"status": "SUCCESS", "job_url": job_url}
 
-    async def take_screenshot(self, path: str = "screenshots/test.png") -> dict:
+    async def take_screenshot(self, path: str | None = None) -> dict:
         if not self.manager.is_running:
             await self.manager.launch()
+
         page = await self.manager.get_page("default")
+
+        if path is None:
+            screenshot_dir = Path(tempfile.gettempdir()) / "screenshots"
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            path = str(screenshot_dir / "test.png")
+        else:
+            target = Path(path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            path = str(target)
+
         await page.screenshot(path=path)
+
         return {"path": path}
 
 
