@@ -10,6 +10,8 @@ from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
 from smarthunt.notifications.models import Notification
 from smarthunt.settings.models import UserSettings
+from smarthunt.providers.health.models import ProviderHealth
+from smarthunt.scheduler.history.models import SchedulerHistory
 
 __all__ = [
     "Application",
@@ -24,4 +26,6 @@ __all__ = [
     "JobTag",
     "Notification",
     "UserSettings",
+    "ProviderHealth",
+    "SchedulerHistory",
 ]
