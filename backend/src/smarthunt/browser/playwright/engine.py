@@ -1,25 +1,27 @@
-from smarthunt.browser.playwright.models import EngineStatus
+from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.providers.linkedin.login import linkedin_login
 
 
 class PlaywrightEngine:
-    """
-    Mock automation engine. No real browser is launched yet — every method
-    returns a canned response so the rest of the system (queue, worker, API)
-    can be built and tested against a stable interface.
-    """
-
     def __init__(self):
-        self.status = EngineStatus.NOT_STARTED
+        self.manager = browser_manager
 
     async def start(self) -> dict:
-        self.status = EngineStatus.STARTED
+        await self.manager.launch()
         return {"status": "started"}
 
     async def stop(self) -> dict:
-        self.status = EngineStatus.NOT_STARTED
+        await self.manager.close()
         return {"status": "stopped"}
 
     async def login(self, provider: str) -> dict:
+        if provider.lower() == "linkedin":
+            if not self.manager.is_running:
+                await self.manager.launch()
+            page = await self.manager.get_page(provider)
+            result = await linkedin_login(page)
+            return {**result, "provider": provider}
+
         return {"status": "SUCCESS", "provider": provider}
 
     async def open_job(self, url: str) -> dict:
@@ -29,6 +31,10 @@ class PlaywrightEngine:
         return {"status": "SUCCESS", "job_url": job_url}
 
     async def take_screenshot(self, path: str = "screenshots/test.png") -> dict:
+        if not self.manager.is_running:
+            await self.manager.launch()
+        page = await self.manager.get_page("default")
+        await page.screenshot(path=path)
         return {"path": path}
 
 

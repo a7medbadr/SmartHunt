@@ -21,15 +21,15 @@ class Settings(BaseSettings):
     redis_url: str
 
     openai_api_key: str | None = None
-
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
+    linkedin_email: str | None = None
+    linkedin_password: str | None = None
+
     secret_key: str
     jwt_secret_key: str
-
     jwt_algorithm: str = "HS256"
-
     access_token_expire_minutes: int = Field(
         default=60,
         validation_alias=AliasChoices(
