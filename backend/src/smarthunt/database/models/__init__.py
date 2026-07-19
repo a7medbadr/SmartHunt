@@ -12,6 +12,8 @@ from smarthunt.notifications.models import Notification
 from smarthunt.settings.models import UserSettings
 from smarthunt.providers.health.models import ProviderHealth
 from smarthunt.scheduler.history.models import SchedulerHistory
+from smarthunt.apply_queue.models import ApplyQueueItem
+from smarthunt.browser.session.models import BrowserSession
 
 __all__ = [
     "Application",
@@ -28,4 +30,6 @@ __all__ = [
     "UserSettings",
     "ProviderHealth",
     "SchedulerHistory",
+    "ApplyQueueItem",
+    "BrowserSession",
 ]

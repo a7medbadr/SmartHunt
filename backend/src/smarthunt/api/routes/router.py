@@ -22,6 +22,8 @@ from smarthunt.notifications.router import router as notifications_router
 from smarthunt.settings.router import router as settings_router
 from smarthunt.providers.health.router import router as provider_health_router
 from smarthunt.scheduler.history.router import router as scheduler_history_router
+from smarthunt.apply_queue.router import router as apply_queue_router
+from smarthunt.browser.session.router import router as browser_session_router
 
 api_router = APIRouter()
 
@@ -47,3 +49,5 @@ api_router.include_router(notifications_router, prefix="/notifications", tags=["
 api_router.include_router(settings_router, prefix="/settings", tags=["settings"])
 api_router.include_router(provider_health_router, prefix="/providers/health", tags=["provider-health"])
 api_router.include_router(scheduler_history_router, prefix="/scheduler/history", tags=["scheduler-history"])
+api_router.include_router(apply_queue_router, prefix="/apply-queue", tags=["apply-queue"])
+api_router.include_router(browser_session_router, prefix="/browser/session", tags=["browser-session"])
