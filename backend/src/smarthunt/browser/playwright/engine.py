@@ -3,100 +3,46 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.browser.form_detector import (
-    form_detector,
-)
-
-from smarthunt.browser.navigation import (
-    navigation_service,
-)
-
-from smarthunt.browser.playwright.easy_apply import (
-    easy_apply_engine,
-)
-
-from smarthunt.browser.playwright.form_filler import (
-    form_filler_engine,
-)
-
-from smarthunt.browser.playwright.manager import (
-    browser_manager,
-)
-
-from smarthunt.browser.form_filler import (
-    FormFiller,
-)
-
-from smarthunt.browser.providers.linkedin.login import (
-    linkedin_login,
-)
-
-from smarthunt.core.exceptions import (
-    JobPageNotFound,
-)
-
+from smarthunt.browser.form_detector import form_detector
+from smarthunt.browser.form_filler import FormFiller
+from smarthunt.browser.navigation import navigation_service
+from smarthunt.browser.playwright.easy_apply import easy_apply_engine
+from smarthunt.browser.playwright.form_filler import form_filler_engine
+from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.providers.linkedin.login import linkedin_login
+from smarthunt.core.exceptions import JobPageNotFound
 from smarthunt.logging.logger import logger
-
-from smarthunt.recruitment.service import (
-    RecruitmentService,
-)
-
-from smarthunt.resume.profile_builder import (
-    resume_profile_builder,
-)
+from smarthunt.recruitment.service import RecruitmentService
+from smarthunt.resume.profile_builder import resume_profile_builder
 
 
 class PlaywrightEngine:
-
     def __init__(self):
         self.manager = browser_manager
 
     async def status(self):
-
         return {
             "running": self.manager.is_running,
             "browser_started": self.manager.browser is not None,
-            "active_contexts": len(
-                self.manager.contexts
-            ),
-            "active_pages": len(
-                self.manager.pages
-            ),
+            "active_contexts": len(self.manager.contexts),
+            "active_pages": len(self.manager.pages),
         }
 
     async def start(self):
-
         await self.manager.launch()
-
-        return {
-            "status": "started"
-        }
+        return {"status": "started"}
 
     async def stop(self):
-
         await self.manager.close()
+        return {"status": "stopped"}
 
-        return {
-            "status": "stopped"
-        }
-
-    async def login(
-        self,
-        provider: str,
-    ):
-
+    async def login(self, provider: str):
         if provider.lower() == "linkedin":
-
             if not self.manager.is_running:
                 await self.manager.launch()
 
-            page = await self.manager.get_page(
-                provider
-            )
-
-            result = await linkedin_login(
-                page
-            )
+            page = await self.manager.get_page(provider)
+            result = await linkedin_login(page)
 
             return {
                 **result,
@@ -108,67 +54,35 @@ class PlaywrightEngine:
             "provider": provider,
         }
 
-    async def open_job(
-        self,
-        job_url: str,
-    ):
-
+    async def open_job(self, job_url: str):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         try:
-
-            title = await navigation_service.open_job(
-                page=page,
-                url=job_url,
-            )
-
+            title = await navigation_service.open_job(page=page, url=job_url)
         except JobPageNotFound:
+            return {"status": "FAILED", "title": None}
 
-            return {
-                "status": "FAILED",
-                "title": None,
-            }
+        return {"status": "SUCCESS", "title": title}
 
-        return {
-            "status": "SUCCESS",
-            "title": title,
-        }
-
-    async def detect_form(
-        self,
-        job_url: str,
-    ):
-
+    async def detect_form(self, job_url: str):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         try:
-
-            await navigation_service.open_job(
-                page=page,
-                url=job_url,
-            )
-
+            await navigation_service.open_job(page=page, url=job_url)
         except JobPageNotFound:
-
             return {
                 "available": False,
                 "easy_apply": False,
                 "selector": None,
             }
 
-        form = await form_detector.detect(
-            page
-        )
+        form = await form_detector.detect(page)
 
         return {
             "available": form.available,
@@ -182,54 +96,31 @@ class PlaywrightEngine:
         application_id: str | None = None,
         db: AsyncSession | None = None,
     ):
-
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         try:
-
-            await navigation_service.open_job(
-                page=page,
-                url=job_url,
-            )
-
+            await navigation_service.open_job(page=page, url=job_url)
         except JobPageNotFound:
+            return {"status": "FAILED"}
 
-            return {
-                "status": "FAILED"
-            }
-
-        clicked = await easy_apply_engine.click_easy_apply(
-            page
-        )
+        clicked = await easy_apply_engine.click_easy_apply(page)
 
         if not clicked:
+            return {"status": "FAILED"}
 
-            return {
-                "status": "FAILED"
-            }
+        await easy_apply_engine.wait_modal(page)
 
-        await easy_apply_engine.wait_modal(
-            page
-        )
-
-        result = await easy_apply_engine.run(
-            page
-        )
+        result = await easy_apply_engine.run(page)
 
         if (
             result.get("status") == "PAUSED_UNKNOWN_QUESTION"
             and application_id
             and db is not None
         ):
-            await self._pause_application(
-                application_id,
-                db,
-            )
+            await self._pause_application(application_id, db)
 
         return result
 
@@ -238,14 +129,11 @@ class PlaywrightEngine:
         application_id: str,
         db: AsyncSession,
     ) -> None:
-
         try:
             app_uuid = UUID(application_id)
-
         except ValueError:
             logger.warning(
-                f"Invalid application_id={application_id}, "
-                "skipping status update"
+                f"Invalid application_id={application_id}, skipping status update"
             )
             return
 
@@ -258,75 +146,43 @@ class PlaywrightEngine:
 
         if updated is None:
             logger.warning(
-                f"Application {application_id} not found, "
-                "skipping status update"
+                f"Application {application_id} not found, skipping status update"
             )
 
-    async def fill_form(
-        self,
-        job_url: str,
-    ):
-
+    async def fill_form(self, job_url: str):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         if (
             job_url == "https://example.com"
-            or "linkedin.com/jobs/view/test"
-            in job_url
+            or "linkedin.com/jobs/view/test" in job_url
         ):
-
-            return {
-                "status": "SUCCESS"
-            }
+            return {"status": "SUCCESS"}
 
         try:
-
-            await navigation_service.open_job(
-                page=page,
-                url=job_url,
-            )
-
+            await navigation_service.open_job(page=page, url=job_url)
         except JobPageNotFound:
+            return {"status": "FAILED"}
 
-            return {
-                "status": "FAILED"
-            }
-
-        return await form_filler_engine.fill_form(
-            page
-        )
+        return await form_filler_engine.fill_form(page)
 
     async def fill_profile(
         self,
         job_url: str,
         resume: str,
     ):
-
         if not self.manager.is_running:
             await self.manager.launch()
 
-        profile = resume_profile_builder.build(
-            resume
-        )
+        profile = resume_profile_builder.build(resume)
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         try:
-
-            await navigation_service.open_job(
-                page=page,
-                url=job_url,
-            )
-
+            await navigation_service.open_job(page=page, url=job_url)
         except JobPageNotFound:
-
             return {
                 "status": "FAILED",
                 "filled_fields": 0,
@@ -352,62 +208,30 @@ class PlaywrightEngine:
             "unknown_questions": result["unknown_questions"],
         }
 
-    async def apply(
-        self,
-        job_url: str,
-    ):
-
+    async def apply(self, job_url: str):
         return {
             "status": "SUCCESS",
             "job_url": job_url,
         }
 
-    async def take_screenshot(
-        self,
-        path: str | None = None,
-    ):
-
+    async def take_screenshot(self, path: str | None = None):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page(
-            "default"
-        )
+        page = await self.manager.get_page("default")
 
         if path is None:
-
-            screenshot_dir = (
-                Path("/tmp")
-                / "screenshots"
-            )
-
-            screenshot_dir.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            path = str(
-                screenshot_dir / "test.png"
-            )
-
+            screenshot_dir = Path("/tmp") / "screenshots"
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            path = str(screenshot_dir / "test.png")
         else:
-
             target = Path(path)
-
-            target.parent.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
+            target.parent.mkdir(parents=True, exist_ok=True)
             path = str(target)
 
-        await page.screenshot(
-            path=path
-        )
+        await page.screenshot(path=path)
 
-        return {
-            "path": path
-        }
+        return {"path": path}
 
 
 playwright_engine = PlaywrightEngine()
