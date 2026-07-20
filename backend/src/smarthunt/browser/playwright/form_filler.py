@@ -13,16 +13,18 @@ class FormFillerEngine:
     """
 
     def get_profile(self) -> dict:
-        resume_path = resume_storage.get_resume_path()
+        info = resume_storage.get_resume_info()
 
         return {
             "first_name": "",
             "last_name": "",
             "email": "",
             "phone": "",
-            "resume_path": str(resume_path)
-            if resume_path
-            else None,
+            "resume_path": (
+                info["stored_path"]
+                if info.get("uploaded")
+                else None
+            ),
         }
 
     async def fill_textbox(
