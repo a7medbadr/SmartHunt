@@ -10,21 +10,22 @@ from fastapi import (
 
 from pydantic import BaseModel, Field
 
+from smarthunt.resume.api.schemas import (
+    ResumeProfileRequest,
+    ResumeProfileResponse,
+)
 from smarthunt.resume.parser.parser import extract_text
 from smarthunt.resume.parser.skills import extract_skills
-
+from smarthunt.resume.profile_builder import ResumeProfileBuilder
 from smarthunt.resume.reviewer.router import (
     router as reviewer_router,
 )
-
 from smarthunt.resume.services.generator import (
     generate_resume,
 )
-
 from smarthunt.resume.services.persistence import (
     resume_service,
 )
-
 from smarthunt.resume.storage.storage import (
     STORAGE_DIR,
 )
@@ -58,6 +59,18 @@ class ResumeGenerateResponse(BaseModel):
 
 class ResumeAnalyzeResponse(BaseModel):
     skills: list[str]
+
+
+@router.post(
+    "/profile",
+    response_model=ResumeProfileResponse,
+    status_code=status.HTTP_200_OK,
+)
+def build_resume_profile(
+    payload: ResumeProfileRequest,
+):
+    profile = ResumeProfileBuilder().build(payload.resume)
+    return ResumeProfileResponse(**profile.to_dict())
 
 
 @router.get(
@@ -110,17 +123,14 @@ def analyze_resume(
             detail="Only PDF files are allowed",
         )
 
-
     STORAGE_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-
     temp_path = STORAGE_DIR / (
         f"temp_{file.filename}"
     )
-
 
     try:
 
@@ -134,7 +144,6 @@ def analyze_resume(
                 buffer,
             )
 
-
         text = extract_text(
             temp_path
         )
@@ -143,17 +152,14 @@ def analyze_resume(
             text
         )
 
-
         return ResumeAnalyzeResponse(
             skills=skills
         )
-
 
     finally:
 
         if temp_path.exists():
             temp_path.unlink()
-
 
 
 @router.post(
