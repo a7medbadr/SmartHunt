@@ -1,12 +1,14 @@
 from pathlib import Path
 import tempfile
 
+from smarthunt.browser.form_detector import form_detector
+from smarthunt.browser.navigation import navigation_service
 from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.browser.providers.linkedin.login import linkedin_login
 
 
 class PlaywrightEngine:
-    def __init__(self):
+    def __init__(self) -> None:
         self.manager = browser_manager
 
     async def start(self) -> dict:
@@ -23,16 +25,59 @@ class PlaywrightEngine:
                 await self.manager.launch()
 
             page = await self.manager.get_page(provider)
+
             result = await linkedin_login(page)
-            return {**result, "provider": provider}
 
-        return {"status": "SUCCESS", "provider": provider}
+            return {
+                **result,
+                "provider": provider,
+            }
 
-    async def open_job(self, url: str) -> dict:
-        return {"status": "SUCCESS", "job_url": url}
+        return {
+            "status": "SUCCESS",
+            "provider": provider,
+        }
+
+    async def open_job(self, job_url: str) -> dict:
+        if not self.manager.is_running:
+            await self.manager.launch()
+
+        page = await self.manager.get_page("default")
+
+        title = await navigation_service.open_job(
+            page=page,
+            url=job_url,
+        )
+
+        return {
+            "status": "SUCCESS",
+            "title": title,
+        }
+
+    async def detect_form(self, job_url: str) -> dict:
+        if not self.manager.is_running:
+            await self.manager.launch()
+
+        page = await self.manager.get_page("default")
+
+        await navigation_service.open_job(
+            page=page,
+            url=job_url,
+        )
+
+        form = await form_detector.detect(page)
+
+        return {
+            "available": form.available,
+            "easy_apply": form.easy_apply,
+            "selector": form.selector,
+        }
 
     async def apply(self, job_url: str) -> dict:
-        return {"status": "SUCCESS", "job_url": job_url}
+        return {
+            "status": "SUCCESS",
+            "job_url": job_url,
+        }
 
     async def take_screenshot(self, path: str | None = None) -> dict:
         if not self.manager.is_running:
@@ -51,7 +96,9 @@ class PlaywrightEngine:
 
         await page.screenshot(path=path)
 
-        return {"path": path}
+        return {
+            "path": path,
+        }
 
 
 playwright_engine = PlaywrightEngine()
