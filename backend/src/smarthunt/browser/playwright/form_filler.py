@@ -2,6 +2,16 @@ from pathlib import Path
 
 from playwright.async_api import Page
 
+from smarthunt.browser.playwright.retry import retry_executor
+from smarthunt.browser.question_classifier import (
+    QuestionType,
+    classify,
+)
+from smarthunt.browser.unknown_questions import (
+    UnknownQuestionRecord,
+    unknown_question_repository,
+)
+from smarthunt.logging.logger import logger
 from smarthunt.resume.storage.storage import (
     resume_storage,
 )
@@ -33,7 +43,13 @@ class FormFillerEngine:
         selector: str,
         value: str,
     ):
-        await page.locator(selector).fill(value)
+        await retry_executor.run(
+            page.locator(selector).fill,
+            value,
+            operation="fill",
+            provider="linkedin",
+            page_url=page.url,
+        )
 
     async def fill_textarea(
         self,
@@ -41,7 +57,13 @@ class FormFillerEngine:
         selector: str,
         value: str,
     ):
-        await page.locator(selector).fill(value)
+        await retry_executor.run(
+            page.locator(selector).fill,
+            value,
+            operation="fill",
+            provider="linkedin",
+            page_url=page.url,
+        )
 
     async def fill_select(
         self,
@@ -49,7 +71,13 @@ class FormFillerEngine:
         selector: str,
         value: str,
     ):
-        await page.locator(selector).select_option(value)
+        await retry_executor.run(
+            page.locator(selector).select_option,
+            value,
+            operation="select_option",
+            provider="linkedin",
+            page_url=page.url,
+        )
 
     async def fill_checkbox(
         self,
@@ -59,14 +87,24 @@ class FormFillerEngine:
         checkbox = page.locator(selector)
 
         if not await checkbox.is_checked():
-            await checkbox.check()
+            await retry_executor.run(
+                checkbox.check,
+                operation="click",
+                provider="linkedin",
+                page_url=page.url,
+            )
 
     async def fill_radio(
         self,
         page: Page,
         selector: str,
     ):
-        await page.locator(selector).check()
+        await retry_executor.run(
+            page.locator(selector).check,
+            operation="click",
+            provider="linkedin",
+            page_url=page.url,
+        )
 
     async def upload_resume(
         self,
@@ -81,13 +119,18 @@ class FormFillerEngine:
         path = Path(resume_path)
 
         if path.exists():
-            await page.locator(selector).set_input_files(
-                str(path)
+            await retry_executor.run(
+                page.locator(selector).set_input_files,
+                str(path),
+                operation="fill",
+                provider="linkedin",
+                page_url=page.url,
             )
 
     async def fill_form(
         self,
         page: Page,
+        provider: str = "linkedin",
     ) -> dict:
 
         profile = self.get_profile()
@@ -114,13 +157,21 @@ class FormFillerEngine:
                 ).lower()
 
                 if "email" in field:
-                    await element.fill(
-                        profile["email"]
+                    await retry_executor.run(
+                        element.fill,
+                        profile["email"],
+                        operation="fill",
+                        provider=provider,
+                        page_url=page.url,
                     )
 
                 elif "phone" in field:
-                    await element.fill(
-                        profile["phone"]
+                    await retry_executor.run(
+                        element.fill,
+                        profile["phone"],
+                        operation="fill",
+                        provider=provider,
+                        page_url=page.url,
                     )
 
                 elif (
@@ -135,13 +186,19 @@ class FormFillerEngine:
                     )
 
                 elif input_type == "checkbox":
-                    await element.check()
+                    await retry_executor.run(
+                        element.check,
+                        operation="click",
+                        provider=provider,
+                        page_url=page.url,
+                    )
 
             except Exception:
                 continue
 
         unknown = await self.detect_unknown_question(
-            page
+            page,
+            provider=provider,
         )
 
         if unknown:
@@ -157,6 +214,7 @@ class FormFillerEngine:
     async def detect_unknown_question(
         self,
         page: Page,
+        provider: str = "linkedin",
     ):
 
         questions = [
@@ -172,6 +230,28 @@ class FormFillerEngine:
 
         for question in questions:
             if question in text:
+
+                question_type = classify(question)
+
+                await unknown_question_repository.save(
+                    UnknownQuestionRecord(
+                        provider=provider,
+                        url=getattr(page, "url", "unknown"),
+                        label=question,
+                        html=text[:2000],
+                        confidence=(
+                            0.3
+                            if question_type is QuestionType.UNKNOWN
+                            else 0.6
+                        ),
+                    )
+                )
+
+                logger.info(
+                    f"UnknownQuestion provider={provider} "
+                    f"label={question} type={question_type.value}"
+                )
+
                 return question
 
         return None

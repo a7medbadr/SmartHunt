@@ -37,7 +37,7 @@ async def update_queue_status(
     except ApplyQueueNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ApplyQueueInvalidStatusError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

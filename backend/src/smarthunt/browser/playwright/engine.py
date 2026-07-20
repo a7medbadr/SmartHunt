@@ -1,4 +1,7 @@
 from pathlib import Path
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.browser.form_detector import (
     form_detector,
@@ -32,6 +35,12 @@ from smarthunt.core.exceptions import (
     JobPageNotFound,
 )
 
+from smarthunt.logging.logger import logger
+
+from smarthunt.recruitment.service import (
+    RecruitmentService,
+)
+
 from smarthunt.resume.profile_builder import (
     resume_profile_builder,
 )
@@ -41,6 +50,19 @@ class PlaywrightEngine:
 
     def __init__(self):
         self.manager = browser_manager
+
+    async def status(self):
+
+        return {
+            "running": self.manager.is_running,
+            "browser_started": self.manager.browser is not None,
+            "active_contexts": len(
+                self.manager.contexts
+            ),
+            "active_pages": len(
+                self.manager.pages
+            ),
+        }
 
     async def start(self):
 
@@ -157,6 +179,8 @@ class PlaywrightEngine:
     async def easy_apply(
         self,
         job_url: str,
+        application_id: str | None = None,
+        db: AsyncSession | None = None,
     ):
 
         if not self.manager.is_running:
@@ -193,14 +217,50 @@ class PlaywrightEngine:
             page
         )
 
-        while await easy_apply_engine.next_step(
-            page
-        ):
-            pass
-
-        return await easy_apply_engine.submit(
+        result = await easy_apply_engine.run(
             page
         )
+
+        if (
+            result.get("status") == "PAUSED_UNKNOWN_QUESTION"
+            and application_id
+            and db is not None
+        ):
+            await self._pause_application(
+                application_id,
+                db,
+            )
+
+        return result
+
+    async def _pause_application(
+        self,
+        application_id: str,
+        db: AsyncSession,
+    ) -> None:
+
+        try:
+            app_uuid = UUID(application_id)
+
+        except ValueError:
+            logger.warning(
+                f"Invalid application_id={application_id}, "
+                "skipping status update"
+            )
+            return
+
+        service = RecruitmentService(db)
+
+        updated = await service.update_status(
+            app_uuid,
+            "PAUSED_UNKNOWN_QUESTION",
+        )
+
+        if updated is None:
+            logger.warning(
+                f"Application {application_id} not found, "
+                "skipping status update"
+            )
 
     async def fill_form(
         self,

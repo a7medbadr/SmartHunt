@@ -13,6 +13,7 @@ class ApplyRequest(BaseModel):
 
 class EasyApplyRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
+    application_id: Optional[str] = None
 
 
 class FormFillRequest(BaseModel):
@@ -38,8 +39,16 @@ class StatusResponse(BaseModel):
     job_url: Optional[str] = None
 
 
+class PlaywrightStatusResponse(BaseModel):
+    running: bool
+    browser_started: bool
+    active_contexts: int
+    active_pages: int
+
+
 class EasyApplyResponse(BaseModel):
     status: str
+    question: Optional[str] = None
 
 
 class FormFillResponse(BaseModel):

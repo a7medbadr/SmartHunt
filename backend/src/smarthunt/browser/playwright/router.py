@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.api.dependencies import get_db
 
 from smarthunt.browser.playwright.engine import (
     playwright_engine,
@@ -17,6 +20,7 @@ from smarthunt.browser.playwright.schemas import (
     LoginRequest,
     OpenJobRequest,
     OpenJobResponse,
+    PlaywrightStatusResponse,
     ScreenshotResponse,
     StatusResponse,
 )
@@ -26,6 +30,14 @@ router = APIRouter(
     prefix="",
     tags=["playwright"],
 )
+
+
+@router.get(
+    "/status",
+    response_model=PlaywrightStatusResponse,
+)
+async def status():
+    return await playwright_engine.status()
 
 
 @router.post(
@@ -88,9 +100,14 @@ async def apply(payload: ApplyRequest):
     "/easy-apply",
     response_model=EasyApplyResponse,
 )
-async def easy_apply(payload: EasyApplyRequest):
+async def easy_apply(
+    payload: EasyApplyRequest,
+    db: AsyncSession = Depends(get_db),
+):
     return await playwright_engine.easy_apply(
-        payload.job_url
+        payload.job_url,
+        application_id=payload.application_id,
+        db=db,
     )
 
 

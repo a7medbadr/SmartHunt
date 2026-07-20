@@ -1,6 +1,27 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
+
+from smarthunt.browser.question_classifier import (
+    QuestionType,
+    classify,
+)
 from smarthunt.domain import ResumeProfile
+
+
+class Decision(str, Enum):
+    ANSWER = "ANSWER"
+    UNKNOWN = "UNKNOWN"
+    SKIP = "SKIP"
+
+
+@dataclass(slots=True)
+class QuestionDecision:
+    decision: Decision
+    answer: str | None = None
+    confidence: float = 0.0
+    reason: str = ""
 
 
 class QuestionAnswerer:
@@ -15,9 +36,21 @@ class QuestionAnswerer:
         self,
         question: str,
         profile: ResumeProfile,
-    ) -> str | None:
+    ) -> QuestionDecision:
 
         normalized = self._normalize(question)
+
+        if not normalized:
+            return QuestionDecision(
+                decision=Decision.SKIP,
+                reason="empty question",
+            )
+
+        if classify(question) is QuestionType.UNSUPPORTED:
+            return QuestionDecision(
+                decision=Decision.SKIP,
+                reason="unsupported question type",
+            )
 
         mapping = (
             ("email", profile.email),
@@ -62,9 +95,29 @@ class QuestionAnswerer:
 
         for keyword, value in mapping:
             if keyword in normalized:
-                return value
 
-        return None
+                if value is None:
+                    return QuestionDecision(
+                        decision=Decision.UNKNOWN,
+                        confidence=0.5,
+                        reason=(
+                            f"matched '{keyword}' but "
+                            "profile value is missing"
+                        ),
+                    )
+
+                return QuestionDecision(
+                    decision=Decision.ANSWER,
+                    answer=value,
+                    confidence=1.0,
+                    reason=f"matched keyword '{keyword}'",
+                )
+
+        return QuestionDecision(
+            decision=Decision.UNKNOWN,
+            confidence=0.0,
+            reason="no keyword match",
+        )
 
     @staticmethod
     def _normalize(question: str) -> str:

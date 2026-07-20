@@ -43,10 +43,15 @@ async def test_get_page_creates_context_and_page_per_provider():
     manager.contexts = {}
     manager.pages = {}
 
-    mock_context = AsyncMock()
+    mock_context = MagicMock()
+    mock_context.new_page = AsyncMock()
+
     mock_page = AsyncMock()
     mock_page.is_closed = MagicMock(return_value=False)
-    mock_context.new_page = AsyncMock(return_value=mock_page)
+
+    mock_context.new_page.return_value = mock_page
+    mock_context.set_default_timeout = MagicMock()
+    mock_context.set_default_navigation_timeout = MagicMock()
 
     manager.browser = AsyncMock()
     manager.browser.new_context = AsyncMock(return_value=mock_context)
@@ -56,6 +61,9 @@ async def test_get_page_creates_context_and_page_per_provider():
     assert page is mock_page
     assert "linkedin" in manager.contexts
     assert "linkedin" in manager.pages
+
+    mock_context.set_default_timeout.assert_called_once()
+    mock_context.set_default_navigation_timeout.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -73,6 +81,7 @@ async def test_close_shuts_down_browser_and_playwright():
 
     mock_page = AsyncMock()
     mock_page.is_closed = MagicMock(return_value=False)
+
     mock_context = AsyncMock()
     mock_browser = AsyncMock()
     mock_playwright = AsyncMock()
@@ -88,6 +97,7 @@ async def test_close_shuts_down_browser_and_playwright():
     mock_context.close.assert_called_once()
     mock_browser.close.assert_called_once()
     mock_playwright.stop.assert_called_once()
+
     assert manager.browser is None
     assert manager.playwright is None
     assert manager.pages == {}

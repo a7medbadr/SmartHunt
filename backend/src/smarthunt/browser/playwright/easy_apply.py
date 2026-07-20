@@ -1,5 +1,10 @@
 from playwright.async_api import Page
 
+from smarthunt.browser.playwright.form_filler import (
+    form_filler_engine,
+)
+from smarthunt.browser.playwright.retry import retry_executor
+
 
 class EasyApplyEngine:
     """
@@ -18,7 +23,12 @@ class EasyApplyEngine:
                 button = page.locator(selector).first
 
                 if await button.count() > 0:
-                    await button.click()
+                    await retry_executor.run(
+                        button.click,
+                        operation="click",
+                        provider="linkedin",
+                        page_url=page.url,
+                    )
                     return True
 
             except Exception:
@@ -38,7 +48,13 @@ class EasyApplyEngine:
                 modal = page.locator(selector).first
 
                 if await modal.count() > 0:
-                    await modal.wait_for(timeout=10000)
+                    await retry_executor.run(
+                        modal.wait_for,
+                        operation="wait_for_selector",
+                        provider="linkedin",
+                        page_url=page.url,
+                        timeout=10000,
+                    )
                     return True
 
             except Exception:
@@ -58,7 +74,12 @@ class EasyApplyEngine:
                 button = page.locator(selector).first
 
                 if await button.count() > 0:
-                    await button.click()
+                    await retry_executor.run(
+                        button.click,
+                        operation="click",
+                        provider="linkedin",
+                        page_url=page.url,
+                    )
                     await page.wait_for_timeout(1000)
                     return True
 
@@ -90,7 +111,12 @@ class EasyApplyEngine:
                 button = page.locator(selector).first
 
                 if await button.count() > 0:
-                    await button.click()
+                    await retry_executor.run(
+                        button.click,
+                        operation="click",
+                        provider="linkedin",
+                        page_url=page.url,
+                    )
 
                     await page.wait_for_timeout(2000)
 
@@ -110,11 +136,28 @@ class EasyApplyEngine:
 
 
     async def run(self, page: Page) -> dict:
+        """
+        Steps through the Easy Apply modal.
+
+        Fills the current step's fields first; if an unknown
+        question blocks filling, the workflow pauses instead
+        of submitting or failing.
+        """
 
         max_steps = 5
         steps = 0
 
         while steps < max_steps:
+
+            fill_result = await form_filler_engine.fill_form(
+                page
+            )
+
+            if fill_result.get("status") == "QUESTION_REQUIRED":
+                return {
+                    "status": "PAUSED_UNKNOWN_QUESTION",
+                    "question": fill_result.get("question"),
+                }
 
             moved = await self.next_step(page)
 

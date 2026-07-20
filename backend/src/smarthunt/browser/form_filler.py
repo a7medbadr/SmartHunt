@@ -3,10 +3,15 @@ from __future__ import annotations
 from playwright.async_api import Locator, Page
 
 from smarthunt.browser.question_answerer import (
+    Decision,
     question_answerer,
 )
-
+from smarthunt.browser.unknown_questions import (
+    UnknownQuestionRecord,
+    unknown_question_repository,
+)
 from smarthunt.domain import ResumeProfile
+from smarthunt.logging.logger import logger
 
 
 class FormFiller:
@@ -25,9 +30,11 @@ class FormFiller:
         self,
         page: Page,
         profile: ResumeProfile,
+        provider: str = "unknown",
     ):
         self.page = page
         self.profile = profile
+        self.provider = provider
 
         self.filled_fields = 0
         self.unknown_questions: list[str] = []
@@ -38,25 +45,63 @@ class FormFiller:
         question: str,
     ) -> bool:
 
-        answer = question_answerer.answer(
+        decision = question_answerer.answer(
             question,
             self.profile,
         )
 
-        if answer is None:
-            self.unknown_questions.append(
-                question
+        if decision.decision == Decision.ANSWER:
+            await locator.fill(
+                decision.answer
             )
 
-            return False
+            self.filled_fields += 1
 
-        await locator.fill(
-            answer
+            return True
+
+        self.unknown_questions.append(
+            question
         )
 
-        self.filled_fields += 1
+        await self._save_unknown_question(
+            locator,
+            question,
+            decision,
+        )
 
-        return True
+        return False
+
+    async def _save_unknown_question(
+        self,
+        locator: Locator,
+        question: str,
+        decision,
+    ) -> None:
+
+        html = ""
+
+        try:
+            html = await locator.evaluate(
+                "el => el.outerHTML"
+            )
+        except Exception:
+            html = ""
+
+        await unknown_question_repository.save(
+            UnknownQuestionRecord(
+                provider=self.provider,
+                url=getattr(self.page, "url", "unknown"),
+                label=question,
+                html=html,
+                confidence=decision.confidence,
+            )
+        )
+
+        logger.info(
+            f"UnknownQuestion provider={self.provider} "
+            f"label={question} decision={decision.decision.value} "
+            f"reason={decision.reason}"
+        )
 
     async def fill_textareas(self):
 
