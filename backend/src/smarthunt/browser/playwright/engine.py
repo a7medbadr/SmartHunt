@@ -12,6 +12,10 @@ from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.browser.providers.linkedin.login import linkedin_login
 from smarthunt.core.exceptions import JobPageNotFound
 from smarthunt.logging.logger import logger
+from smarthunt.metrics.scheduler_lock import (
+    scheduler_lock_acquired_total,
+    scheduler_lock_conflicts_total,
+)
 from smarthunt.recruitment.service import RecruitmentService
 from smarthunt.resume.profile_builder import resume_profile_builder
 
@@ -109,7 +113,10 @@ class PlaywrightEngine:
         clicked = await easy_apply_engine.click_easy_apply(page)
 
         if not clicked:
+            scheduler_lock_conflicts_total.inc()
             return {"status": "FAILED"}
+
+        scheduler_lock_acquired_total.inc()
 
         await easy_apply_engine.wait_modal(page)
 

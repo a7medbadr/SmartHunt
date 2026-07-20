@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.database.session import get_db
+from smarthunt.api.dependencies import get_db
 from smarthunt.apply_queue.models import ApplyQueueItem
 from smarthunt.apply_queue.schemas import ApplyQueueResponse
 from smarthunt.browser.playwright.engine import playwright_engine
+from smarthunt.scheduler.locks.service import scheduler_lock_service
 
 
 class AutoApplyWorkerNotFoundError(Exception):
@@ -38,6 +39,14 @@ class AutoApplyWorker:
         if item is None:
             return None
 
+        locked = await scheduler_lock_service.acquire(
+            db,
+            str(item.job_id),
+        )
+
+        if not locked:
+            return None
+
         item.status = "RUNNING"
         await db.flush()
 
@@ -57,6 +66,13 @@ class AutoApplyWorker:
 
             item.status = "FAILED"
 
+        finally:
+
+            await scheduler_lock_service.release(
+                db,
+                str(item.job_id),
+            )
+
         await db.flush()
         await db.refresh(item)
 
@@ -71,7 +87,9 @@ class AutoApplyWorker:
 
         while True:
 
-            item = await self.process_next(db)
+            item = await self.process_next(
+                db,
+            )
 
             if item is None:
                 break
@@ -91,7 +109,9 @@ class AutoApplyWorker:
             )
         )
 
-        failed_items = list(result.scalars().all())
+        failed_items = list(
+            result.scalars().all()
+        )
 
         retried: List[ApplyQueueItem] = []
 
@@ -100,7 +120,9 @@ class AutoApplyWorker:
             item.status = "PENDING"
             await db.flush()
 
-            processed = await self.process_next(db)
+            processed = await self.process_next(
+                db,
+            )
 
             if processed is not None:
                 retried.append(processed)

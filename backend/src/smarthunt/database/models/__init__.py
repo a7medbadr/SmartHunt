@@ -13,6 +13,7 @@ from smarthunt.notifications.models import Notification
 from smarthunt.providers.health.models import ProviderHealth
 from smarthunt.saved_searches.models import SavedSearch
 from smarthunt.scheduler.history.models import SchedulerHistory
+from smarthunt.scheduler.locks.models import SchedulerLock
 from smarthunt.settings.models import UserSettings
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "Resume",
     "SavedSearch",
     "SchedulerHistory",
+    "SchedulerLock",
     "SearchHistory",
     "User",
     "UserSettings",
