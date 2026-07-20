@@ -1,20 +1,40 @@
 from pathlib import Path
 
-from smarthunt.browser.form_detector import form_detector
-from smarthunt.browser.navigation import navigation_service
+from smarthunt.browser.form_detector import (
+    form_detector,
+)
+
+from smarthunt.browser.navigation import (
+    navigation_service,
+)
+
 from smarthunt.browser.playwright.easy_apply import (
     easy_apply_engine,
 )
+
 from smarthunt.browser.playwright.form_filler import (
     form_filler_engine,
 )
+
 from smarthunt.browser.playwright.manager import (
     browser_manager,
 )
+
+from smarthunt.browser.form_filler import (
+    FormFiller,
+)
+
 from smarthunt.browser.providers.linkedin.login import (
     linkedin_login,
 )
-from smarthunt.core.exceptions import JobPageNotFound
+
+from smarthunt.core.exceptions import (
+    JobPageNotFound,
+)
+
+from smarthunt.resume.profile_builder import (
+    resume_profile_builder,
+)
 
 
 class PlaywrightEngine:
@@ -220,6 +240,57 @@ class PlaywrightEngine:
         return await form_filler_engine.fill_form(
             page
         )
+
+    async def fill_profile(
+        self,
+        job_url: str,
+        resume: str,
+    ):
+
+        if not self.manager.is_running:
+            await self.manager.launch()
+
+        profile = resume_profile_builder.build(
+            resume
+        )
+
+        page = await self.manager.get_page(
+            "default"
+        )
+
+        try:
+
+            await navigation_service.open_job(
+                page=page,
+                url=job_url,
+            )
+
+        except JobPageNotFound:
+
+            return {
+                "status": "FAILED",
+                "filled_fields": 0,
+                "unknown_questions": [],
+            }
+
+        filler = FormFiller(
+            page=page,
+            profile=profile,
+        )
+
+        result = await filler.fill_textareas()
+
+        status = (
+            "SUCCESS"
+            if not result["unknown_questions"]
+            else "PARTIAL_SUCCESS"
+        )
+
+        return {
+            "status": status,
+            "filled_fields": result["filled_fields"],
+            "unknown_questions": result["unknown_questions"],
+        }
 
     async def apply(
         self,

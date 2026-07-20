@@ -19,6 +19,11 @@ class FormFillRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
 
 
+class FillProfileRequest(BaseModel):
+    job_url: str = Field(..., min_length=1)
+    resume: str = Field(..., min_length=1)
+
+
 class OpenJobRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
 
@@ -40,6 +45,12 @@ class EasyApplyResponse(BaseModel):
 class FormFillResponse(BaseModel):
     status: str
     question: Optional[str] = None
+
+
+class FillProfileResponse(BaseModel):
+    status: str
+    filled_fields: int
+    unknown_questions: list[str]
 
 
 class ScreenshotResponse(BaseModel):

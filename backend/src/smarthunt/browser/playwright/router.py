@@ -10,6 +10,8 @@ from smarthunt.browser.playwright.schemas import (
     DetectFormResponse,
     EasyApplyRequest,
     EasyApplyResponse,
+    FillProfileRequest,
+    FillProfileResponse,
     FormFillRequest,
     FormFillResponse,
     LoginRequest,
@@ -31,7 +33,6 @@ router = APIRouter(
     response_model=StatusResponse,
 )
 async def start_engine():
-
     return await playwright_engine.start()
 
 
@@ -40,7 +41,6 @@ async def start_engine():
     response_model=StatusResponse,
 )
 async def stop_engine():
-
     return await playwright_engine.stop()
 
 
@@ -48,10 +48,7 @@ async def stop_engine():
     "/login",
     response_model=StatusResponse,
 )
-async def login(
-    payload: LoginRequest,
-):
-
+async def login(payload: LoginRequest):
     return await playwright_engine.login(
         payload.provider
     )
@@ -61,10 +58,7 @@ async def login(
     "/open-job",
     response_model=OpenJobResponse,
 )
-async def open_job(
-    payload: OpenJobRequest,
-):
-
+async def open_job(payload: OpenJobRequest):
     return await playwright_engine.open_job(
         payload.job_url
     )
@@ -74,10 +68,7 @@ async def open_job(
     "/detect-form",
     response_model=DetectFormResponse,
 )
-async def detect_form(
-    payload: DetectFormRequest,
-):
-
+async def detect_form(payload: DetectFormRequest):
     return await playwright_engine.detect_form(
         payload.job_url
     )
@@ -87,10 +78,7 @@ async def detect_form(
     "/apply",
     response_model=StatusResponse,
 )
-async def apply(
-    payload: ApplyRequest,
-):
-
+async def apply(payload: ApplyRequest):
     return await playwright_engine.apply(
         payload.job_url
     )
@@ -100,10 +88,7 @@ async def apply(
     "/easy-apply",
     response_model=EasyApplyResponse,
 )
-async def easy_apply(
-    payload: EasyApplyRequest,
-):
-
+async def easy_apply(payload: EasyApplyRequest):
     return await playwright_engine.easy_apply(
         payload.job_url
     )
@@ -113,12 +98,22 @@ async def easy_apply(
     "/fill-form",
     response_model=FormFillResponse,
 )
-async def fill_form(
-    payload: FormFillRequest,
-):
-
+async def fill_form(payload: FormFillRequest):
     return await playwright_engine.fill_form(
         payload.job_url
+    )
+
+
+@router.post(
+    "/fill-profile",
+    response_model=FillProfileResponse,
+)
+async def fill_profile(
+    payload: FillProfileRequest,
+):
+    return await playwright_engine.fill_profile(
+        payload.job_url,
+        payload.resume,
     )
 
 
@@ -127,5 +122,4 @@ async def fill_form(
     response_model=ScreenshotResponse,
 )
 async def screenshot():
-
     return await playwright_engine.take_screenshot()
