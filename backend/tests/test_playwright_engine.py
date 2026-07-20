@@ -30,7 +30,7 @@ def mock_browser_manager(monkeypatch):
         return_value=MagicMock()
     )
 
-    mock_page.url = "https://www.linkedin.com/jobs/view/test"
+    mock_page.url = "https://www.linkedin.com/feed/"
 
     locator = MagicMock()
 
@@ -186,6 +186,7 @@ async def test_screenshot(client: AsyncClient):
     data = response.json()
 
     assert "path" in data
+
     assert data["path"].endswith(
         "screenshots/test.png"
     )
