@@ -5,6 +5,7 @@ from smarthunt.browser.form_detector import form_detector
 from smarthunt.browser.navigation import navigation_service
 from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.browser.providers.linkedin.login import linkedin_login
+from smarthunt.core.exceptions import JobPageNotFound
 
 
 class PlaywrightEngine:
@@ -44,10 +45,16 @@ class PlaywrightEngine:
 
         page = await self.manager.get_page("default")
 
-        title = await navigation_service.open_job(
-            page=page,
-            url=job_url,
-        )
+        try:
+            title = await navigation_service.open_job(
+                page=page,
+                url=job_url,
+            )
+        except JobPageNotFound:
+            return {
+                "status": "FAILED",
+                "title": None,
+            }
 
         return {
             "status": "SUCCESS",
@@ -60,10 +67,17 @@ class PlaywrightEngine:
 
         page = await self.manager.get_page("default")
 
-        await navigation_service.open_job(
-            page=page,
-            url=job_url,
-        )
+        try:
+            await navigation_service.open_job(
+                page=page,
+                url=job_url,
+            )
+        except JobPageNotFound:
+            return {
+                "available": False,
+                "easy_apply": False,
+                "selector": None,
+            }
 
         form = await form_detector.detect(page)
 
