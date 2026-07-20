@@ -11,6 +11,14 @@ class ApplyRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
 
 
+class EasyApplyRequest(BaseModel):
+    job_url: str = Field(..., min_length=1)
+
+
+class FormFillRequest(BaseModel):
+    job_url: str = Field(..., min_length=1)
+
+
 class OpenJobRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
 
@@ -23,6 +31,15 @@ class StatusResponse(BaseModel):
     status: str
     provider: Optional[str] = None
     job_url: Optional[str] = None
+
+
+class EasyApplyResponse(BaseModel):
+    status: str
+
+
+class FormFillResponse(BaseModel):
+    status: str
+    question: Optional[str] = None
 
 
 class ScreenshotResponse(BaseModel):

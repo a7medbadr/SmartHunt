@@ -10,19 +10,19 @@ from playwright.async_api import (
 
 
 class BrowserManager:
-    """
-    Singleton responsible for managing the Playwright browser lifecycle.
-    """
 
     _instance: Optional["BrowserManager"] = None
 
     def __new__(cls):
+
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
+
         return cls._instance
 
     def __init__(self):
+
         if self._initialized:
             return
 
@@ -38,7 +38,11 @@ class BrowserManager:
     def is_running(self) -> bool:
         return self.browser is not None
 
-    async def launch(self, headless: bool = True) -> None:
+    async def launch(
+        self,
+        headless: bool = True,
+    ) -> None:
+
         if self.browser is not None:
             return
 
@@ -54,11 +58,18 @@ class BrowserManager:
             ],
         )
 
-    async def get_page(self, provider: str) -> Page:
+    async def get_page(
+        self,
+        provider: str,
+    ) -> Page:
+
         if self.browser is None:
-            raise RuntimeError("Browser is not started. Call launch() first.")
+            raise RuntimeError(
+                "Browser is not started. Call launch() first."
+            )
 
         if provider not in self.contexts:
+
             context = await self.browser.new_context(
                 ignore_https_errors=True,
                 viewport={
@@ -72,18 +83,31 @@ class BrowserManager:
                 ),
             )
 
-            context.set_default_timeout(30000)
-            context.set_default_navigation_timeout(60000)
+            context.set_default_timeout(
+                10000
+            )
+
+            context.set_default_navigation_timeout(
+                10000
+            )
 
             self.contexts[provider] = context
 
-        if provider not in self.pages or self.pages[provider].is_closed():
-            self.pages[provider] = await self.contexts[provider].new_page()
+        if (
+            provider not in self.pages
+            or self.pages[provider].is_closed()
+        ):
+
+            self.pages[provider] = await (
+                self.contexts[provider].new_page()
+            )
 
         return self.pages[provider]
 
     async def close(self) -> None:
+
         for page in self.pages.values():
+
             if not page.is_closed():
                 await page.close()
 
