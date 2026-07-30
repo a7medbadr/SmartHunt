@@ -1,5 +1,8 @@
 import os
+import subprocess
+from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -10,8 +13,6 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 from smarthunt.api.dependencies import get_db
-from smarthunt.database import models  # noqa: F401
-from smarthunt.database.base import Base
 from smarthunt.main import app
 
 
@@ -36,12 +37,19 @@ SessionLocal = async_sessionmaker(
 TestSessionLocal = SessionLocal
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def prepare_database():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+@pytest.fixture(scope="session", autouse=True)
+def migrate_database():
+    backend_dir = Path(__file__).resolve().parent.parent
 
-    yield
+    env = os.environ.copy()
+    env["DATABASE_URL"] = TEST_DATABASE_URL
+
+    subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        env=env,
+        check=True,
+    )
 
 
 @pytest_asyncio.fixture
@@ -57,7 +65,6 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession):
-
     async def override_get_db():
         yield db_session
 

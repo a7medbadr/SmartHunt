@@ -3,25 +3,26 @@ import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# 1. تحديد مسار روت المشروع وقراءة الـ .env
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-load_dotenv(BASE_DIR / ".env")
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-# 2. إضافة مسار الـ backend والـ src لـ sys.path لضمان صحة الـ imports
-BACKEND_DIR = BASE_DIR / "backend"
-sys.path.insert(0, str(BACKEND_DIR))
-sys.path.insert(0, str(BACKEND_DIR / "src"))
+if (BASE_DIR / ".env.test").exists():
+    load_dotenv(BASE_DIR / ".env.test", override=False)
 
-# 3. استدعاء الـ Base والموديلات (مع تعطيل فحص ruff E402 لأن تعديل sys.path مطلوب أولاً)
+if (BASE_DIR / ".env").exists():
+    load_dotenv(BASE_DIR / ".env", override=False)
+
+sys.path.insert(0, str(BASE_DIR))
+sys.path.insert(0, str(BASE_DIR / "src"))
+
 from smarthunt.database.base import Base  # noqa: E402
-from smarthunt.database import models  # noqa: E402,F401
+from smarthunt.database import models  # noqa: F401,E402
 
 config = context.config
 
@@ -30,8 +31,11 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# قراءة الرابط مباشرة من البيئة
-db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/smarthunt")
+db_url = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("TEST_DATABASE_URL")
+    or "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt"
+)
 
 
 def run_migrations_offline() -> None:
@@ -47,7 +51,10 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

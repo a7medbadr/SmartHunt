@@ -1,9 +1,13 @@
+from datetime import datetime, timezone
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.notifications.models import Notification
+from smarthunt.notifications.models import (
+    Notification,
+    NotificationStatus,
+)
 from smarthunt.notifications.schemas import NotificationCreate
 
 
@@ -12,43 +16,138 @@ class NotificationNotFoundError(Exception):
 
 
 class NotificationService:
-    async def create(self, db: AsyncSession, data: NotificationCreate) -> Notification:
+
+    async def create(
+        self,
+        db: AsyncSession,
+        data: NotificationCreate,
+    ) -> Notification:
+
         notification = Notification(
+            user_id=data.user_id,
+            type=data.type,
             title=data.title,
             message=data.message,
-            type=data.type,
+            status=NotificationStatus.SENT.value,
+            channel=data.channel,
+            priority=data.priority,
+            expires_at=data.expires_at,
         )
+
         db.add(notification)
         await db.flush()
         await db.refresh(notification)
+
         return notification
 
-    async def list_all(self, db: AsyncSession) -> List[Notification]:
+    async def list_all(
+        self,
+        db: AsyncSession,
+    ) -> List[Notification]:
+
         result = await db.execute(
-            select(Notification).order_by(Notification.created_at.desc())
+            select(Notification)
+            .order_by(Notification.created_at.desc())
         )
+
         return list(result.scalars().all())
 
-    async def get(self, db: AsyncSession, notification_id: int) -> Notification:
+    async def unread_count(
+        self,
+        db: AsyncSession,
+    ) -> int:
+
         result = await db.execute(
-            select(Notification).where(Notification.id == notification_id)
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.read_at.is_(None))
         )
+
+        return int(result.scalar() or 0)
+
+    async def get(
+        self,
+        db: AsyncSession,
+        notification_id: int,
+    ) -> Notification:
+
+        result = await db.execute(
+            select(Notification)
+            .where(Notification.id == notification_id)
+        )
+
         notification = result.scalar_one_or_none()
+
         if notification is None:
             raise NotificationNotFoundError(
                 f"Notification with id {notification_id} not found"
             )
+
         return notification
 
-    async def mark_read(self, db: AsyncSession, notification_id: int) -> Notification:
+    async def mark_read(
+        self,
+        db: AsyncSession,
+        notification_id: int,
+    ) -> Notification:
+
         notification = await self.get(db, notification_id)
-        notification.is_read = True
+
+        notification.status = NotificationStatus.READ.value
+        notification.read_at = datetime.now(timezone.utc)
+
         await db.flush()
         await db.refresh(notification)
+
         return notification
 
-    async def delete(self, db: AsyncSession, notification_id: int) -> None:
+    async def mark_all_read(
+        self,
+        db: AsyncSession,
+    ) -> int:
+
+        result = await db.execute(
+            update(Notification)
+            .where(Notification.read_at.is_(None))
+            .values(
+                status=NotificationStatus.READ.value,
+                read_at=datetime.now(timezone.utc),
+            )
+        )
+
+        await db.flush()
+
+        return result.rowcount or 0
+
+    async def cleanup_expired(
+        self,
+        db: AsyncSession,
+    ) -> int:
+
+        result = await db.execute(
+            select(Notification).where(
+                Notification.expires_at.is_not(None),
+                Notification.expires_at < datetime.now(timezone.utc),
+            )
+        )
+
+        rows = list(result.scalars().all())
+
+        for row in rows:
+            await db.delete(row)
+
+        await db.flush()
+
+        return len(rows)
+
+    async def delete(
+        self,
+        db: AsyncSession,
+        notification_id: int,
+    ) -> None:
+
         notification = await self.get(db, notification_id)
+
         await db.delete(notification)
         await db.flush()
 

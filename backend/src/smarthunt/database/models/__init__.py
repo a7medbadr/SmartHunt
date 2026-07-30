@@ -15,6 +15,9 @@ from smarthunt.saved_searches.models import SavedSearch
 from smarthunt.scheduler.history.models import SchedulerHistory
 from smarthunt.scheduler.locks.models import SchedulerLock
 from smarthunt.settings.models import UserSettings
+from smarthunt.audit.models import AuditLog
+from smarthunt.events.models import EventLog
+
 
 __all__ = [
     "Activity",
@@ -34,4 +37,6 @@ __all__ = [
     "SearchHistory",
     "User",
     "UserSettings",
+    "AuditLog",
+    "EventLog",
 ]
