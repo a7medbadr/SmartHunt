@@ -3,12 +3,11 @@ services:
     image: postgres:17
     container_name: smarthunt-postgres
     restart: unless-stopped
+    network_mode: host
     environment:
       - POSTGRES_DB=smarthunt
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -16,8 +15,7 @@ services:
     image: valkey/valkey:8
     container_name: smarthunt-valkey
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    network_mode: host
 
   backend:
     build:
@@ -25,16 +23,18 @@ services:
       dockerfile: backend/Dockerfile
     container_name: smarthunt-backend-app
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # Matches how postgres/valkey are actually deployed on this host (see
+    # `docker inspect smarthunt-postgres` — they run with --network host,
+    # not the compose bridge network below), so .env's `localhost` URLs
+    # resolve correctly with no per-service overrides needed. Port mapping
+    # doesn't apply under host networking; the container binds :8000 directly.
+    network_mode: host
     depends_on:
       - postgres
       - valkey
     env_file:
       - .env
       - /home/badr/secrets/secret.env
-    environment:
-      - PYTHONPATH=/app
 
 volumes:
   postgres_data:

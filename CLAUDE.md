@@ -191,6 +191,19 @@ builds it. `docker-compose.yml`'s `backend` service must therefore use `context:
 past the first cached layer (found and fixed 2026-07-31; watch for this if the Dockerfile or compose
 file are touched independently, since nothing catches the mismatch except actually rebuilding).
 
+On this dev machine, `postgres`/`valkey` actually run with `--network host` (not the compose bridge
+network the file used to imply via `ports:` mappings) — `docker-compose.yml` now matches that with
+`network_mode: host` on all three services, which is also why `.env`'s `DATABASE_URL`/`REDIS_URL`
+can just say `localhost` with no per-service override needed. If this is ever moved to a machine
+where postgres/valkey are set up differently, this will need revisiting.
+
+`/home/badr/secrets/secret.env` (loaded as a second `env_file` after `.env`) must never define a key
+with an **empty** value for something `.env` already sets for real — `env_file` merge order means a
+present-but-empty line silently overrides and blanks out the real one (hit this with `SECRET_KEY`/
+`JWT_SECRET_KEY` 2026-07-31: causes `jwt.exceptions.InvalidKeyError: HMAC key must not be empty` at
+login, not at startup, so it doesn't fail fast). Only put a key in `secret.env` at all once it has a
+real value to contribute.
+
 ## Frontend
 
 `frontend/` is a Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind v4 + shadcn/ui app, added
