@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     ollama_url: str = "http://localhost:11434"
 
+    ollama_model: str = "qwen2.5:0.5b"
+
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
