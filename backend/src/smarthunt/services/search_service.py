@@ -1,17 +1,19 @@
 import logging
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
-from smarthunt.providers.manager import provider_manager
+from typing import Any, Dict, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from smarthunt.database.repositories.job_repository import JobRepository
 
 logger = logging.getLogger(__name__)
 
 
 class SearchService:
-    """Service layer for aggregating and executing job searches."""
+    """Service layer for querying jobs discovered and stored in the database."""
 
-    def __init__(self, db_session: Optional[Any] = None) -> None:
+    def __init__(self, db_session: Optional[AsyncSession] = None) -> None:
         self.db = db_session
-        self.manager = provider_manager
+        self.repository = JobRepository(db_session) if db_session is not None else None
 
     async def search(
         self,
@@ -21,87 +23,33 @@ class SearchService:
         limit: int = 10,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Execute aggregated search across registered providers."""
+        """Return all stored jobs; the router applies keyword/location/source
+        filtering, sorting, and pagination on top of this result set."""
         logger.info(f"Searching jobs with query='{query}', location='{location}'")
 
-        mock_jobs = [
+        jobs = await self.repository.get_all() if self.repository is not None else []
+
+        job_dicts = [
             {
-                "id": 1,
-                "title": "OpenShift Platform Specialist",
-                "location": "Riyadh",
-                "company": "N/A",
-                "source": "drjobs",
-                "url": "https://drjobs.com/jobs/openshift-platform-specialist-0",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "id": 2,
-                "title": "Senior Systems Engineer (IBM AIX)",
-                "location": "Khobar",
-                "company": "N/A",
-                "source": "tanqeeb",
-                "url": "https://tanqeeb.com/jobs/senior-systems-engineer-(ibm-aix)-1",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "id": 3,
-                "title": "Site Reliability Engineer (SRE)",
-                "location": "Abu Dhabi",
-                "company": "N/A",
-                "source": "naukrigulf",
-                "url": "https://naukrigulf.com/jobs/site-reliability-engineer-(sre)-2",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "id": 4,
-                "title": "Cyber Security Specialist",
-                "location": "Doha",
-                "company": "N/A",
-                "source": "monstergulf",
-                "url": "https://monstergulf.com/jobs/cyber-security-specialist-3",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "id": 5,
-                "title": "Network Infrastructure Engineer",
-                "location": "Muscat",
-                "company": "N/A",
-                "source": "forasnagulf",
-                "url": "https://forasnagulf.com/jobs/network-infrastructure-engineer-4",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "id": 6,
-                "title": "Linux Administrator",
-                "location": "Jeddah",
-                "company": "N/A",
-                "source": "wzayef",
-                "url": "https://wzayef.com/jobs/linux-administrator-5",
-                "requirements": None,
-                "description": None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            },
+                "id": job.id,
+                "title": job.title,
+                "location": job.location,
+                "company": job.company,
+                "source": job.source,
+                "url": job.url,
+                "requirements": job.requirements,
+                "description": job.description,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+            }
+            for job in jobs
         ]
 
         return {
-            "jobs": mock_jobs,
-            "total": len(mock_jobs),
+            "jobs": job_dicts,
+            "total": len(job_dicts),
             "page": page,
             "limit": limit,
         }
 
     # Alias for backwards compatibility if needed elsewhere
     search_jobs = search
-
-
-search_service = SearchService()
