@@ -3,9 +3,25 @@ from smarthunt.resume.parser.skills import KNOWN_SKILLS
 
 # إضافة التقنيات الجديدة المحددة للسبرينت
 JOB_ADDITIONAL_SKILLS = {
-    "c++", "c#", "java", "go", "rust", "sql", "postgresql", "oracle",
-    "mongodb", "redis", "kafka", "rabbitmq", "helm", "gitlab", "github",
-    "ci/cd", "vmware", "rhel", "aix"
+    "c++",
+    "c#",
+    "java",
+    "go",
+    "rust",
+    "sql",
+    "postgresql",
+    "oracle",
+    "mongodb",
+    "redis",
+    "kafka",
+    "rabbitmq",
+    "helm",
+    "gitlab",
+    "github",
+    "ci/cd",
+    "vmware",
+    "rhel",
+    "aix",
 }
 
 ALL_JOB_SKILLS = set(KNOWN_SKILLS).union(JOB_ADDITIONAL_SKILLS)

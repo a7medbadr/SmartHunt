@@ -1,6 +1,5 @@
 from prometheus_client import Counter, Histogram
 
-
 scheduler_execution_total = Counter(
     "smarthunt_scheduler_execution_total",
     "Total scheduler job executions",

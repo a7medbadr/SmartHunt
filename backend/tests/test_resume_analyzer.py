@@ -10,6 +10,7 @@ client = TestClient(app)
 
 # --- Extract Skills ---
 
+
 def test_extract_skills_finds_known_skills():
     text = "I have experience with Linux, Python and Docker in production."
     skills = extract_skills(text)
@@ -34,6 +35,7 @@ def test_extract_skills_empty_text():
 
 
 # --- Upload PDF / API Response ---
+
 
 def test_analyze_resume_rejects_non_pdf():
     invalid_file = ("resume.txt", io.BytesIO(b"Linux Python Docker"), "text/plain")

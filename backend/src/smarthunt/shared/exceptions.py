@@ -4,7 +4,6 @@ from starlette import status
 
 import structlog
 
-
 logger = structlog.get_logger("smarthunt")
 
 

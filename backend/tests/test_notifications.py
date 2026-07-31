@@ -74,9 +74,7 @@ async def test_pagination(client: AsyncClient):
             },
         )
 
-    response = await client.get(
-        "/api/v1/notifications?page=2&page_size=10"
-    )
+    response = await client.get("/api/v1/notifications?page=2&page_size=10")
 
     assert response.status_code == 200
     assert len(response.json()) == 10
@@ -95,15 +93,11 @@ async def test_mark_notification_read(client: AsyncClient):
 
     notification_id = response.json()["id"]
 
-    response = await client.post(
-        f"/api/v1/notifications/{notification_id}/read"
-    )
+    response = await client.post(f"/api/v1/notifications/{notification_id}/read")
 
     assert response.status_code == 200
 
-    response = await client.get(
-        "/api/v1/notifications"
-    )
+    response = await client.get("/api/v1/notifications")
 
     assert response.json()[0]["status"] == "READ"
     assert response.json()[0]["read_at"] is not None
@@ -121,16 +115,12 @@ async def test_mark_all_read(client: AsyncClient):
             },
         )
 
-    response = await client.post(
-        "/api/v1/notifications/read-all"
-    )
+    response = await client.post("/api/v1/notifications/read-all")
 
     assert response.status_code == 200
     assert response.json()["updated"] == 3
 
-    response = await client.get(
-        "/api/v1/notifications/unread-count"
-    )
+    response = await client.get("/api/v1/notifications/unread-count")
 
     assert response.json()["count"] == 0
 
@@ -147,9 +137,7 @@ async def test_unread_count(client: AsyncClient):
             },
         )
 
-    response = await client.get(
-        "/api/v1/notifications/unread-count"
-    )
+    response = await client.get("/api/v1/notifications/unread-count")
 
     assert response.status_code == 200
     assert response.json()["count"] == 4
@@ -163,31 +151,23 @@ async def test_cleanup_expired_notifications(client: AsyncClient):
             "title": "Expired",
             "message": "msg",
             "type": "INFO",
-            "expires_at": (
-                datetime.now(timezone.utc) - timedelta(days=1)
-            ).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
         },
     )
 
-    response = await client.post(
-        "/api/v1/notifications/cleanup"
-    )
+    response = await client.post("/api/v1/notifications/cleanup")
 
     assert response.status_code == 200
     assert response.json()["deleted"] == 1
 
-    response = await client.get(
-        "/api/v1/notifications"
-    )
+    response = await client.get("/api/v1/notifications")
 
     assert response.json() == []
 
 
 @pytest.mark.asyncio
 async def test_mark_read_nonexistent(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/notifications/999999/read"
-    )
+    response = await client.post("/api/v1/notifications/999999/read")
 
     assert response.status_code == 404
 
@@ -205,17 +185,13 @@ async def test_delete_notification(client: AsyncClient):
 
     notification_id = response.json()["id"]
 
-    response = await client.delete(
-        f"/api/v1/notifications/{notification_id}"
-    )
+    response = await client.delete(f"/api/v1/notifications/{notification_id}")
 
     assert response.status_code == 204
 
 
 @pytest.mark.asyncio
 async def test_delete_nonexistent_notification(client: AsyncClient):
-    response = await client.delete(
-        "/api/v1/notifications/999999"
-    )
+    response = await client.delete("/api/v1/notifications/999999")
 
     assert response.status_code == 404

@@ -21,15 +21,11 @@ class BrowserSessionService:
         return session
 
     async def list_all(self, db: AsyncSession) -> List[BrowserSession]:
-        result = await db.execute(
-            select(BrowserSession).order_by(BrowserSession.started_at.desc())
-        )
+        result = await db.execute(select(BrowserSession).order_by(BrowserSession.started_at.desc()))
         return list(result.scalars().all())
 
     async def get(self, db: AsyncSession, session_id: int) -> BrowserSession:
-        result = await db.execute(
-            select(BrowserSession).where(BrowserSession.id == session_id)
-        )
+        result = await db.execute(select(BrowserSession).where(BrowserSession.id == session_id))
         session = result.scalar_one_or_none()
         if session is None:
             raise BrowserSessionNotFoundError(f"Browser session with id {session_id} not found")

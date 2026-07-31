@@ -51,17 +51,13 @@ class FormFiller:
         )
 
         if decision.decision == Decision.ANSWER:
-            await locator.fill(
-                decision.answer
-            )
+            await locator.fill(decision.answer)
 
             self.filled_fields += 1
 
             return True
 
-        self.unknown_questions.append(
-            question
-        )
+        self.unknown_questions.append(question)
 
         await self._save_unknown_question(
             locator,
@@ -81,9 +77,7 @@ class FormFiller:
         html = ""
 
         try:
-            html = await locator.evaluate(
-                "el => el.outerHTML"
-            )
+            html = await locator.evaluate("el => el.outerHTML")
         except Exception:
             html = ""
 
@@ -114,9 +108,7 @@ class FormFiller:
 
         for selector in selectors:
 
-            await self._fill_selector(
-                selector
-            )
+            await self._fill_selector(selector)
 
         return {
             "filled_fields": self.filled_fields,
@@ -128,15 +120,11 @@ class FormFiller:
         selector: str,
     ):
 
-        locators = await self.page.locator(
-            selector
-        ).all()
+        locators = await self.page.locator(selector).all()
 
         for locator in locators:
 
-            question = await self._extract_question(
-                locator
-            )
+            question = await self._extract_question(locator)
 
             if not question:
                 continue
@@ -157,9 +145,7 @@ class FormFiller:
             "name",
         ):
 
-            value = await locator.get_attribute(
-                attribute
-            )
+            value = await locator.get_attribute(attribute)
 
             if value:
                 return value

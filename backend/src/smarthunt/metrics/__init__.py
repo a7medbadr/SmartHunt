@@ -31,7 +31,6 @@ from .scheduler_lock import (
 
 from .instrumentation import setup_metrics
 
-
 __all__ = [
     "api_errors_total",
     "ai_calls_total",

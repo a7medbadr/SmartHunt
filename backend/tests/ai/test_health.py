@@ -10,8 +10,6 @@ async def test_ai_health_check():
 
     assert result["status"] == "healthy"
 
-    assert len(
-        result["providers"]
-    ) > 0
+    assert len(result["providers"]) > 0
 
     assert "provider" in result["providers"][0]

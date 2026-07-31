@@ -34,19 +34,11 @@ def filter_jobs(
 
     if location and location.strip():
         loc = location.strip().lower()
-        filtered = [
-            j
-            for j in filtered
-            if loc in str(_get_field(j, "location") or "").lower()
-        ]
+        filtered = [j for j in filtered if loc in str(_get_field(j, "location") or "").lower()]
 
     if source and source.strip():
         src = source.strip().lower()
-        filtered = [
-            j
-            for j in filtered
-            if src in str(_get_field(j, "source") or "").lower()
-        ]
+        filtered = [j for j in filtered if src in str(_get_field(j, "source") or "").lower()]
 
     return filtered
 
@@ -76,7 +68,9 @@ def sort_jobs(
     try:
         return sorted(jobs, key=_sort_key, reverse=is_desc)
     except TypeError:
-        return sorted(jobs, key=lambda j: str(_get_field(j, sort_by) or "").lower(), reverse=is_desc)
+        return sorted(
+            jobs, key=lambda j: str(_get_field(j, sort_by) or "").lower(), reverse=is_desc
+        )
 
 
 def paginate_jobs(

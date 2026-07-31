@@ -11,7 +11,9 @@ router = APIRouter(prefix="", tags=["scheduler-history"])
 
 
 @router.post("", response_model=SchedulerHistoryResponse, status_code=201)
-async def create_scheduler_history(payload: SchedulerHistoryCreate, db: AsyncSession = Depends(get_db)):
+async def create_scheduler_history(
+    payload: SchedulerHistoryCreate, db: AsyncSession = Depends(get_db)
+):
     return await scheduler_history_service.create(db, payload)
 
 

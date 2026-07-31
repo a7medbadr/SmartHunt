@@ -22,15 +22,11 @@ class JobRepository:
         return job
 
     async def get(self, job_id: int):
-        result = await self.session.execute(
-            select(Job).where(Job.id == job_id)
-        )
+        result = await self.session.execute(select(Job).where(Job.id == job_id))
         return result.scalar_one_or_none()
 
     async def get_all(self):
-        result = await self.session.execute(
-            select(Job)
-        )
+        result = await self.session.execute(select(Job))
         return list(result.scalars())
 
     async def delete(self, job_id: int):
@@ -103,31 +99,19 @@ class JobRepository:
         stmt = select(Job)
 
         if getattr(params, "title", None):
-            stmt = stmt.where(
-                Job.title.ilike(f"%{params.title}%")
-            )
+            stmt = stmt.where(Job.title.ilike(f"%{params.title}%"))
 
         if getattr(params, "company", None):
-            stmt = stmt.where(
-                Job.company.ilike(f"%{params.company}%")
-            )
+            stmt = stmt.where(Job.company.ilike(f"%{params.company}%"))
 
         if getattr(params, "location", None):
-            stmt = stmt.where(
-                Job.location.ilike(f"%{params.location}%")
-            )
+            stmt = stmt.where(Job.location.ilike(f"%{params.location}%"))
 
         if getattr(params, "provider", None):
-            stmt = stmt.where(
-                Job.source.ilike(f"%{params.provider}%")
-            )
+            stmt = stmt.where(Job.source.ilike(f"%{params.provider}%"))
 
         total = (
-            await self.session.execute(
-                select(func.count()).select_from(
-                    stmt.subquery()
-                )
-            )
+            await self.session.execute(select(func.count()).select_from(stmt.subquery()))
         ).scalar_one()
 
         sort_name = getattr(
@@ -142,29 +126,25 @@ class JobRepository:
             Job.created_at,
         )
 
-        if str(
-            getattr(
-                params,
-                "order",
-                "desc",
-            )
-        ).lower() == "asc":
-            stmt = stmt.order_by(
-                asc(sort_attr)
-            )
+        if (
+            str(
+                getattr(
+                    params,
+                    "order",
+                    "desc",
+                )
+            ).lower()
+            == "asc"
+        ):
+            stmt = stmt.order_by(asc(sort_attr))
         else:
-            stmt = stmt.order_by(
-                desc(sort_attr)
-            )
+            stmt = stmt.order_by(desc(sort_attr))
 
         page = getattr(params, "page", 1)
         limit = getattr(params, "limit", 10)
 
-        stmt = stmt.offset(
-            (page - 1) * limit
-        ).limit(limit)
+        stmt = stmt.offset((page - 1) * limit).limit(limit)
 
         result = await self.session.execute(stmt)
 
         return list(result.scalars()), total
-

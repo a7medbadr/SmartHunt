@@ -21,9 +21,7 @@ async def list_job_notes(job_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{note_id}", response_model=JobNoteResponse)
-async def update_job_note(
-    note_id: int, payload: JobNoteUpdate, db: AsyncSession = Depends(get_db)
-):
+async def update_job_note(note_id: int, payload: JobNoteUpdate, db: AsyncSession = Depends(get_db)):
     try:
         return await job_note_service.update_note(db, note_id, payload)
     except JobNoteNotFoundError as e:

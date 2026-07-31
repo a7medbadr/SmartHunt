@@ -23,7 +23,6 @@ class AIProviderFactory:
 
     _providers: dict[AIProvider, BaseAIProvider] = {}
 
-
     @classmethod
     def get(
         cls,
@@ -37,19 +36,14 @@ class AIProviderFactory:
 
             if provider not in cls._providers:
 
-                implementation = cls._provider_classes.get(
-                    provider
-                )
+                implementation = cls._provider_classes.get(provider)
 
                 if implementation is None:
-                    raise ValueError(
-                        f"Unsupported AI provider {provider}"
-                    )
+                    raise ValueError(f"Unsupported AI provider {provider}")
 
                 cls._providers[provider] = implementation()
 
         return cls._providers[provider]
-
 
     @classmethod
     def register(
@@ -61,12 +55,9 @@ class AIProviderFactory:
         with cls._lock:
             cls._providers[provider] = implementation
 
-
     @classmethod
     def available_providers(
         cls,
     ) -> list[AIProvider]:
 
-        return list(
-            cls._provider_classes.keys()
-        )
+        return list(cls._provider_classes.keys())

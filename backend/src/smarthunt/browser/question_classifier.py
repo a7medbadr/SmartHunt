@@ -49,23 +49,15 @@ _UNSUPPORTED_KEYWORDS: tuple[str, ...] = (
 
 
 def classify(question: str) -> QuestionType:
-    normalized = " ".join(
-        question.lower().strip().split()
-    )
+    normalized = " ".join(question.lower().strip().split())
 
     if not normalized:
         return QuestionType.UNSUPPORTED
 
-    if any(
-        keyword in normalized
-        for keyword in _UNSUPPORTED_KEYWORDS
-    ):
+    if any(keyword in normalized for keyword in _UNSUPPORTED_KEYWORDS):
         return QuestionType.UNSUPPORTED
 
-    if any(
-        keyword in normalized
-        for keyword in _KNOWN_KEYWORDS
-    ):
+    if any(keyword in normalized for keyword in _KNOWN_KEYWORDS):
         return QuestionType.KNOWN
 
     return QuestionType.UNKNOWN

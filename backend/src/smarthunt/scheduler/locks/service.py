@@ -25,20 +25,14 @@ class SchedulerLockService:
 
         await self.cleanup_expired(db)
 
-        existing = await db.execute(
-            select(SchedulerLock).where(
-                SchedulerLock.job_id == job_id
-            )
-        )
+        existing = await db.execute(select(SchedulerLock).where(SchedulerLock.job_id == job_id))
 
         if existing.scalar_one_or_none():
 
             scheduler_lock_conflicts_total.inc()
             return False
 
-        now = datetime.now(timezone.utc).replace(
-            tzinfo=None
-        )
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         lock = SchedulerLock(
             job_id=job_id,
@@ -60,11 +54,7 @@ class SchedulerLockService:
         job_id: str,
     ):
 
-        await db.execute(
-            delete(SchedulerLock).where(
-                SchedulerLock.job_id == job_id
-            )
-        )
+        await db.execute(delete(SchedulerLock).where(SchedulerLock.job_id == job_id))
 
         await db.flush()
 
@@ -73,20 +63,12 @@ class SchedulerLockService:
         db: AsyncSession,
     ):
 
-        now = datetime.now(timezone.utc).replace(
-            tzinfo=None
-        )
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        result = await db.execute(
-            delete(SchedulerLock).where(
-                SchedulerLock.expires_at < now
-            )
-        )
+        result = await db.execute(delete(SchedulerLock).where(SchedulerLock.expires_at < now))
 
         if result.rowcount:
-            scheduler_lock_expired_total.inc(
-                result.rowcount
-            )
+            scheduler_lock_expired_total.inc(result.rowcount)
 
         await db.flush()
 
@@ -97,11 +79,7 @@ class SchedulerLockService:
 
         await self.cleanup_expired(db)
 
-        result = await db.execute(
-            select(SchedulerLock).order_by(
-                SchedulerLock.acquired_at
-            )
-        )
+        result = await db.execute(select(SchedulerLock).order_by(SchedulerLock.acquired_at))
 
         return list(result.scalars().all())
 

@@ -4,9 +4,7 @@ from typing import Any
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc).replace(
-        tzinfo=None
-    )
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 async def execute_scheduler_job(

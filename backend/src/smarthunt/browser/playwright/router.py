@@ -25,7 +25,6 @@ from smarthunt.browser.playwright.schemas import (
     StatusResponse,
 )
 
-
 router = APIRouter(
     prefix="",
     tags=["playwright"],
@@ -61,9 +60,7 @@ async def stop_engine():
     response_model=StatusResponse,
 )
 async def login(payload: LoginRequest):
-    return await playwright_engine.login(
-        payload.provider
-    )
+    return await playwright_engine.login(payload.provider)
 
 
 @router.post(
@@ -71,9 +68,7 @@ async def login(payload: LoginRequest):
     response_model=OpenJobResponse,
 )
 async def open_job(payload: OpenJobRequest):
-    return await playwright_engine.open_job(
-        payload.job_url
-    )
+    return await playwright_engine.open_job(payload.job_url)
 
 
 @router.post(
@@ -81,9 +76,7 @@ async def open_job(payload: OpenJobRequest):
     response_model=DetectFormResponse,
 )
 async def detect_form(payload: DetectFormRequest):
-    return await playwright_engine.detect_form(
-        payload.job_url
-    )
+    return await playwright_engine.detect_form(payload.job_url)
 
 
 @router.post(
@@ -91,9 +84,7 @@ async def detect_form(payload: DetectFormRequest):
     response_model=StatusResponse,
 )
 async def apply(payload: ApplyRequest):
-    return await playwright_engine.apply(
-        payload.job_url
-    )
+    return await playwright_engine.apply(payload.job_url)
 
 
 @router.post(
@@ -116,9 +107,7 @@ async def easy_apply(
     response_model=FormFillResponse,
 )
 async def fill_form(payload: FormFillRequest):
-    return await playwright_engine.fill_form(
-        payload.job_url
-    )
+    return await playwright_engine.fill_form(payload.job_url)
 
 
 @router.post(

@@ -16,15 +16,11 @@ class SchedulerService:
 
     def start(self) -> None:
         if not settings.scheduler_enabled:
-            logger.info(
-                "scheduler_disabled"
-            )
+            logger.info("scheduler_disabled")
             return
 
         if scheduler.running:
-            logger.info(
-                "scheduler_already_running"
-            )
+            logger.info("scheduler_already_running")
             return
 
         try:
@@ -61,7 +57,5 @@ class SchedulerService:
             )
 
         except Exception:
-            logger.exception(
-                "scheduler_start_failed"
-            )
+            logger.exception("scheduler_start_failed")
             raise

@@ -44,7 +44,12 @@ async def test_list_provider_health(client: AsyncClient):
     )
     await client.post(
         "/api/v1/providers/health",
-        json={"provider": "indeed", "status": "DOWN", "response_time_ms": None, "message": "Timeout"},
+        json={
+            "provider": "indeed",
+            "status": "DOWN",
+            "response_time_ms": None,
+            "message": "Timeout",
+        },
     )
 
     response = await client.get("/api/v1/providers/health")

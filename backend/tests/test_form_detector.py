@@ -12,9 +12,7 @@ def make_page(selector=None):
             return MagicMock()
         return None
 
-    page.query_selector = AsyncMock(
-        side_effect=fake_query_selector
-    )
+    page.query_selector = AsyncMock(side_effect=fake_query_selector)
 
     return page
 
@@ -23,9 +21,7 @@ def make_page(selector=None):
 async def test_detect_easy_apply():
     detector = FormDetector()
 
-    page = make_page(
-        "button[aria-label='Easy Apply']"
-    )
+    page = make_page("button[aria-label='Easy Apply']")
 
     result = await detector.detect(page)
 
@@ -37,9 +33,7 @@ async def test_detect_easy_apply():
 async def test_detect_apply_now():
     detector = FormDetector()
 
-    page = make_page(
-        "text=Apply Now"
-    )
+    page = make_page("text=Apply Now")
 
     result = await detector.detect(page)
 

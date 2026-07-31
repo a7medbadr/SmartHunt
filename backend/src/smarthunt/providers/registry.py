@@ -60,9 +60,7 @@ class ProviderRegistry:
                 requirements=item.get("requirements", ""),
             )
 
-        raise TypeError(
-            f"Unsupported provider object: {type(item)}"
-        )
+        raise TypeError(f"Unsupported provider object: {type(item)}")
 
     async def fetch_all_jobs(
         self,
@@ -95,9 +93,7 @@ class ProviderRegistry:
                 continue
 
             for job in result:
-                jobs.append(
-                    self._normalize(job)
-                )
+                jobs.append(self._normalize(job))
 
         return jobs
 

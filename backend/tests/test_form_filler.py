@@ -11,12 +11,7 @@ def build_page(locator_groups):
     page = MagicMock()
 
     page.locator.side_effect = [
-        MagicMock(
-            all=AsyncMock(
-                return_value=group
-            )
-        )
-        for group in locator_groups
+        MagicMock(all=AsyncMock(return_value=group)) for group in locator_groups
     ]
 
     return page
@@ -29,9 +24,7 @@ async def test_fill_email_success():
 
     locator.fill = AsyncMock()
 
-    locator.get_attribute = AsyncMock(
-        return_value="email"
-    )
+    locator.get_attribute = AsyncMock(return_value="email")
 
     page = build_page(
         [
@@ -44,9 +37,7 @@ async def test_fill_email_success():
 
     filler = FormFiller(
         page=page,
-        profile=ResumeProfile(
-            email="test@example.com"
-        ),
+        profile=ResumeProfile(email="test@example.com"),
     )
 
     result = await filler.fill_textareas()
@@ -54,9 +45,7 @@ async def test_fill_email_success():
     assert result["filled_fields"] == 1
     assert result["unknown_questions"] == []
 
-    locator.fill.assert_awaited_once_with(
-        "test@example.com"
-    )
+    locator.fill.assert_awaited_once_with("test@example.com")
 
 
 @pytest.mark.asyncio
@@ -64,9 +53,7 @@ async def test_unknown_question():
 
     locator = MagicMock()
 
-    locator.get_attribute = AsyncMock(
-        return_value="security clearance"
-    )
+    locator.get_attribute = AsyncMock(return_value="security clearance")
 
     page = build_page(
         [
@@ -86,9 +73,7 @@ async def test_unknown_question():
 
     assert result["filled_fields"] == 0
 
-    assert result["unknown_questions"] == [
-        "security clearance"
-    ]
+    assert result["unknown_questions"] == ["security clearance"]
 
 
 @pytest.mark.asyncio
@@ -120,13 +105,9 @@ async def test_multiple_inputs():
     email = MagicMock()
     phone = MagicMock()
 
-    email.get_attribute = AsyncMock(
-        return_value="email"
-    )
+    email.get_attribute = AsyncMock(return_value="email")
 
-    phone.get_attribute = AsyncMock(
-        return_value="phone"
-    )
+    phone.get_attribute = AsyncMock(return_value="phone")
 
     email.fill = AsyncMock()
     phone.fill = AsyncMock()
@@ -156,10 +137,6 @@ async def test_multiple_inputs():
     assert result["filled_fields"] == 2
     assert result["unknown_questions"] == []
 
-    email.fill.assert_awaited_once_with(
-        "test@example.com"
-    )
+    email.fill.assert_awaited_once_with("test@example.com")
 
-    phone.fill.assert_awaited_once_with(
-        "+966500000000"
-    )
+    phone.fill.assert_awaited_once_with("+966500000000")

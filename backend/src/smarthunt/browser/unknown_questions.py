@@ -11,9 +11,7 @@ class UnknownQuestionRecord:
     url: str
     label: str
     html: str
-    timestamp: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     confidence: float = 0.0
 
 
@@ -47,11 +45,7 @@ class InMemoryUnknownQuestionRepository:
         if provider is None:
             return list(self._records)
 
-        return [
-            record
-            for record in self._records
-            if record.provider == provider
-        ]
+        return [record for record in self._records if record.provider == provider]
 
     def clear(self) -> None:
         self._records.clear()

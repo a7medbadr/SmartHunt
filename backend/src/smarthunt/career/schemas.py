@@ -1,8 +1,10 @@
 from pydantic import BaseModel
 from typing import List
 
+
 class CareerAdviceRequest(BaseModel):
     resume: str
+
 
 class CareerAdviceResponse(BaseModel):
     current_level: str

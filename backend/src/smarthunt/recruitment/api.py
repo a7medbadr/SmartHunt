@@ -9,7 +9,14 @@ router = APIRouter()
 
 _applications_db = []
 
-VALID_STATUSES = {"Applied", "Interviewing", "Offered", "Rejected", "Pending", "Technical Interview"}
+VALID_STATUSES = {
+    "Applied",
+    "Interviewing",
+    "Offered",
+    "Rejected",
+    "Pending",
+    "Technical Interview",
+}
 
 
 @router.get("/applications", status_code=status.HTTP_200_OK)

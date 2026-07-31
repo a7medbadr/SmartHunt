@@ -15,9 +15,7 @@ class CoverLetterService:
         matched_skills = match_result["matched_skills"]
 
         if matched_skills:
-            skills_bullets = "\n".join(
-                f"- {skill.title()}" for skill in matched_skills
-            )
+            skills_bullets = "\n".join(f"- {skill.title()}" for skill in matched_skills)
         else:
             skills_bullets = "- Technical expertise alignment with the role requirement"
 

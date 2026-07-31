@@ -24,19 +24,11 @@ class AIService:
         fallback_provider: AIProvider | None = AIProvider.LOCAL,
     ):
 
-        self.provider = (
-            provider
-            or AIProvider(settings.ai_provider)
-        )
+        self.provider = provider or AIProvider(settings.ai_provider)
 
-        self.retries = (
-            retries
-            if retries is not None
-            else settings.ai_max_retries
-        )
+        self.retries = retries if retries is not None else settings.ai_max_retries
 
         self.fallback_provider = fallback_provider
-
 
     async def _execute(
         self,
@@ -44,15 +36,12 @@ class AIService:
         request: AIRequest,
     ) -> AIResponse:
 
-        provider = AIProviderFactory.get(
-            provider_name
-        )
+        provider = AIProviderFactory.get(provider_name)
 
         return await asyncio.wait_for(
             provider.generate(request),
             timeout=request.timeout,
         )
-
 
     async def generate(
         self,
@@ -60,18 +49,11 @@ class AIService:
     ) -> AIResponse:
 
         if not settings.enable_ai_services:
-            raise AIProviderError(
-                "AI services are disabled"
-            )
+            raise AIProviderError("AI services are disabled")
 
-
-        provider = (
-            request.provider
-            or self.provider
-        )
+        provider = request.provider or self.provider
 
         last_exception = None
-
 
         for attempt in range(
             1,
@@ -98,25 +80,17 @@ class AIService:
 
                 return response
 
+            except asyncio.TimeoutError:
 
-            except asyncio.TimeoutError as exc:
-
-                last_exception = AITimeoutError(
-                    f"Timeout provider={provider}"
-                )
-
+                last_exception = AITimeoutError(f"Timeout provider={provider}")
 
             except AIProviderError as exc:
 
                 last_exception = exc
 
-
             except Exception as exc:
 
-                last_exception = AIProviderError(
-                    str(exc)
-                )
-
+                last_exception = AIProviderError(str(exc))
 
             logger.warning(
                 "AI provider failed provider=%s attempt=%s error=%s",
@@ -125,11 +99,7 @@ class AIService:
                 last_exception,
             )
 
-
-        if (
-            self.fallback_provider
-            and self.fallback_provider != provider
-        ):
+        if self.fallback_provider and self.fallback_provider != provider:
 
             logger.warning(
                 "Trying AI fallback provider=%s",
@@ -145,14 +115,9 @@ class AIService:
 
             except Exception as exc:
 
-                raise AIRetryExceededError(
-                    f"Fallback failed: {exc}"
-                ) from exc
+                raise AIRetryExceededError(f"Fallback failed: {exc}") from exc
 
-
-        raise AIRetryExceededError(
-            f"AI retries exhausted: {last_exception}"
-        )
+        raise AIRetryExceededError(f"AI retries exhausted: {last_exception}")
 
 
 ai_service = AIService()

@@ -18,19 +18,16 @@ class FailedJobRepository:
 
         return job
 
-
     async def list_failed(
         self,
         db: AsyncSession,
     ) -> list[FailedSchedulerJob]:
 
         result = await db.execute(
-            select(FailedSchedulerJob)
-            .order_by(FailedSchedulerJob.created_at.desc())
+            select(FailedSchedulerJob).order_by(FailedSchedulerJob.created_at.desc())
         )
 
         return list(result.scalars().all())
-
 
     async def get(
         self,
@@ -38,11 +35,6 @@ class FailedJobRepository:
         job_id: int,
     ) -> FailedSchedulerJob | None:
 
-        result = await db.execute(
-            select(FailedSchedulerJob)
-            .where(
-                FailedSchedulerJob.id == job_id
-            )
-        )
+        result = await db.execute(select(FailedSchedulerJob).where(FailedSchedulerJob.id == job_id))
 
         return result.scalar_one_or_none()

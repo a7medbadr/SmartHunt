@@ -4,7 +4,6 @@ from smarthunt.ai.health import ai_health_check
 from smarthunt.ai.service import ai_service
 from smarthunt.ai.types import AIRequest, AIResponse
 
-
 router = APIRouter(
     prefix="/ai",
 )
@@ -18,9 +17,7 @@ async def generate_ai(
     request: AIRequest,
 ) -> AIResponse:
 
-    return await ai_service.generate(
-        request
-    )
+    return await ai_service.generate(request)
 
 
 @router.get(

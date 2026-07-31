@@ -13,15 +13,12 @@ class SchedulerRetryWorker:
     def __init__(self):
         self.repository = FailedJobRepository()
 
-
     async def process(
         self,
         db: AsyncSession,
     ):
 
-        failed_jobs = await self.repository.list_failed(
-            db
-        )
+        failed_jobs = await self.repository.list_failed(db)
 
         processed = []
 

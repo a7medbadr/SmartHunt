@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.database.session import get_db
 from smarthunt.scheduler.failed_job_repository import FailedJobRepository
 
-
 router = APIRouter()
 
 repository = FailedJobRepository()

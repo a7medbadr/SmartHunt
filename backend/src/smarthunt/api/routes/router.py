@@ -46,7 +46,6 @@ from smarthunt.search.router import router as search_router
 from smarthunt.search.metrics_router import router as search_metrics_router
 from smarthunt.settings.router import router as settings_router
 
-
 api_router = APIRouter()
 
 

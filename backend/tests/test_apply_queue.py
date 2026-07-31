@@ -72,9 +72,7 @@ async def test_update_queue_status(client: AsyncClient, test_job: int):
     )
     item_id = response.json()["id"]
 
-    response = await client.patch(
-        f"/api/v1/apply-queue/{item_id}", json={"status": "RUNNING"}
-    )
+    response = await client.patch(f"/api/v1/apply-queue/{item_id}", json={"status": "RUNNING"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "RUNNING"
@@ -88,9 +86,7 @@ async def test_update_queue_status_invalid(client: AsyncClient, test_job: int):
     )
     item_id = response.json()["id"]
 
-    response = await client.patch(
-        f"/api/v1/apply-queue/{item_id}", json={"status": "BOGUS"}
-    )
+    response = await client.patch(f"/api/v1/apply-queue/{item_id}", json={"status": "BOGUS"})
 
     assert response.status_code == 422
 

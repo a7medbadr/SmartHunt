@@ -25,17 +25,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         requests = self.clients[client_ip]
 
-        requests[:] = [
-            timestamp
-            for timestamp in requests
-            if now - timestamp < self.window_seconds
-        ]
+        requests[:] = [timestamp for timestamp in requests if now - timestamp < self.window_seconds]
 
-        print(
-            f"[RATE LIMIT] ip={client_ip} "
-            f"count_before={len(requests)} "
-            f"id={id(self)}"
-        )
+        print(f"[RATE LIMIT] ip={client_ip} " f"count_before={len(requests)} " f"id={id(self)}")
 
         if len(requests) >= self.requests_limit:
             print("[RATE LIMIT] BLOCKED")
@@ -48,8 +40,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         requests.append(now)
 
-        print(
-            f"[RATE LIMIT] count_after={len(requests)}"
-        )
+        print(f"[RATE LIMIT] count_after={len(requests)}")
 
         return await call_next(request)

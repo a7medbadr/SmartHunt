@@ -83,6 +83,4 @@ async def search_jobs(
         print("!!! [CRITICAL ERROR] In /search/jobs:", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         print("=" * 60, file=sys.stderr)
-        raise HTTPException(
-            status_code=500, detail=f"Internal Server Error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

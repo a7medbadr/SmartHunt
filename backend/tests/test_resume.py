@@ -10,7 +10,9 @@ def test_resume_lifecycle(tmp_path, monkeypatch):
     storage_dir = tmp_path / "resumes"
     storage_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("smarthunt.resume.storage.storage.STORAGE_DIR", storage_dir)
-    monkeypatch.setattr("smarthunt.resume.storage.storage.RESUME_FILE_PATH", storage_dir / "resume.pdf")
+    monkeypatch.setattr(
+        "smarthunt.resume.storage.storage.RESUME_FILE_PATH", storage_dir / "resume.pdf"
+    )
 
     # 1. GET resume when empty
     response = client.get("/api/v1/resume")

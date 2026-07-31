@@ -15,6 +15,4 @@ async def database_statistics():
         repo = JobRepository(session)
         jobs = await repo.get_all()
 
-    return {
-        "jobs": len(jobs)
-    }
+    return {"jobs": len(jobs)}

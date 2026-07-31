@@ -32,11 +32,7 @@ class CircuitBreaker:
         if self.last_failure is None:
             return True
 
-        if (
-            datetime.now(UTC) - self.last_failure
-        ) >= timedelta(
-            seconds=self.retry_after_seconds
-        ):
+        if (datetime.now(UTC) - self.last_failure) >= timedelta(seconds=self.retry_after_seconds):
             self.state = ProviderState.HALF_OPEN
             return True
 
@@ -53,8 +49,5 @@ class CircuitBreaker:
         self.failure_count += 1
         self.last_failure = datetime.now(UTC)
 
-        if (
-            self.failure_count
-            >= self.failure_threshold
-        ):
+        if self.failure_count >= self.failure_threshold:
             self.state = ProviderState.OPEN

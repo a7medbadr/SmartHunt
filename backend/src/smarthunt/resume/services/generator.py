@@ -19,7 +19,9 @@ def generate_resume(
 
     # 4. Format skills for template display
     core_skills_str = "\n".join(f"- {skill.title()}" for skill in matched) if matched else "- N/A"
-    recommended_skills_str = "\n".join(f"- {skill.title()}" for skill in missing) if missing else "- None"
+    recommended_skills_str = (
+        "\n".join(f"- {skill.title()}" for skill in missing) if missing else "- None"
+    )
 
     # 5. Build template-based resume
     generated_resume_template = f"""# Tailored Professional Resume

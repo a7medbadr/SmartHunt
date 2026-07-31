@@ -3,7 +3,6 @@ from typing import Optional
 
 from playwright.async_api import Page
 
-
 FORM_SELECTORS = (
     ("easy_apply", "button[aria-label='Easy Apply']"),
     ("easy_apply", "text=Easy Apply"),

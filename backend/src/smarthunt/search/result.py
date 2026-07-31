@@ -1,5 +1,6 @@
 import math
 
+
 class SearchResult:
     def __init__(self, items, total, page, limit):
         self.items = items

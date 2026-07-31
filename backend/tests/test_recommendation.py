@@ -3,10 +3,10 @@ from smarthunt.main import app
 
 client = TestClient(app)
 
+
 def test_recommend_jobs():
     response = client.post(
-        "/api/v1/jobs/recommend",
-        json={"resume": "Linux Docker Python OpenShift AWS"}
+        "/api/v1/jobs/recommend", json={"resume": "Linux Docker Python OpenShift AWS"}
     )
     assert response.status_code == 200
     data = response.json()

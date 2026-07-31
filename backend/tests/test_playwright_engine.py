@@ -18,33 +18,21 @@ def mock_browser_manager(monkeypatch):
     mock_page.wait_for_selector = AsyncMock()
     mock_page.wait_for_load_state = AsyncMock()
 
-    mock_page.title = AsyncMock(
-        return_value="Linux Engineer"
-    )
+    mock_page.title = AsyncMock(return_value="Linux Engineer")
 
-    mock_page.content = AsyncMock(
-        return_value="<html></html>"
-    )
+    mock_page.content = AsyncMock(return_value="<html></html>")
 
-    mock_page.query_selector = AsyncMock(
-        return_value=MagicMock()
-    )
+    mock_page.query_selector = AsyncMock(return_value=MagicMock())
 
     mock_page.url = "https://www.linkedin.com/feed/"
 
     locator = MagicMock()
 
-    locator.get_attribute = AsyncMock(
-        return_value="email"
-    )
+    locator.get_attribute = AsyncMock(return_value="email")
 
     locator.fill = AsyncMock()
 
-    mock_page.locator.return_value.all = AsyncMock(
-        return_value=[
-            locator
-        ]
-    )
+    mock_page.locator.return_value.all = AsyncMock(return_value=[locator])
 
     async def fake_launch(headless: bool = True):
         browser_manager.browser = MagicMock()
@@ -93,9 +81,7 @@ def linkedin_credentials(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_start_engine(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/browser/playwright/start"
-    )
+    response = await client.post("/api/v1/browser/playwright/start")
 
     assert response.status_code == 200
     assert response.json()["status"] == "started"
@@ -103,13 +89,9 @@ async def test_start_engine(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_stop_engine(client: AsyncClient):
-    await client.post(
-        "/api/v1/browser/playwright/start"
-    )
+    await client.post("/api/v1/browser/playwright/start")
 
-    response = await client.post(
-        "/api/v1/browser/playwright/stop"
-    )
+    response = await client.post("/api/v1/browser/playwright/stop")
 
     assert response.status_code == 200
     assert response.json()["status"] == "stopped"
@@ -177,9 +159,7 @@ async def test_apply(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_screenshot(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/browser/playwright/screenshot"
-    )
+    response = await client.post("/api/v1/browser/playwright/screenshot")
 
     assert response.status_code == 200
 
@@ -187,9 +167,7 @@ async def test_screenshot(client: AsyncClient):
 
     assert "path" in data
 
-    assert data["path"].endswith(
-        "screenshots/test.png"
-    )
+    assert data["path"].endswith("screenshots/test.png")
 
 
 @pytest.mark.asyncio

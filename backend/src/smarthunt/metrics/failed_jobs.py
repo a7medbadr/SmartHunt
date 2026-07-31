@@ -1,6 +1,5 @@
 from prometheus_client import Counter
 
-
 scheduler_failed_jobs_total = Counter(
     "smarthunt_scheduler_failed_jobs_total",
     "Total failed scheduler jobs",

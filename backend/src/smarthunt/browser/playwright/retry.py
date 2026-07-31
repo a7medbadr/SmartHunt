@@ -107,9 +107,7 @@ class ExponentialBackoff:
         self.policy = policy
 
     def delay_for_attempt(self, attempt: int) -> float:
-        raw = self.policy.base_delay * (
-            self.policy.multiplier ** (attempt - 1)
-        )
+        raw = self.policy.base_delay * (self.policy.multiplier ** (attempt - 1))
 
         capped = min(raw, self.policy.max_delay)
 
@@ -151,10 +149,7 @@ class RetryExecutor:
 
         message = str(exc).lower()
 
-        return any(
-            pattern in message
-            for pattern in NON_RETRYABLE_MESSAGE_PATTERNS
-        )
+        return any(pattern in message for pattern in NON_RETRYABLE_MESSAGE_PATTERNS)
 
     @staticmethod
     def _is_retryable(exc: BaseException) -> bool:
@@ -170,10 +165,7 @@ class RetryExecutor:
             # Only worth retrying if the browser itself is still alive.
             return browser_manager.is_running
 
-        return any(
-            pattern in message
-            for pattern in RETRYABLE_MESSAGE_PATTERNS
-        )
+        return any(pattern in message for pattern in RETRYABLE_MESSAGE_PATTERNS)
 
     @staticmethod
     def _record_metric(counter, operation: str, provider: str) -> None:
@@ -195,17 +187,13 @@ class RetryExecutor:
 
         for attempt in range(1, self.policy.max_attempts + 1):
 
-            self._record_metric(
-                playwright_retry_total, operation, provider
-            )
+            self._record_metric(playwright_retry_total, operation, provider)
 
             try:
                 result = await func(*args, **kwargs)
 
                 if attempt > 1:
-                    self._record_metric(
-                        playwright_retry_success, operation, provider
-                    )
+                    self._record_metric(playwright_retry_success, operation, provider)
 
                     elapsed = time.monotonic() - start
 
@@ -246,14 +234,10 @@ class RetryExecutor:
                 )
 
                 if attempt >= self.policy.max_attempts:
-                    self._record_metric(
-                        playwright_retry_failed, operation, provider
-                    )
+                    self._record_metric(playwright_retry_failed, operation, provider)
                     break
 
-                await asyncio.sleep(
-                    self.backoff.delay_for_attempt(attempt)
-                )
+                await asyncio.sleep(self.backoff.delay_for_attempt(attempt))
 
         raise last_exception
 

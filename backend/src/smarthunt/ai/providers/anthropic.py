@@ -18,9 +18,7 @@ class AnthropicProvider(BaseAIProvider):
     ) -> AIResponse:
 
         if not settings.anthropic_api_key:
-            raise AIProviderError(
-                "Anthropic API key is not configured"
-            )
+            raise AIProviderError("Anthropic API key is not configured")
 
         try:
             return AIResponse(
@@ -30,6 +28,4 @@ class AnthropicProvider(BaseAIProvider):
             )
 
         except Exception as exc:
-            raise AIProviderError(
-                f"Anthropic provider failed: {exc}"
-            ) from exc
+            raise AIProviderError(f"Anthropic provider failed: {exc}") from exc

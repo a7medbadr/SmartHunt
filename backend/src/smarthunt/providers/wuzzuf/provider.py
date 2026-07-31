@@ -1,6 +1,7 @@
 from smarthunt.providers.base.provider import BaseProvider
 from typing import Any
 
+
 class WuzzufProvider(BaseProvider):
     name = "wuzzuf"
     supports_login = True

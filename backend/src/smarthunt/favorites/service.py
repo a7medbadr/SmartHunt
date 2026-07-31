@@ -17,14 +17,10 @@ class FavoriteNotFoundError(Exception):
 
 class FavoritesService:
     async def add_favorite(self, db: AsyncSession, data: FavoriteJobCreate) -> FavoriteJob:
-        result = await db.execute(
-            select(FavoriteJob).where(FavoriteJob.job_id == data.job_id)
-        )
+        result = await db.execute(select(FavoriteJob).where(FavoriteJob.job_id == data.job_id))
         existing = result.scalar_one_or_none()
         if existing is not None:
-            raise FavoriteAlreadyExistsError(
-                f"Job with id {data.job_id} is already in favorites"
-            )
+            raise FavoriteAlreadyExistsError(f"Job with id {data.job_id} is already in favorites")
 
         favorite = FavoriteJob(job_id=data.job_id)
         db.add(favorite)

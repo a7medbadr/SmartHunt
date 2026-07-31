@@ -47,28 +47,16 @@ async def list_notifications(
     notifications = await notification_service.list_all(db)
 
     if unread_only:
-        notifications = [
-            n for n in notifications
-            if n.read_at is None
-        ]
+        notifications = [n for n in notifications if n.read_at is None]
 
     if notification_type:
-        notifications = [
-            n for n in notifications
-            if n.type == notification_type
-        ]
+        notifications = [n for n in notifications if n.type == notification_type]
 
     if channel:
-        notifications = [
-            n for n in notifications
-            if n.channel == channel
-        ]
+        notifications = [n for n in notifications if n.channel == channel]
 
     if status_filter:
-        notifications = [
-            n for n in notifications
-            if n.status == status_filter
-        ]
+        notifications = [n for n in notifications if n.status == status_filter]
 
     start = (page - 1) * page_size
     end = start + page_size

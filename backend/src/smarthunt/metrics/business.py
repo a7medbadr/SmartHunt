@@ -1,6 +1,5 @@
 from prometheus_client import Counter, Gauge
 
-
 jobs_created_total = Counter(
     "smarthunt_jobs_created_total",
     "Total jobs persisted",

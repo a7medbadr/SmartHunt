@@ -68,9 +68,7 @@ async def test_verify_job_page_success():
 
 @pytest.mark.asyncio
 async def test_verify_job_page_login():
-    page = make_page(
-        "https://www.linkedin.com/login"
-    )
+    page = make_page("https://www.linkedin.com/login")
 
     service = NavigationService()
 
@@ -80,9 +78,7 @@ async def test_verify_job_page_login():
 
 @pytest.mark.asyncio
 async def test_verify_job_page_404():
-    page = make_page(
-        "https://www.linkedin.com/404"
-    )
+    page = make_page("https://www.linkedin.com/404")
 
     service = NavigationService()
 
@@ -92,9 +88,7 @@ async def test_verify_job_page_404():
 
 @pytest.mark.asyncio
 async def test_verify_job_page_access_denied():
-    page = make_page(
-        "https://www.linkedin.com/access-denied"
-    )
+    page = make_page("https://www.linkedin.com/access-denied")
 
     service = NavigationService()
 

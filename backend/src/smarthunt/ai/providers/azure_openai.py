@@ -18,14 +18,10 @@ class AzureOpenAIProvider(BaseAIProvider):
     ) -> AIResponse:
 
         if not settings.azure_openai_api_key:
-            raise AIProviderError(
-                "Azure OpenAI API key is not configured"
-            )
+            raise AIProviderError("Azure OpenAI API key is not configured")
 
         if not settings.azure_openai_endpoint:
-            raise AIProviderError(
-                "Azure OpenAI endpoint is not configured"
-            )
+            raise AIProviderError("Azure OpenAI endpoint is not configured")
 
         try:
             return AIResponse(
@@ -35,6 +31,4 @@ class AzureOpenAIProvider(BaseAIProvider):
             )
 
         except Exception as exc:
-            raise AIProviderError(
-                f"Azure OpenAI provider failed: {exc}"
-            ) from exc
+            raise AIProviderError(f"Azure OpenAI provider failed: {exc}") from exc

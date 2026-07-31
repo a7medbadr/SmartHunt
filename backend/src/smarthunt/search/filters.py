@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class JobFilters(BaseModel):
     experience: Optional[str] = None
     remote: Optional[bool] = None

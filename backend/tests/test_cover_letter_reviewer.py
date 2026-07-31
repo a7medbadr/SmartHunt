@@ -3,10 +3,9 @@ from smarthunt.main import app
 
 client = TestClient(app)
 
+
 def test_cover_letter_review_endpoint():
-    payload = {
-        "cover_letter": "I am applying for the job."
-    }
+    payload = {"cover_letter": "I am applying for the job."}
     response = client.post("/api/v1/cover-letter/review", json=payload)
 
     assert response.status_code == 200

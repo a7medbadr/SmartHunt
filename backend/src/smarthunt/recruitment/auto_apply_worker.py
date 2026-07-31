@@ -24,9 +24,7 @@ class AutoApplyWorker:
 
         result = await db.execute(
             select(ApplyQueueItem)
-            .where(
-                ApplyQueueItem.status == "PENDING"
-            )
+            .where(ApplyQueueItem.status == "PENDING")
             .order_by(
                 ApplyQueueItem.priority.desc(),
                 ApplyQueueItem.created_at,
@@ -56,11 +54,7 @@ class AutoApplyWorker:
                 job_url=f"job:{item.job_id}",
             )
 
-            item.status = (
-                "SUCCESS"
-                if result.get("status") == "SUCCESS"
-                else "FAILED"
-            )
+            item.status = "SUCCESS" if result.get("status") == "SUCCESS" else "FAILED"
 
         except Exception:
 
@@ -103,15 +97,9 @@ class AutoApplyWorker:
         db: AsyncSession,
     ) -> List[ApplyQueueItem]:
 
-        result = await db.execute(
-            select(ApplyQueueItem).where(
-                ApplyQueueItem.status == "FAILED"
-            )
-        )
+        result = await db.execute(select(ApplyQueueItem).where(ApplyQueueItem.status == "FAILED"))
 
-        failed_items = list(
-            result.scalars().all()
-        )
+        failed_items = list(result.scalars().all())
 
         retried: List[ApplyQueueItem] = []
 
@@ -135,18 +123,12 @@ class AutoApplyWorker:
         item_id: int,
     ) -> ApplyQueueItem:
 
-        result = await db.execute(
-            select(ApplyQueueItem).where(
-                ApplyQueueItem.id == item_id
-            )
-        )
+        result = await db.execute(select(ApplyQueueItem).where(ApplyQueueItem.id == item_id))
 
         item = result.scalar_one_or_none()
 
         if item is None:
-            raise AutoApplyWorkerNotFoundError(
-                f"Apply queue item with id {item_id} not found"
-            )
+            raise AutoApplyWorkerNotFoundError(f"Apply queue item with id {item_id} not found")
 
         item.status = "FAILED"
 

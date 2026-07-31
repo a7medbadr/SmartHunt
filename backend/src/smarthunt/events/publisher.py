@@ -2,7 +2,6 @@ from typing import Callable, Awaitable
 
 from smarthunt.events.base import BaseEvent
 
-
 Subscriber = Callable[[BaseEvent], Awaitable[None]]
 
 

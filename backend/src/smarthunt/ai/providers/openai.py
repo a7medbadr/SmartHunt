@@ -18,9 +18,7 @@ class OpenAIProvider(BaseAIProvider):
     ) -> AIResponse:
 
         if not settings.openai_api_key:
-            raise AIProviderError(
-                "OpenAI API key is not configured"
-            )
+            raise AIProviderError("OpenAI API key is not configured")
 
         try:
             return AIResponse(
@@ -30,6 +28,4 @@ class OpenAIProvider(BaseAIProvider):
             )
 
         except Exception as exc:
-            raise AIProviderError(
-                f"OpenAI provider failed: {exc}"
-            ) from exc
+            raise AIProviderError(f"OpenAI provider failed: {exc}") from exc

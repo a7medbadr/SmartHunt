@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from smarthunt.database.base import Base
 
+
 class SearchHistory(Base):
     __tablename__ = "search_history"
 
@@ -16,5 +17,6 @@ class SearchHistory(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="search_histories", lazy="joined")
+
 
 SearchHistoryModel = SearchHistory

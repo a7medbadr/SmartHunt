@@ -29,9 +29,7 @@ class SearchHistoryRepository:
 
     async def list_recent(self, limit: int = 10) -> List[SearchHistory]:
         result = await self.session.execute(
-            select(SearchHistory)
-            .order_by(SearchHistory.created_at.desc())
-            .limit(limit)
+            select(SearchHistory).order_by(SearchHistory.created_at.desc()).limit(limit)
         )
         return list(result.scalars().all())
 

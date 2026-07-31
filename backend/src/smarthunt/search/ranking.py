@@ -8,7 +8,7 @@ class RankingEngine:
             "experience_match": 80,
             "education_match": 90,
             "missing_skills": ["Ansible Tower", "CI/CD Pipeline"],
-            "bonus_skills": ["FastAPI", "OpenShift"]
+            "bonus_skills": ["FastAPI", "OpenShift"],
         }
         title_lower = job.title.lower()
         if "senior" in title_lower or "admin" in title_lower:

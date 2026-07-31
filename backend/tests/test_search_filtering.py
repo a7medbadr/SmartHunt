@@ -76,9 +76,27 @@ def test_router_integration_with_mock_jobs():
     from smarthunt.search.filtering import filter_jobs
 
     mock_service_jobs = [
-        {"id": 1, "title": "OpenShift Platform Specialist", "location": "Riyadh", "source": "drjobs", "description": None},
-        {"id": 2, "title": "Senior Systems Engineer (IBM AIX)", "location": "Khobar", "source": "tanqeeb", "description": None},
-        {"id": 6, "title": "Linux Administrator", "location": "Jeddah", "source": "wzayef", "description": None},
+        {
+            "id": 1,
+            "title": "OpenShift Platform Specialist",
+            "location": "Riyadh",
+            "source": "drjobs",
+            "description": None,
+        },
+        {
+            "id": 2,
+            "title": "Senior Systems Engineer (IBM AIX)",
+            "location": "Khobar",
+            "source": "tanqeeb",
+            "description": None,
+        },
+        {
+            "id": 6,
+            "title": "Linux Administrator",
+            "location": "Jeddah",
+            "source": "wzayef",
+            "description": None,
+        },
     ]
 
     # Test keyword search

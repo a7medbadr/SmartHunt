@@ -24,6 +24,4 @@ class LocalLLMProvider(BaseAIProvider):
             )
 
         except Exception as exc:
-            raise AIProviderError(
-                f"Local LLM provider failed: {exc}"
-            ) from exc
+            raise AIProviderError(f"Local LLM provider failed: {exc}") from exc

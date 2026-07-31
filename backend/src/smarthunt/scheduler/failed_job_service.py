@@ -19,7 +19,6 @@ class FailedSchedulerJobService:
     def __init__(self):
         self.repository = FailedJobRepository()
 
-
     async def create(
         self,
         db: AsyncSession,
@@ -29,9 +28,7 @@ class FailedSchedulerJobService:
         error: str,
     ) -> FailedSchedulerJob:
 
-        now = datetime.now(timezone.utc).replace(
-            tzinfo=None
-        )
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         record = FailedSchedulerJob(
             provider=provider,
@@ -52,14 +49,12 @@ class FailedSchedulerJobService:
 
         return result
 
-
     async def can_retry(
         self,
         record: FailedSchedulerJob,
     ) -> bool:
 
         return record.retry_count < self.MAX_RETRIES
-
 
     async def prepare_retry(
         self,
@@ -76,17 +71,12 @@ class FailedSchedulerJobService:
 
             scheduler_failed_jobs_retry_total.inc()
 
-        record.updated_at = datetime.now(
-            timezone.utc
-        ).replace(
-            tzinfo=None
-        )
+        record.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         await db.flush()
         await db.refresh(record)
 
         return record
-
 
     async def mark_running(
         self,
@@ -99,7 +89,6 @@ class FailedSchedulerJobService:
         await db.flush()
 
         return record
-
 
     async def mark_success(
         self,

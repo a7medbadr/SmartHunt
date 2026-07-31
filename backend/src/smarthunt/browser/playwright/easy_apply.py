@@ -92,14 +92,10 @@ class EasyApplyEngine:
         content = (await page.content()).lower()
 
         if "application submitted" in content:
-            return {
-                "status": "SUCCESS"
-            }
+            return {"status": "SUCCESS"}
 
         if "save application" in content:
-            return {
-                "status": "REVIEW_REQUIRED"
-            }
+            return {"status": "REVIEW_REQUIRED"}
 
         selectors = [
             "button:has-text('Submit application')",
@@ -123,17 +119,12 @@ class EasyApplyEngine:
                     content = (await page.content()).lower()
 
                     if "application submitted" in content:
-                        return {
-                            "status": "SUCCESS"
-                        }
+                        return {"status": "SUCCESS"}
 
             except Exception:
                 continue
 
-        return {
-            "status": "REVIEW_REQUIRED"
-        }
-
+        return {"status": "REVIEW_REQUIRED"}
 
     async def run(self, page: Page) -> dict:
         """
@@ -149,9 +140,7 @@ class EasyApplyEngine:
 
         while steps < max_steps:
 
-            fill_result = await form_filler_engine.fill_form(
-                page
-            )
+            fill_result = await form_filler_engine.fill_form(page)
 
             if fill_result.get("status") == "QUESTION_REQUIRED":
                 return {

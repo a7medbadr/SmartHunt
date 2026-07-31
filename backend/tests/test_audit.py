@@ -5,9 +5,7 @@ from httpx import AsyncClient
 
 async def test_create_and_get_audit_logs(client: AsyncClient):
 
-    response = await client.get(
-        "/api/v1/audit/logs"
-    )
+    response = await client.get("/api/v1/audit/logs")
 
     assert response.status_code == 200
 
@@ -21,9 +19,7 @@ async def test_audit_filter_action(client: AsyncClient):
 
     response = await client.get(
         "/api/v1/audit/logs",
-        params={
-            "action": "LOGIN"
-        },
+        params={"action": "LOGIN"},
     )
 
     assert response.status_code == 200
@@ -38,9 +34,7 @@ async def test_audit_filter_resource_type(client: AsyncClient):
 
     response = await client.get(
         "/api/v1/audit/logs",
-        params={
-            "resource_type": "application"
-        },
+        params={"resource_type": "application"},
     )
 
     assert response.status_code == 200
@@ -73,9 +67,7 @@ async def test_audit_date_filters(client: AsyncClient):
     response = await client.get(
         "/api/v1/audit/logs",
         params={
-            "date_from": (
-                now - timedelta(days=1)
-            ).isoformat(),
+            "date_from": (now - timedelta(days=1)).isoformat(),
             "date_to": now.isoformat(),
         },
     )

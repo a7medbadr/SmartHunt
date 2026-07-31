@@ -20,16 +20,12 @@ async def main():
 
     async with engine.begin() as conn:
         exists = await conn.execute(
-            text(
-                "SELECT 1 FROM pg_database WHERE datname=:name"
-            ),
+            text("SELECT 1 FROM pg_database WHERE datname=:name"),
             {"name": TEST_DB},
         )
 
         if exists.scalar() is None:
-            await conn.execute(
-                text(f'CREATE DATABASE "{TEST_DB}"')
-            )
+            await conn.execute(text(f'CREATE DATABASE "{TEST_DB}"'))
 
     await engine.dispose()
 

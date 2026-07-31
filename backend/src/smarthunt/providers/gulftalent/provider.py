@@ -1,6 +1,7 @@
 from smarthunt.providers.base.provider import BaseProvider
 from typing import Any
 
+
 class GulfTalentProvider(BaseProvider):
     name = "gulftalent"
     supports_login = True

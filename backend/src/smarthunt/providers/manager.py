@@ -42,8 +42,12 @@ class ProviderManager:
             "total": len(providers),
             "supports_login": sum(1 for p in providers if getattr(p, "supports_login", False)),
             "supports_apply": sum(1 for p in providers if getattr(p, "supports_apply", False)),
-            "supports_resume_upload": sum(1 for p in providers if getattr(p, "supports_resume_upload", False)),
-            "supports_cover_letter": sum(1 for p in providers if getattr(p, "supports_cover_letter", False)),
+            "supports_resume_upload": sum(
+                1 for p in providers if getattr(p, "supports_resume_upload", False)
+            ),
+            "supports_cover_letter": sum(
+                1 for p in providers if getattr(p, "supports_cover_letter", False)
+            ),
         }
 
 

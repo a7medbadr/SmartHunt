@@ -31,7 +31,5 @@ class IdempotencyKey(Base):
 
     expires_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: (
-            datetime.now(timezone.utc) + timedelta(hours=24)
-        ).replace(tzinfo=None),
+        default=lambda: (datetime.now(timezone.utc) + timedelta(hours=24)).replace(tzinfo=None),
     )

@@ -7,11 +7,12 @@ from smarthunt.database.session import get_db
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
+
 @router.get(
     "/statistics",
     response_model=DashboardStatisticsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get Dashboard Statistics"
+    summary="Get Dashboard Statistics",
 )
 async def get_dashboard_statistics(db: AsyncSession = Depends(get_db)):
     service = DashboardService(db)

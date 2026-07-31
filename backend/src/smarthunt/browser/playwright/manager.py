@@ -64,9 +64,7 @@ class BrowserManager:
     ) -> Page:
 
         if self.browser is None:
-            raise RuntimeError(
-                "Browser is not started. Call launch() first."
-            )
+            raise RuntimeError("Browser is not started. Call launch() first.")
 
         if provider not in self.contexts:
 
@@ -83,24 +81,15 @@ class BrowserManager:
                 ),
             )
 
-            context.set_default_timeout(
-                10000
-            )
+            context.set_default_timeout(10000)
 
-            context.set_default_navigation_timeout(
-                10000
-            )
+            context.set_default_navigation_timeout(10000)
 
             self.contexts[provider] = context
 
-        if (
-            provider not in self.pages
-            or self.pages[provider].is_closed()
-        ):
+        if provider not in self.pages or self.pages[provider].is_closed():
 
-            self.pages[provider] = await (
-                self.contexts[provider].new_page()
-            )
+            self.pages[provider] = await self.contexts[provider].new_page()
 
         return self.pages[provider]
 

@@ -30,11 +30,7 @@ class FormFillerEngine:
             "last_name": "",
             "email": "",
             "phone": "",
-            "resume_path": (
-                info["stored_path"]
-                if info.get("uploaded")
-                else None
-            ),
+            "resume_path": (info["stored_path"] if info.get("uploaded") else None),
         }
 
     async def fill_textbox(
@@ -135,9 +131,7 @@ class FormFillerEngine:
 
         profile = self.get_profile()
 
-        inputs = await page.locator(
-            "input, textarea, select"
-        ).all()
+        inputs = await page.locator("input, textarea, select").all()
 
         for element in inputs:
 
@@ -146,15 +140,9 @@ class FormFillerEngine:
 
                 name = await element.get_attribute("name")
 
-                placeholder = await element.get_attribute(
-                    "placeholder"
-                )
+                placeholder = await element.get_attribute("placeholder")
 
-                field = (
-                    name
-                    or placeholder
-                    or ""
-                ).lower()
+                field = (name or placeholder or "").lower()
 
                 if "email" in field:
                     await retry_executor.run(
@@ -174,10 +162,7 @@ class FormFillerEngine:
                         page_url=page.url,
                     )
 
-                elif (
-                    "resume" in field
-                    and input_type == "file"
-                ):
+                elif "resume" in field and input_type == "file":
 
                     await self.upload_resume(
                         page,
@@ -207,9 +192,7 @@ class FormFillerEngine:
                 "question": unknown,
             }
 
-        return {
-            "status": "SUCCESS"
-        }
+        return {"status": "SUCCESS"}
 
     async def detect_unknown_question(
         self,
@@ -224,9 +207,7 @@ class FormFillerEngine:
             "sponsorship",
         ]
 
-        text = (
-            await page.content()
-        ).lower()
+        text = (await page.content()).lower()
 
         for question in questions:
             if question in text:
@@ -239,11 +220,7 @@ class FormFillerEngine:
                         url=getattr(page, "url", "unknown"),
                         label=question,
                         html=text[:2000],
-                        confidence=(
-                            0.3
-                            if question_type is QuestionType.UNKNOWN
-                            else 0.6
-                        ),
+                        confidence=(0.3 if question_type is QuestionType.UNKNOWN else 0.6),
                     )
                 )
 

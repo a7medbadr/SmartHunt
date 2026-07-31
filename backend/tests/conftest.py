@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
-
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(
@@ -22,16 +21,11 @@ load_dotenv(
 )
 
 os.environ["APP_ENV"] = "test"
-os.environ["JWT_SECRET_KEY"] = (
-    "test-jwt-secret-key-32-characters-long"
-)
-os.environ["SECRET_KEY"] = (
-    "test-secret-key-32-characters-long"
-)
+os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-32-characters-long"
+os.environ["SECRET_KEY"] = "test-secret-key-32-characters-long"
 
 from smarthunt.api.dependencies import get_db
 from smarthunt.main import app
-
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",

@@ -19,9 +19,7 @@ def test_initial_state():
 
 def test_open_after_threshold():
 
-    cb = CircuitBreaker(
-        failure_threshold=3
-    )
+    cb = CircuitBreaker(failure_threshold=3)
 
     cb.record_failure()
     cb.record_failure()
@@ -36,18 +34,13 @@ def test_open_after_threshold():
 
 def test_half_open_after_retry_timeout():
 
-    cb = CircuitBreaker(
-        retry_after_seconds=60
-    )
+    cb = CircuitBreaker(retry_after_seconds=60)
 
     cb.record_failure()
     cb.record_failure()
     cb.record_failure()
 
-    cb.last_failure = (
-        datetime.now(UTC)
-        - timedelta(seconds=61)
-    )
+    cb.last_failure = datetime.now(UTC) - timedelta(seconds=61)
 
     assert cb.allow_request() is True
     assert cb.state == ProviderState.HALF_OPEN
@@ -55,9 +48,7 @@ def test_half_open_after_retry_timeout():
 
 def test_success_closes_circuit():
 
-    cb = CircuitBreaker(
-        failure_threshold=3
-    )
+    cb = CircuitBreaker(failure_threshold=3)
 
     cb.record_failure()
     cb.record_failure()
@@ -72,9 +63,7 @@ def test_success_closes_circuit():
 
 def test_failure_after_recovery():
 
-    cb = CircuitBreaker(
-        failure_threshold=3
-    )
+    cb = CircuitBreaker(failure_threshold=3)
 
     cb.record_failure()
     cb.record_failure()

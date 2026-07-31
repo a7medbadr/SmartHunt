@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 from fastapi import status
 
+
 @pytest.mark.asyncio
 async def test_get_dashboard_statistics_empty_db(client: AsyncClient):
     response = await client.get("/api/v1/dashboard/statistics")

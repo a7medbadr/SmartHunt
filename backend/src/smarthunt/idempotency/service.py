@@ -41,11 +41,7 @@ class IdempotencyService:
         key: str,
     ) -> IdempotencyKey | None:
 
-        result = await db.execute(
-            select(IdempotencyKey).where(
-                IdempotencyKey.key == key
-            )
-        )
+        result = await db.execute(select(IdempotencyKey).where(IdempotencyKey.key == key))
 
         return result.scalar_one_or_none()
 

@@ -20,7 +20,6 @@ class AuditRepository:
         await self.db.refresh(audit)
         return audit
 
-
     async def get_logs(
         self,
         action: str | None = None,
@@ -34,31 +33,18 @@ class AuditRepository:
         query = select(AuditLog)
 
         if action:
-            query = query.where(
-                AuditLog.action == action
-            )
+            query = query.where(AuditLog.action == action)
 
         if resource_type:
-            query = query.where(
-                AuditLog.resource_type == resource_type
-            )
+            query = query.where(AuditLog.resource_type == resource_type)
 
         if date_from:
-            query = query.where(
-                AuditLog.created_at >= date_from
-            )
+            query = query.where(AuditLog.created_at >= date_from)
 
         if date_to:
-            query = query.where(
-                AuditLog.created_at <= date_to
-            )
+            query = query.where(AuditLog.created_at <= date_to)
 
-        query = (
-            query
-            .order_by(AuditLog.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-        )
+        query = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
 
         result = await self.db.execute(query)
 

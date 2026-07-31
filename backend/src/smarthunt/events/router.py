@@ -7,7 +7,6 @@ from smarthunt.api.dependencies import get_db
 from smarthunt.events.repository import event_repository
 from smarthunt.events.schemas import EventResponse
 
-
 router = APIRouter(
     prefix="/events",
     tags=["events"],

@@ -1,6 +1,5 @@
 from prometheus_client import Counter
 
-
 events_published_total = Counter(
     "smarthunt_events_published_total",
     "Total published events",

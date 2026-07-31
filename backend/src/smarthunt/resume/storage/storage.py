@@ -3,7 +3,6 @@ import shutil
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, Union
 
-
 STORAGE_DIR = Path(
     os.getenv(
         "RESUME_STORAGE_DIR",
@@ -43,9 +42,7 @@ class ResumeStorage:
 
         if isinstance(file_obj, bytes):
 
-            file_path.write_bytes(
-                file_obj
-            )
+            file_path.write_bytes(file_obj)
 
         else:
 
@@ -80,14 +77,10 @@ class ResumeStorage:
         self,
     ) -> Dict[str, Any]:
 
-        files = list(
-            STORAGE_DIR.iterdir()
-        )
+        files = list(STORAGE_DIR.iterdir())
 
         if not files:
-            return {
-                "uploaded": False
-            }
+            return {"uploaded": False}
 
         latest = files[0]
 

@@ -6,9 +6,7 @@ from smarthunt.domain import ResumeProfile
 
 
 def test_answer_email():
-    profile = ResumeProfile(
-        email="test@example.com"
-    )
+    profile = ResumeProfile(email="test@example.com")
 
     answerer = QuestionAnswerer()
 
@@ -23,9 +21,7 @@ def test_answer_email():
 
 
 def test_answer_phone():
-    profile = ResumeProfile(
-        phone="+966500000000"
-    )
+    profile = ResumeProfile(phone="+966500000000")
 
     answerer = QuestionAnswerer()
 
@@ -40,9 +36,7 @@ def test_answer_phone():
 
 
 def test_answer_linkedin():
-    profile = ResumeProfile(
-        linkedin="https://linkedin.com/in/test"
-    )
+    profile = ResumeProfile(linkedin="https://linkedin.com/in/test")
 
     answerer = QuestionAnswerer()
 
@@ -57,9 +51,7 @@ def test_answer_linkedin():
 
 
 def test_answer_experience():
-    profile = ResumeProfile(
-        years_of_experience=8
-    )
+    profile = ResumeProfile(years_of_experience=8)
 
     answerer = QuestionAnswerer()
 

@@ -25,9 +25,7 @@ class JobTagService:
         )
         existing = result.scalar_one_or_none()
         if existing is not None:
-            raise JobTagAlreadyExistsError(
-                f"Tag '{data.tag}' already exists for job {data.job_id}"
-            )
+            raise JobTagAlreadyExistsError(f"Tag '{data.tag}' already exists for job {data.job_id}")
 
         tag = JobTag(job_id=data.job_id, tag=data.tag.strip())
         db.add(tag)

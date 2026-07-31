@@ -49,5 +49,8 @@ APP_ENV = "test"
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]
+
 [tool.black]
 line-length = 100

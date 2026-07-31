@@ -7,9 +7,7 @@ async def test_easy_apply(client: AsyncClient):
 
     response = await client.post(
         "/api/v1/browser/playwright/easy-apply",
-        json={
-            "job_url": "https://www.linkedin.com/jobs/view/test"
-        },
+        json={"job_url": "https://www.linkedin.com/jobs/view/test"},
     )
 
     assert response.status_code == 200

@@ -1,10 +1,11 @@
 import hashlib
 
+
 class DeduplicationEngine:
     @staticmethod
     def generate_hash(title: str, company: str, city: str, description: str) -> str:
         norm_text = f"{title.lower().strip()}|{company.lower().strip()}|{city.lower().strip()}|{description.lower().strip()}"
-        return hashlib.sha256(norm_text.encode('utf-8')).hexdigest()
+        return hashlib.sha256(norm_text.encode("utf-8")).hexdigest()
 
     @classmethod
     def deduplicate(cls, jobs: list) -> list:

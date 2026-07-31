@@ -18,7 +18,6 @@ from smarthunt.settings.models import UserSettings
 from smarthunt.audit.models import AuditLog
 from smarthunt.events.models import EventLog
 
-
 __all__ = [
     "Activity",
     "Application",

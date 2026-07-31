@@ -55,10 +55,7 @@ class NotificationService:
         db: AsyncSession,
     ) -> List[Notification]:
 
-        result = await db.execute(
-            select(Notification)
-            .order_by(Notification.created_at.desc())
-        )
+        result = await db.execute(select(Notification).order_by(Notification.created_at.desc()))
 
         return list(result.scalars().all())
 
@@ -68,9 +65,7 @@ class NotificationService:
     ) -> int:
 
         result = await db.execute(
-            select(func.count())
-            .select_from(Notification)
-            .where(Notification.read_at.is_(None))
+            select(func.count()).select_from(Notification).where(Notification.read_at.is_(None))
         )
 
         return int(result.scalar() or 0)
@@ -81,17 +76,12 @@ class NotificationService:
         notification_id: int,
     ) -> Notification:
 
-        result = await db.execute(
-            select(Notification)
-            .where(Notification.id == notification_id)
-        )
+        result = await db.execute(select(Notification).where(Notification.id == notification_id))
 
         notification = result.scalar_one_or_none()
 
         if notification is None:
-            raise NotificationNotFoundError(
-                f"Notification with id {notification_id} not found"
-            )
+            raise NotificationNotFoundError(f"Notification with id {notification_id} not found")
 
         return notification
 

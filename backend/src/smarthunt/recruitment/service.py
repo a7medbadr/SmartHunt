@@ -28,12 +28,8 @@ class RecruitmentService:
         result = await self.session.execute(select(Application))
         return list(result.scalars().all())
 
-    async def update_status(
-        self, app_id: UUID, status: str
-    ) -> Optional[Application]:
-        result = await self.session.execute(
-            select(Application).where(Application.id == app_id)
-        )
+    async def update_status(self, app_id: UUID, status: str) -> Optional[Application]:
+        result = await self.session.execute(select(Application).where(Application.id == app_id))
         app = result.scalar_one_or_none()
         if not app:
             return None
@@ -44,9 +40,7 @@ class RecruitmentService:
         return app
 
     async def delete_application(self, app_id: UUID) -> bool:
-        result = await self.session.execute(
-            select(Application).where(Application.id == app_id)
-        )
+        result = await self.session.execute(select(Application).where(Application.id == app_id))
         app = result.scalar_one_or_none()
         if not app:
             return False

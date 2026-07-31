@@ -42,9 +42,7 @@ class ProviderHealthService:
         return list(result.scalars().all())
 
     async def get_by_provider(self, db: AsyncSession, provider: str) -> ProviderHealth:
-        result = await db.execute(
-            select(ProviderHealth).where(ProviderHealth.provider == provider)
-        )
+        result = await db.execute(select(ProviderHealth).where(ProviderHealth.provider == provider))
         record = result.scalar_one_or_none()
         if record is None:
             raise ProviderHealthNotFoundError(f"No health record for provider '{provider}'")

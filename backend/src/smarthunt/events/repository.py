@@ -28,16 +28,12 @@ class EventRepository:
 
         return event
 
-
     async def list_all(
         self,
         db: AsyncSession,
     ) -> list[EventLog]:
 
-        result = await db.execute(
-            select(EventLog)
-            .order_by(EventLog.created_at.desc())
-        )
+        result = await db.execute(select(EventLog).order_by(EventLog.created_at.desc()))
 
         return list(result.scalars().all())
 

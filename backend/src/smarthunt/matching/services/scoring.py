@@ -11,6 +11,7 @@ def calculate_score(
             None,
             resume.lower(),
             job_description.lower(),
-        ).ratio() * 100,
+        ).ratio()
+        * 100,
         2,
     )

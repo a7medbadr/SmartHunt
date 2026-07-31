@@ -122,11 +122,7 @@ class PlaywrightEngine:
 
         result = await easy_apply_engine.run(page)
 
-        if (
-            result.get("status") == "PAUSED_UNKNOWN_QUESTION"
-            and application_id
-            and db is not None
-        ):
+        if result.get("status") == "PAUSED_UNKNOWN_QUESTION" and application_id and db is not None:
             await self._pause_application(application_id, db)
 
         return result
@@ -139,9 +135,7 @@ class PlaywrightEngine:
         try:
             app_uuid = UUID(application_id)
         except ValueError:
-            logger.warning(
-                f"Invalid application_id={application_id}, skipping status update"
-            )
+            logger.warning(f"Invalid application_id={application_id}, skipping status update")
             return
 
         service = RecruitmentService(db)
@@ -152,9 +146,7 @@ class PlaywrightEngine:
         )
 
         if updated is None:
-            logger.warning(
-                f"Application {application_id} not found, skipping status update"
-            )
+            logger.warning(f"Application {application_id} not found, skipping status update")
 
     async def fill_form(self, job_url: str):
         if not self.manager.is_running:
@@ -162,10 +154,7 @@ class PlaywrightEngine:
 
         page = await self.manager.get_page("default")
 
-        if (
-            job_url == "https://example.com"
-            or "linkedin.com/jobs/view/test" in job_url
-        ):
+        if job_url == "https://example.com" or "linkedin.com/jobs/view/test" in job_url:
             return {"status": "SUCCESS"}
 
         try:
@@ -203,11 +192,7 @@ class PlaywrightEngine:
 
         result = await filler.fill_textareas()
 
-        status = (
-            "SUCCESS"
-            if not result["unknown_questions"]
-            else "PARTIAL_SUCCESS"
-        )
+        status = "SUCCESS" if not result["unknown_questions"] else "PARTIAL_SUCCESS"
 
         return {
             "status": status,

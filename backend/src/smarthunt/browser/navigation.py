@@ -94,50 +94,29 @@ class NavigationService:
 
         except PlaywrightTimeoutError:
 
-            logger.warning(
-                "Timed out waiting for page load."
-            )
+            logger.warning("Timed out waiting for page load.")
 
     async def verify_job_page(
         self,
         page: Page,
     ) -> None:
 
-        current_url = (
-            page.url or ""
-        ).lower()
+        current_url = (page.url or "").lower()
 
-        if any(
-            marker in current_url
-            for marker in LOGIN_URL_MARKERS
-        ):
-            raise JobPageNotFound(
-                "Redirected to login page."
-            )
+        if any(marker in current_url for marker in LOGIN_URL_MARKERS):
+            raise JobPageNotFound("Redirected to login page.")
 
-        if any(
-            marker in current_url
-            for marker in NOT_FOUND_URL_MARKERS
-        ):
-            raise JobPageNotFound(
-                "Job page not found."
-            )
+        if any(marker in current_url for marker in NOT_FOUND_URL_MARKERS):
+            raise JobPageNotFound("Job page not found.")
 
-        if any(
-            marker in current_url
-            for marker in ACCESS_DENIED_URL_MARKERS
-        ):
-            raise JobPageNotFound(
-                "Access denied."
-            )
+        if any(marker in current_url for marker in ACCESS_DENIED_URL_MARKERS):
+            raise JobPageNotFound("Access denied.")
 
         for selector in JOB_PAGE_SELECTORS:
 
             try:
 
-                element = await page.query_selector(
-                    selector
-                )
+                element = await page.query_selector(selector)
 
                 if element is not None:
                     return
@@ -149,9 +128,7 @@ class NavigationService:
                     selector,
                 )
 
-        raise JobPageNotFound(
-            "Could not verify job page."
-        )
+        raise JobPageNotFound("Could not verify job page.")
 
     async def get_job_title(
         self,

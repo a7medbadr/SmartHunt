@@ -55,41 +55,29 @@ class QuestionAnswerer:
         mapping = (
             ("email", profile.email),
             ("e-mail", profile.email),
-
             ("phone", profile.phone),
             ("mobile", profile.phone),
             ("telephone", profile.phone),
-
             ("linkedin", profile.linkedin),
-
             ("github", profile.github),
             ("git hub", profile.github),
-
             ("portfolio", profile.portfolio),
-
             ("full name", profile.full_name),
             ("name", profile.full_name),
-
             ("current title", profile.current_title),
             ("job title", profile.current_title),
             ("position", profile.current_title),
-
             ("company", profile.current_company),
             ("current company", profile.current_company),
-
             ("experience", self._experience(profile)),
             ("years", self._experience(profile)),
-
             ("country", profile.country),
             ("city", profile.city),
             ("nationality", profile.nationality),
-
             ("notice", profile.notice_period),
             ("salary", profile.salary_expectation),
-
             ("skills", self._join(profile.skills)),
             ("languages", self._join(profile.languages)),
-
             ("summary", profile.summary),
         )
 
@@ -100,10 +88,7 @@ class QuestionAnswerer:
                     return QuestionDecision(
                         decision=Decision.UNKNOWN,
                         confidence=0.5,
-                        reason=(
-                            f"matched '{keyword}' but "
-                            "profile value is missing"
-                        ),
+                        reason=(f"matched '{keyword}' but " "profile value is missing"),
                     )
 
                 return QuestionDecision(
@@ -121,9 +106,7 @@ class QuestionAnswerer:
 
     @staticmethod
     def _normalize(question: str) -> str:
-        return " ".join(
-            question.lower().strip().split()
-        )
+        return " ".join(question.lower().strip().split())
 
     @staticmethod
     def _join(values: list[str]) -> str | None:

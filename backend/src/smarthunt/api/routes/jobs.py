@@ -40,4 +40,3 @@ async def create_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job already exists",
         ) from None
-

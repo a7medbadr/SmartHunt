@@ -26,9 +26,7 @@ class DiscoveryService:
             limit=limit,
         )
 
-        inserted = await self.repository.save_discovered_jobs(
-            jobs
-        )
+        inserted = await self.repository.save_discovered_jobs(jobs)
 
         return {
             "providers": len(provider_registry.providers()),

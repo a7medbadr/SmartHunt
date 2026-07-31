@@ -30,12 +30,9 @@ from smarthunt.resume.storage.storage import (
     STORAGE_DIR,
 )
 
-
 router = APIRouter()
 
-router.include_router(
-    reviewer_router
-)
+router.include_router(reviewer_router)
 
 
 class ResumeGenerateRequest(BaseModel):
@@ -94,9 +91,7 @@ async def upload_resume(
     file: UploadFile = File(...),
 ):
 
-    return await resume_service.upload_resume(
-        file
-    )
+    return await resume_service.upload_resume(file)
 
 
 @router.delete(
@@ -128,9 +123,7 @@ def analyze_resume(
         exist_ok=True,
     )
 
-    temp_path = STORAGE_DIR / (
-        f"temp_{file.filename}"
-    )
+    temp_path = STORAGE_DIR / (f"temp_{file.filename}")
 
     try:
 
@@ -144,17 +137,11 @@ def analyze_resume(
                 buffer,
             )
 
-        text = extract_text(
-            temp_path
-        )
+        text = extract_text(temp_path)
 
-        skills = extract_skills(
-            text
-        )
+        skills = extract_skills(text)
 
-        return ResumeAnalyzeResponse(
-            skills=skills
-        )
+        return ResumeAnalyzeResponse(skills=skills)
 
     finally:
 
@@ -176,6 +163,4 @@ def generate_tailored_resume(
         job_description=payload.job,
     )
 
-    return ResumeGenerateResponse(
-        **result
-    )
+    return ResumeGenerateResponse(**result)

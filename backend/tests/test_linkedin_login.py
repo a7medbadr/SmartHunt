@@ -68,9 +68,7 @@ async def test_login_failed_on_unexpected_page():
 
 @pytest.mark.asyncio
 async def test_login_failed_without_credentials(monkeypatch):
-    monkeypatch.setattr(
-        "smarthunt.browser.providers.linkedin.login.settings.linkedin_email", None
-    )
+    monkeypatch.setattr("smarthunt.browser.providers.linkedin.login.settings.linkedin_email", None)
 
     page = make_mock_page("https://www.linkedin.com/feed/")
 

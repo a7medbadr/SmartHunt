@@ -1,7 +1,6 @@
 from prometheus_client import Counter
 from prometheus_client import Gauge
 
-
 provider_failures_total = Counter(
     "provider_failures_total",
     "Total provider failures",

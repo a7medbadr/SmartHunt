@@ -9,7 +9,6 @@ from smarthunt.logging.config import configure_logging
 
 import structlog
 
-
 logger = structlog.get_logger("smarthunt")
 
 

@@ -18,9 +18,7 @@ class OllamaProvider(BaseAIProvider):
     ) -> AIResponse:
 
         if not settings.ollama_url:
-            raise AIProviderError(
-                "Ollama URL is not configured"
-            )
+            raise AIProviderError("Ollama URL is not configured")
 
         try:
             return AIResponse(
@@ -30,6 +28,4 @@ class OllamaProvider(BaseAIProvider):
             )
 
         except Exception as exc:
-            raise AIProviderError(
-                f"Ollama provider failed: {exc}"
-            ) from exc
+            raise AIProviderError(f"Ollama provider failed: {exc}") from exc

@@ -20,11 +20,7 @@ class Resume(Base):
 
     __tablename__ = "resumes"
 
-
-    id: Mapped[int] = mapped_column(
-        primary_key=True
-    )
-
+    id: Mapped[int] = mapped_column(primary_key=True)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey(
@@ -34,24 +30,20 @@ class Resume(Base):
         nullable=False,
     )
 
-
     filename: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
     )
-
 
     stored_path: Mapped[str] = mapped_column(
         String(512),
         nullable=False,
     )
 
-
     extracted_text: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
-
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -59,14 +51,12 @@ class Resume(Base):
         nullable=False,
     )
 
-
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         nullable=False,
     )
-
 
     user = relationship(
         "User",

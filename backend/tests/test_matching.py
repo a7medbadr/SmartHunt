@@ -8,7 +8,7 @@ client = TestClient(app)
 def test_matcher_full_match():
     resume = "Experienced Linux engineer with Docker, Terraform, and AWS."
     job = "Looking for Linux, Docker, Terraform, and AWS specialist."
-    
+
     result = match(resume, job)
     assert result["score"] == 100
     assert sorted(result["matched_skills"]) == ["aws", "docker", "linux", "terraform"]
@@ -44,7 +44,7 @@ def test_matcher_no_match_and_empty():
 def test_matching_api_endpoint():
     payload = {
         "resume": "Experienced in Linux and Docker",
-        "job": "Needs Linux, Docker, Terraform, and AWS"
+        "job": "Needs Linux, Docker, Terraform, and AWS",
     }
     response = client.post("/api/v1/matching", json=payload)
     assert response.status_code == 200

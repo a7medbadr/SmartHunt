@@ -7,7 +7,6 @@ from smarthunt.audit.schemas import AuditLogResponse
 from smarthunt.audit.service import AuditService
 from smarthunt.database.session import get_db
 
-
 router = APIRouter(
     prefix="/audit",
     tags=["audit"],

@@ -1,6 +1,7 @@
 from smarthunt.providers.base.provider import BaseProvider
 from typing import Any
 
+
 class BaytProvider(BaseProvider):
     name = "bayt"
     supports_login = True
