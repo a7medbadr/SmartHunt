@@ -85,7 +85,7 @@ async def test_retry_failed(client: AsyncClient, test_job: int, db_session: Asyn
     )
     item_id = response.json()["id"]
 
-    result = await db_session.execute(
+    await db_session.execute(
         ApplyQueueItem.__table__.update()
         .where(ApplyQueueItem.id == item_id)
         .values(status="FAILED")

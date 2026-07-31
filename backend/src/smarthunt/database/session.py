@@ -1,8 +1,5 @@
-import os
 from collections.abc import AsyncGenerator
-from pathlib import Path
 
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -10,21 +7,10 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-ROOT_DIR = Path(__file__).resolve().parents[4]
-load_dotenv(ROOT_DIR / ".env", override=False)
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt",
-)
-
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt_test",
-)
+from smarthunt.core.config import settings
 
 engine = create_async_engine(
-    DATABASE_URL,
+    settings.database_url,
     echo=False,
     pool_pre_ping=True,
     future=True,

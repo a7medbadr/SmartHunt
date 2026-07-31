@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -7,23 +7,28 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.api.dependencies import get_db
+from smarthunt.api.dependencies.database import get_db
 from smarthunt.core.config import settings
 from smarthunt.database.repositories.user_repository import UserRepository
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login",
+)
 
 
 def create_access_token(
-    data: dict,
-    expires_delta: timedelta = timedelta(
-        minutes=settings.access_token_expire_minutes,
-    ),
+    data: dict[str, Any],
+    expires_delta: timedelta | None = None,
 ) -> str:
-    expire = datetime.now(UTC) + expires_delta
+    expire = datetime.now(UTC) + (
+        expires_delta
+        or timedelta(
+            minutes=settings.access_token_expire_minutes,
+        )
+    )
 
     payload = data.copy()
-    payload.update({"exp": expire})
+    payload["exp"] = expire
 
     return jwt.encode(
         payload,
@@ -32,8 +37,15 @@ def create_access_token(
     )
 
 
-DB = Annotated[AsyncSession, Depends(get_db)]
-Token = Annotated[str, Depends(oauth2_scheme)]
+DB = Annotated[
+    AsyncSession,
+    Depends(get_db),
+]
+
+Token = Annotated[
+    str,
+    Depends(oauth2_scheme),
+]
 
 
 async def get_current_user(
@@ -54,7 +66,7 @@ async def get_current_user(
 
         username = payload.get("sub")
 
-        if username is None:
+        if not username:
             raise credentials_exception
 
     except InvalidTokenError as exc:
@@ -66,4 +78,3 @@ async def get_current_user(
         raise credentials_exception
 
     return user
-

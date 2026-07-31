@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.api.dependencies import get_db
-from smarthunt.events.models import EventLog
 from smarthunt.events.repository import event_repository
 from smarthunt.events.schemas import EventResponse
 

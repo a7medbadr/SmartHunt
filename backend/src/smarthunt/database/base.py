@@ -1,3 +1,5 @@
 from smarthunt.database.session import Base
 
-__all__ = ["Base"]
+__all__ = (
+    "Base",
+)

@@ -6,13 +6,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SmartHunt"
-    VERSION: str = "0.1.0"
+    VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
     app_name: str = "SmartHunt"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     app_env: str = "development"
     app_debug: bool = False
+
+    build_version: str = "latest"
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -30,6 +32,7 @@ class Settings(BaseSettings):
     secret_key: str
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
+
     access_token_expire_minutes: int = Field(
         default=60,
         validation_alias=AliasChoices(

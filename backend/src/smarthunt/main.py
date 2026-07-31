@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from smarthunt.api.routes import api_router
 from smarthunt.core.config import settings
 from smarthunt.core.lifespan import lifespan
+from smarthunt.metrics import setup_metrics
 
 
 app = FastAPI(
@@ -15,6 +15,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS or ["*"],
@@ -23,7 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Instrumentator().instrument(app).expose(app)
+
+setup_metrics(app)
+
 
 app.include_router(
     api_router,
@@ -31,8 +34,10 @@ app.include_router(
 )
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health_check():
     return {
         "status": "healthy",
+        "application": settings.PROJECT_NAME,
+        "version": settings.VERSION,
     }

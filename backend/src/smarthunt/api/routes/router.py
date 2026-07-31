@@ -6,6 +6,7 @@ from smarthunt.apply_queue.router import router as apply_queue_router
 from smarthunt.api.routes.auth import router as auth_router
 from smarthunt.api.routes.health import router as health_router
 from smarthunt.api.routes.jobs import router as jobs_router
+from smarthunt.api.routes.system import router as system_router
 from smarthunt.browser.playwright.router import router as playwright_router
 from smarthunt.browser.session.router import router as browser_session_router
 from smarthunt.career.router import router as career_router
@@ -16,9 +17,7 @@ from smarthunt.cover_letter.reviewer.router import (
 from smarthunt.dashboard.api import router as dashboard_router
 from smarthunt.events.router import router as events_router
 from smarthunt.favorites.router import router as favorites_router
-from smarthunt.idempotency.router import (
-    router as idempotency_router,
-)
+from smarthunt.idempotency.router import router as idempotency_router
 from smarthunt.job_notes.api import router as job_notes_router
 from smarthunt.job_tags.api import router as job_tags_router
 from smarthunt.matching.api.router import router as matching_router
@@ -49,84 +48,161 @@ from smarthunt.settings.router import router as settings_router
 
 api_router = APIRouter()
 
+
 api_router.include_router(health_router, tags=["health"])
-api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
-api_router.include_router(recruitment_router, prefix="", tags=["recruitment"])
-api_router.include_router(jobs_router, prefix="/jobs", tags=["jobs"])
-api_router.include_router(recommendation_router, prefix="", tags=["recommendation"])
+api_router.include_router(system_router, tags=["system"])
+
+api_router.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["auth"],
+)
+
+api_router.include_router(
+    recruitment_router,
+    prefix="",
+    tags=["recruitment"],
+)
+
+api_router.include_router(
+    jobs_router,
+    prefix="/jobs",
+    tags=["jobs"],
+)
+
+api_router.include_router(
+    recommendation_router,
+    prefix="",
+    tags=["recommendation"],
+)
+
 api_router.include_router(
     cover_letter_router,
     prefix="/cover-letter",
     tags=["cover-letter"],
 )
+
 api_router.include_router(
     cover_letter_reviewer_router,
     prefix="/cover-letter",
     tags=["cover-letter"],
 )
-api_router.include_router(job_notes_router, prefix="/job-notes", tags=["job-notes"])
-api_router.include_router(job_tags_router, prefix="/job-tags", tags=["job-tags"])
-api_router.include_router(matching_router, prefix="/matching", tags=["matching"])
-api_router.include_router(career_router, prefix="/career", tags=["career"])
-api_router.include_router(resume_router, prefix="/resume", tags=["resume"])
+
+api_router.include_router(
+    job_notes_router,
+    prefix="/job-notes",
+    tags=["job-notes"],
+)
+
+api_router.include_router(
+    job_tags_router,
+    prefix="/job-tags",
+    tags=["job-tags"],
+)
+
+api_router.include_router(
+    matching_router,
+    prefix="/matching",
+    tags=["matching"],
+)
+
+api_router.include_router(
+    career_router,
+    prefix="/career",
+    tags=["career"],
+)
+
+api_router.include_router(
+    resume_router,
+    prefix="/resume",
+    tags=["resume"],
+)
+
 api_router.include_router(
     resume_reviewer_router,
     prefix="/resume",
     tags=["resume"],
 )
-api_router.include_router(search_router, prefix="/search", tags=["search"])
+
+api_router.include_router(
+    search_router,
+    prefix="/search",
+    tags=["search"],
+)
+
 api_router.include_router(search_metrics_router)
+
 api_router.include_router(
     saved_searches_router,
     prefix="/saved-searches",
     tags=["saved-searches"],
 )
-api_router.include_router(favorites_router, prefix="/favorites", tags=["favorites"])
+
+api_router.include_router(
+    favorites_router,
+    prefix="/favorites",
+    tags=["favorites"],
+)
+
 api_router.include_router(dashboard_router, tags=["dashboard"])
 api_router.include_router(activity_router, tags=["activity"])
 api_router.include_router(audit_router, tags=["audit"])
 api_router.include_router(events_router, tags=["events"])
+
 api_router.include_router(
     notifications_router,
     prefix="/notifications",
     tags=["notifications"],
 )
-api_router.include_router(settings_router, prefix="/settings", tags=["settings"])
+
+api_router.include_router(
+    settings_router,
+    prefix="/settings",
+    tags=["settings"],
+)
+
 api_router.include_router(
     provider_health_router,
     prefix="/providers/health",
     tags=["provider-health"],
 )
+
 api_router.include_router(
     scheduler_history_router,
     prefix="/scheduler/history",
     tags=["scheduler-history"],
 )
+
 api_router.include_router(
     scheduler_locks_router,
     prefix="/scheduler/locks",
     tags=["scheduler-locks"],
 )
+
 api_router.include_router(
     idempotency_router,
     prefix="/idempotency",
     tags=["idempotency"],
 )
+
 api_router.include_router(
     apply_queue_router,
     prefix="/apply-queue",
     tags=["apply-queue"],
 )
+
 api_router.include_router(
     browser_session_router,
     prefix="/browser/session",
     tags=["browser-session"],
 )
+
 api_router.include_router(
     playwright_router,
     prefix="/browser/playwright",
     tags=["playwright"],
 )
+
 api_router.include_router(
     apply_worker_router,
     prefix="/apply-worker",
