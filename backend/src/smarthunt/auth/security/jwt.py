@@ -11,6 +11,7 @@ from smarthunt.api.dependencies.database import get_db
 from smarthunt.core.config import settings
 from smarthunt.database.repositories.user_repository import UserRepository
 
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
 )
@@ -20,6 +21,7 @@ def create_access_token(
     data: dict[str, Any],
     expires_delta: timedelta | None = None,
 ) -> str:
+
     expire = datetime.now(UTC) + (
         expires_delta
         or timedelta(
@@ -52,16 +54,20 @@ async def get_current_user(
     token: Token,
     db: DB,
 ):
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
     )
 
     try:
+
         payload = jwt.decode(
             token,
             settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
+            algorithms=[
+                settings.jwt_algorithm
+            ],
         )
 
         username = payload.get("sub")
@@ -70,11 +76,17 @@ async def get_current_user(
             raise credentials_exception
 
     except InvalidTokenError as exc:
+
         raise credentials_exception from exc
 
-    user = await UserRepository(db).get_by_username(username)
+
+    user = await UserRepository(db).get_by_username(
+        username
+    )
+
 
     if user is None:
         raise credentials_exception
+
 
     return user
