@@ -4,6 +4,7 @@ from smarthunt.activity.api import router as activity_router
 from smarthunt.ai.api import router as ai_router
 from smarthunt.audit.router import router as audit_router
 from smarthunt.apply_queue.router import router as apply_queue_router
+from smarthunt.applications.router import router as applications_router
 from smarthunt.api.routes.auth import router as auth_router
 from smarthunt.api.routes.health import router as health_router
 from smarthunt.api.routes.jobs import router as jobs_router
@@ -73,6 +74,11 @@ api_router.include_router(
 api_router.include_router(
     recruitment_router,
     tags=["recruitment"],
+)
+
+api_router.include_router(
+    applications_router,
+    tags=["applications"],
 )
 
 api_router.include_router(
