@@ -215,7 +215,11 @@ deltas already hit: `params`/`searchParams` are `Promise`s with no sync-access f
 the default for both `next dev` and `next build`. shadcn/ui has also moved on from the classic
 `form.tsx` (react-hook-form wrapper) to composable `Field`/`FieldGroup`/`FieldLabel`/`FieldError`
 primitives (`npx shadcn add field`, not `add form`) — plain `react-hook-form` `useForm`/`register` is
-used directly against them, no context-wrapper magic.
+used directly against them, no context-wrapper magic. This shadcn version has also switched its
+underlying primitives from **Radix UI to Base UI** (`@base-ui/react`, imported per-component e.g.
+`import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"`) — there is no `asChild` prop on
+triggers (`Dialog`, etc.); style the trigger directly with the exported `buttonVariants()` className
+instead of wrapping a `<Button asChild>` around it.
 
 ```bash
 cd frontend
