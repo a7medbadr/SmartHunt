@@ -8,8 +8,8 @@ SmartHunt is a **single-user** AI-powered job-hunting automation platform — a 
 Operating System," not a SaaS product. The backend (`backend/`) is a FastAPI service that discovers
 jobs across many external job boards, scores them against the owner's resume via AI, generates a
 tailored resume/cover letter per job, and drives a real browser (Playwright) to auto-apply, stopping
-only for CAPTCHA/MFA or an unanswerable question. There is no active frontend — `frontend/` is an
-empty placeholder directory; building it is the current focus (see "Project status & roadmap" below).
+only for CAPTCHA/MFA or an unanswerable question. `frontend/` is a Next.js 16 App Router UI being
+built incrementally (see "Project status & roadmap" below for what exists so far).
 
 The Python package lives at `backend/src/smarthunt/`. The repo root is a uv workspace whose only
 member is `backend/`; `pyproject.toml` at the root and `backend/pyproject.toml` both define pytest
@@ -183,6 +183,51 @@ Container/K8s/OpenShift-oriented: `backend/Dockerfile`, `k8s/`, `helm/smarthunt/
 `docker-compose.yml` (local Postgres + Valkey + backend). `Makefile` targets (`build`, `deploy`,
 `logs`, `status`, `test`) drive an OpenShift (`oc`) deployment, not local dev — `test` there hits a
 live route, it's not the unit test suite.
+
+`backend/Dockerfile` assumes a **repo-root** build context (`COPY backend/requirements.txt .`,
+`COPY backend/ .`), matching how the OpenShift `BuildConfig`/`Makefile`'s `oc start-build ... --from-dir=.`
+builds it. `docker-compose.yml`'s `backend` service must therefore use `context: .` +
+`dockerfile: backend/Dockerfile`, not `context: ./backend` — the latter silently breaks the build
+past the first cached layer (found and fixed 2026-07-31; watch for this if the Dockerfile or compose
+file are touched independently, since nothing catches the mismatch except actually rebuilding).
+
+## Frontend
+
+`frontend/` is a Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind v4 + shadcn/ui app, added
+2026-07-31. **Next.js 16 has real breaking changes from older training data** — the scaffold's own
+`frontend/AGENTS.md` flags this; when in doubt, check `frontend/node_modules/next/dist/docs/`. Known
+deltas already hit: `params`/`searchParams` are `Promise`s with no sync-access fallback (unlike 15);
+`cookies()`/`headers()`/`draftMode()` are async-only; `middleware.ts` is replaced by `proxy.ts`
+(`export function proxy(request: NextRequest)`, Node runtime only, no `edge` option); Turbopack is
+the default for both `next dev` and `next build`. shadcn/ui has also moved on from the classic
+`form.tsx` (react-hook-form wrapper) to composable `Field`/`FieldGroup`/`FieldLabel`/`FieldError`
+primitives (`npx shadcn add field`, not `add form`) — plain `react-hook-form` `useForm`/`register` is
+used directly against them, no context-wrapper magic.
+
+```bash
+cd frontend
+npm run dev      # dev server on :3000 (Turbopack)
+npm run build    # production build
+npm run lint     # eslint
+npx tsc --noEmit  # typecheck
+```
+
+- API calls go through `next.config.ts`'s `rewrites()`, which proxies `/api/:path*` to
+  `${BACKEND_ORIGIN}/api/:path*` (defaults to `http://localhost:8000`) — the browser only ever talks
+  to the Next.js origin, so there's no CORS to configure and no backend URL baked into client code.
+  Override with `BACKEND_ORIGIN=http://localhost:PORT npm run dev` when testing against a
+  non-default backend instance.
+- `src/lib/api-client.ts` — shared `axios` instance (`baseURL: "/api/v1"`), attaches the bearer token
+  from `src/lib/auth.ts` (`localStorage`, key `smarthunt_token`) to every request, clears it on a 401.
+  This is a pragmatic single-user choice, not hardened against XSS token theft — revisit if that ever
+  matters (e.g. move to an httpOnly cookie issued by the backend) before this stops being a
+  local-only personal tool.
+- `src/lib/query-provider.tsx` — TanStack Query provider, mounted once in `src/app/layout.tsx`.
+- `src/lib/auth-api.ts` — typed wrappers (`login`, `getCurrentUser`) around the real
+  `/api/v1/auth/*` endpoints from Sprint 0's auth fix.
+- Root `/` (`src/app/page.tsx`) is a client-side auth gate: redirects to `/login` if no token, fetches
+  `/auth/me` if one exists, and is the natural place each subsequent Sprint replaces with the real
+  dashboard rather than a placeholder.
 
 ## Project status & roadmap
 
