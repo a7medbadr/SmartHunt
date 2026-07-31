@@ -5,6 +5,12 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RegisterPayload {
+  username: string;
+  email: string;
+  password: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -18,6 +24,11 @@ export interface CurrentUser {
 
 export async function login(payload: LoginPayload): Promise<TokenResponse> {
   const { data } = await apiClient.post<TokenResponse>("/auth/login", payload);
+  return data;
+}
+
+export async function register(payload: RegisterPayload): Promise<CurrentUser> {
+  const { data } = await apiClient.post<CurrentUser>("/auth/register", payload);
   return data;
 }
 

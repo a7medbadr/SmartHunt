@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { login } from "@/lib/auth-api";
+import { login, register as registerAccount } from "@/lib/auth-api";
 import { setToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,26 +26,30 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "اكتب اسم المستخدم"),
-  password: z.string().min(1, "اكتب كلمة المرور"),
+const registerSchema = z.object({
+  username: z.string().min(3, "3 حروف على الأقل"),
+  email: z.string().email("إيميل غير صحيح"),
+  password: z.string().min(8, "8 حروف على الأقل"),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
   const {
-    register,
+    register: registerField,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
   });
 
   const mutation = useMutation({
-    mutationFn: login,
+    mutationFn: async (values: RegisterFormValues) => {
+      await registerAccount(values);
+      return login({ username: values.username, password: values.password });
+    },
     onSuccess: (data) => {
       setToken(data.access_token);
       router.push("/");
@@ -58,8 +62,8 @@ export default function LoginPage() {
 
   const serverError =
     mutation.error instanceof AxiosError
-      ? mutation.error.response?.status === 401
-        ? "اسم المستخدم أو كلمة المرور غلط"
+      ? mutation.error.response?.status === 400
+        ? "اسم المستخدم أو الإيميل ده مستخدم قبل كده"
         : "حصل خطأ، جرب تاني"
       : undefined;
 
@@ -68,7 +72,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>SmartHunt</CardTitle>
-          <CardDescription>سجّل دخولك للمتابعة</CardDescription>
+          <CardDescription>إنشاء حساب المالك</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} noValidate>
@@ -79,9 +83,20 @@ export default function LoginPage() {
                   id="username"
                   autoComplete="username"
                   autoFocus
-                  {...register("username")}
+                  {...registerField("username")}
                 />
                 <FieldError errors={[errors.username]} />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="email">الإيميل</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  {...registerField("email")}
+                />
+                <FieldError errors={[errors.email]} />
               </Field>
 
               <Field>
@@ -89,8 +104,8 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
-                  autoComplete="current-password"
-                  {...register("password")}
+                  autoComplete="new-password"
+                  {...registerField("password")}
                 />
                 <FieldError errors={[errors.password]} />
               </Field>
@@ -102,13 +117,13 @@ export default function LoginPage() {
               )}
 
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "جاري الدخول..." : "دخول"}
+                {mutation.isPending ? "جاري الإنشاء..." : "إنشاء الحساب"}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                لسه معملتش حساب؟{" "}
-                <Link href="/register" className="underline">
-                  إنشاء حساب
+                عندك حساب بالفعل؟{" "}
+                <Link href="/login" className="underline">
+                  دخول
                 </Link>
               </p>
             </FieldGroup>
