@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field, computed_field
+from pydantic import AliasChoices, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     app_env: str = "development"
     app_debug: bool = False
-
     build_version: str = "latest"
 
     api_host: str = "0.0.0.0"
@@ -23,6 +22,7 @@ class Settings(BaseSettings):
     redis_url: str
 
     openai_api_key: str | None = None
+
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
@@ -41,7 +41,55 @@ class Settings(BaseSettings):
         ),
     )
 
+    enable_playwright: bool = True
+    enable_notifications: bool = True
+    enable_ai_services: bool = True
+
+    security_headers_enabled: bool = True
+
     BACKEND_CORS_ORIGINS: list[str] = []
+
+    @field_validator("app_env")
+    @classmethod
+    def validate_environment(cls, value: str) -> str:
+        allowed = {
+            "development",
+            "testing",
+            "test",
+            "staging",
+            "production",
+        }
+
+        if value not in allowed:
+            raise ValueError(
+                f"Invalid environment: {value}"
+            )
+
+        return value
+
+    def model_post_init(self, __context) -> None:
+        if self.app_env == "production":
+            required = {
+                "database_url": self.database_url,
+                "secret_key": self.secret_key,
+                "jwt_secret_key": self.jwt_secret_key,
+            }
+
+            missing = [
+                key
+                for key, value in required.items()
+                if not value
+            ]
+
+            if missing:
+                raise ValueError(
+                    f"Missing production configuration: {missing}"
+                )
+
+            if self.app_debug:
+                raise ValueError(
+                    "DEBUG must be disabled in production"
+                )
 
     @computed_field
     @property
@@ -50,6 +98,11 @@ class Settings(BaseSettings):
             "/smarthunt",
             "/smarthunt_test",
         )
+
+    @computed_field
+    @property
+    def environment(self) -> str:
+        return self.app_env
 
     model_config = SettingsConfigDict(
         env_file=".env",

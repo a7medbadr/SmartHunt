@@ -1,0 +1,39 @@
+import pytest
+
+from smarthunt.core.config import Settings
+
+
+def test_valid_configuration():
+    settings = Settings(
+        database_url="postgresql://user:pass@localhost/smarthunt",
+        redis_url="redis://localhost:6379",
+        secret_key="test-secret",
+        jwt_secret_key="test-jwt",
+        app_env="development",
+    )
+
+    assert settings.app_env == "development"
+    assert settings.enable_playwright is True
+
+
+def test_invalid_environment():
+    with pytest.raises(ValueError):
+        Settings(
+            database_url="postgresql://user:pass@localhost/smarthunt",
+            redis_url="redis://localhost:6379",
+            secret_key="test-secret",
+            jwt_secret_key="test-jwt",
+            app_env="invalid",
+        )
+
+
+def test_production_debug_validation():
+    with pytest.raises(ValueError):
+        Settings(
+            database_url="postgresql://user:pass@localhost/smarthunt",
+            redis_url="redis://localhost:6379",
+            secret_key="test-secret",
+            jwt_secret_key="test-jwt",
+            app_env="production",
+            app_debug=True,
+        )

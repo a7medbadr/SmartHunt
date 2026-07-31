@@ -5,6 +5,9 @@ from smarthunt.api.routes import api_router
 from smarthunt.core.config import settings
 from smarthunt.core.lifespan import lifespan
 from smarthunt.metrics import setup_metrics
+from smarthunt.middleware.rate_limit import RateLimitMiddleware
+from smarthunt.middleware.request_id import RequestIDMiddleware
+from smarthunt.middleware.security_headers import SecurityHeadersMiddleware
 
 
 app = FastAPI(
@@ -13,6 +16,21 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+)
+
+
+app.add_middleware(
+    SecurityHeadersMiddleware,
+)
+
+
+app.add_middleware(
+    RequestIDMiddleware,
+)
+
+
+app.add_middleware(
+    RateLimitMiddleware,
 )
 
 
