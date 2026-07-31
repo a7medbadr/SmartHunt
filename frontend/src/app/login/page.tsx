@@ -64,7 +64,7 @@ export default function LoginPage() {
       : undefined;
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 p-4 dark:bg-black">
+    <div className="flex flex-1 items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>SmartHunt</CardTitle>
