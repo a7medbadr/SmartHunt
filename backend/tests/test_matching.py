@@ -52,3 +52,22 @@ def test_matching_api_endpoint():
     assert data["score"] == 50
     assert "linux" in data["matched_skills"]
     assert "terraform" in data["missing_skills"]
+
+
+def test_deep_analysis_endpoint():
+    payload = {
+        "resume": "Experienced in Linux and Docker",
+        "job": "Needs Linux, Docker, Terraform, and AWS",
+    }
+    response = client.post("/api/v1/matching/deep-analysis", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["score"] == 50
+    assert isinstance(data["ai_summary"], str)
+    assert len(data["ai_summary"]) > 0
+    assert data["provider"] in ("local", "ollama")
+
+
+def test_deep_analysis_requires_both_fields():
+    response = client.post("/api/v1/matching/deep-analysis", json={"resume": "", "job": "x"})
+    assert response.status_code == 400
