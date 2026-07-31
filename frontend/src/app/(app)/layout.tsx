@@ -21,6 +21,7 @@ const NAV_LINKS = [
   { href: "/resume", label: "السيرة الذاتية" },
   { href: "/cover-letter", label: "خطاب التقديم" },
   { href: "/applications", label: "التقديمات" },
+  { href: "/ai-assistant", label: "المساعد الذكي" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
