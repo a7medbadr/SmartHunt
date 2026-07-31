@@ -15,7 +15,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const NAV_LINKS = [{ href: "/", label: "الرئيسية" }];
+const NAV_LINKS = [
+  { href: "/", label: "الرئيسية" },
+  { href: "/jobs", label: "الوظائف" },
+];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
