@@ -1,0 +1,230 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project overview
+
+SmartHunt is a **single-user** AI-powered job-hunting automation platform — a personal "AI Career
+Operating System," not a SaaS product. The backend (`backend/`) is a FastAPI service that discovers
+jobs across many external job boards, scores them against the owner's resume via AI, generates a
+tailored resume/cover letter per job, and drives a real browser (Playwright) to auto-apply, stopping
+only for CAPTCHA/MFA or an unanswerable question. There is no active frontend — `frontend/` is an
+empty placeholder directory; building it is the current focus (see "Project status & roadmap" below).
+
+The Python package lives at `backend/src/smarthunt/`. The repo root is a uv workspace whose only
+member is `backend/`; `pyproject.toml` at the root and `backend/pyproject.toml` both define pytest
+config pointing at `backend/tests`.
+
+### Single-user architecture — a deliberate, permanent constraint
+
+This is a standing architectural decision, not a temporary shortcut: SmartHunt serves **one owner
+only**. There is intentionally no multi-tenant design, no organizations/teams, no roles/permissions,
+no admin panel, no self-service registration flow, no "forgot password" / email verification. Every
+row in every table belongs to the single owner. Do not add multi-user scaffolding (tenant IDs, role
+checks, invite flows, etc.) — if multi-user support is ever wanted, the docs treat that as an
+entirely separate future phase, not something to hedge for now. Auth only needs: login, logout,
+change password.
+
+## Commands
+
+Run all commands from `backend/` unless noted. Dependency management is via `uv`.
+
+```bash
+uv sync                                    # install dependencies
+
+uv run ruff check .                        # lint
+uv run black --check --target-version py312 .   # format check (use `black .` to fix)
+uv run python -m compileall src            # syntax/compile check
+
+uv run pytest --envfile=../.env            # run full test suite (as CI does)
+uv run pytest tests/test_jobs.py           # run a single test file
+uv run pytest tests/test_jobs.py::test_name -v   # run a single test
+
+uv run alembic upgrade head                # apply DB migrations
+uv run alembic revision --autogenerate -m "message"   # new migration
+
+uv run uvicorn smarthunt.main:app --reload --host 0.0.0.0 --port 8000   # run the API locally
+```
+
+Local infra (Postgres + Valkey/Redis) is provided by `docker-compose.yml` at the repo root:
+`docker compose up -d postgres valkey`.
+
+CI (`.github/workflows/ci.yml`) runs, in order: `ruff check`, `black --check`, `compileall`,
+`pytest --envfile=../.env`, then `helm lint ../helm/smarthunt`. Match this before considering work done.
+
+### Tests
+
+- Tests live in `backend/tests/`, mirroring package names (e.g. `test_jobs.py`, `test_scheduler_*.py`).
+- `tests/conftest.py` forces `APP_ENV=test` and injects fixed test JWT/secret keys, points at
+  `TEST_DATABASE_URL` (defaults to a local `smarthunt_test` Postgres DB), and **runs
+  `alembic upgrade head` against that test database automatically** via an autouse session
+  fixture — a running, migratable Postgres instance is required to run tests at all (no SQLite/mocked DB).
+  `.env.test` in `backend/` is loaded first for any additional overrides.
+- Use the `client` fixture (httpx `AsyncClient` over the FastAPI app) and `db_session` fixture for
+  endpoint tests; `app.dependency_overrides[get_db]` is wired for you.
+
+## Architecture
+
+### Module layout
+
+The codebase is organized as ~40 vertical feature packages under `smarthunt/` (e.g. `auth/`,
+`jobs`-related `career/`, `resume/`, `search/`, `scheduler/`, `providers/`, `notifications/`,
+`apply_queue/`, `audit/`, `events/`, `favorites/`, `job_notes/`, `job_tags/`, `saved_searches/`,
+`settings/`, `dashboard/`, `activity/`, `recommendation/`, `recruitment/`, `cover_letter/`, `ai/`),
+rather than by technical layer. Within each package, the recurring pattern is:
+
+- `router.py` or `api.py` — FastAPI `APIRouter`, thin HTTP layer
+- `service.py` — business logic, exposed as a module-level singleton instance (e.g.
+  `event_service = EventService()`, `provider_registry = ProviderRegistry()`) that routers import directly
+- `schemas.py` — Pydantic request/response models
+- `models.py` — SQLAlchemy ORM models (some packages instead define models under
+  `smarthunt/database/models/`, e.g. `Job`, `User`, `Resume`, `Application`)
+- `repository.py` (where present) — DB query layer between service and models
+
+All routers are wired together in `smarthunt/api/routes/router.py` (`api_router`), which is mounted
+in `smarthunt/api/main.py` under `settings.API_V1_STR` (`/api/v1`). When adding a new feature
+package with HTTP endpoints, register its router there.
+
+`smarthunt/database/models/__init__.py` re-exports every ORM model across all packages — this is
+what Alembic's autogenerate and `Base.metadata` see, so new models must be added there too.
+
+### Providers (job board integrations)
+
+`smarthunt/providers/<site>/provider.py` — one package per external job board (LinkedIn, Indeed,
+GulfTalent, Bayt, Wuzzuf, NaukriGulf, MonsterGulf, Wzayef, Tanqeeb, DrJobs, ForasnaGulf). Each
+implements `BaseProvider` (`smarthunt/providers/base/provider.py`): an async `search(query,
+location, page, limit) -> list[DiscoveredJob]`, plus capability flags (`supports_login`,
+`supports_apply`, `supports_resume_upload`, `supports_cover_letter`).
+
+**Only 4 of the 11 providers currently set `supports_login`/`supports_apply` to `True`: LinkedIn,
+Bayt, GulfTalent, Wuzzuf.** The other 7 (Indeed, NaukriGulf, MonsterGulf, Wzayef, Tanqeeb, DrJobs,
+ForasnaGulf) inherit the `BaseProvider` defaults (all `False`) — they are discovery/search-only
+today. Auto-apply (`recruitment/auto_apply_worker.py`, `apply_queue/`) only works where
+`supports_apply` is `True` and credentials for that site exist in `Settings` (currently only
+`linkedin_email`/`linkedin_password` — Bayt/GulfTalent/Wuzzuf credential fields still need adding).
+Even within a supported site, not every posting is auto-appliable: many job boards (LinkedIn
+included) mix native "Easy Apply"-style postings with ones that redirect to the employer's own
+external ATS (Greenhouse, Workday, etc.), which the current Playwright layer does not handle.
+
+`smarthunt/providers/registry.py` (`provider_registry`) fan-outs `search()` across every provider
+concurrently via `asyncio.gather(..., return_exceptions=True)` and normalizes results to
+`DiscoveredJob` — a single provider failing/raising does not fail the whole search.
+`smarthunt/providers/manager.py` (`provider_manager`) is a separate registration-based lookup used
+for provider metadata/statistics endpoints. `smarthunt/providers/circuit_breaker.py` and
+`circuit_registry.py` guard against a flaky provider being hammered repeatedly.
+
+### Browser automation / auto-apply
+
+`smarthunt/browser/` wraps Playwright (`playwright/` engine, `session/` for session lifecycle,
+`form_detector.py`/`form_filler.py`/`question_answerer.py`/`question_classifier.py` for filling out
+application forms, `navigation.py`, `provider_executor.py`). `smarthunt/recruitment/auto_apply_worker.py`
+and `smarthunt/apply_queue/` drive the actual apply flow, backed by AI-generated answers to unknown
+questions (`browser/unknown_questions.py`) via the `ai/` package.
+
+### Scheduler
+
+`smarthunt/scheduler/scheduler.py` holds a global `AsyncIOScheduler` (APScheduler) instance.
+`jobs.py` defines the scheduled discovery/apply jobs; `execution.py`/`execution_service.py` track
+run outcomes; `locks/` implements distributed run locking (DB-backed, see `scheduler_locks` table)
+so only one instance executes a given job; `failed_job*.py` and `retry_worker.py` handle
+failure tracking and retries; `history/` persists execution history for the API.
+
+### AI integration
+
+`smarthunt/ai/` is a provider-agnostic AI client layer (`factory.py` builds a client from
+`settings.ai_provider`; `providers/` holds concrete implementations e.g. OpenAI/Azure/Ollama;
+`client.py`/`base.py` define the interface; `health.py` for provider health checks). Consumed by
+`resume/` (parsing, profile building, review), `cover_letter/`, `career/` (advice), `matching/`
+(resume-to-job scoring), and the browser auto-apply question answerer.
+
+### Cross-cutting infrastructure
+
+- `smarthunt/core/config.py` — single `Settings` (pydantic-settings) object read from environment /
+  `.env`, exposed as the module-level `settings` singleton. In `production` (`app_env=="production"`)
+  it enforces required secrets are set and that debug mode is off.
+- `smarthunt/core/lifespan.py` — FastAPI lifespan: runs Alembic migrations, then a DB health check,
+  on every startup, before the app starts serving; closes the DB engine on shutdown.
+- `smarthunt/database/session.py` — async SQLAlchemy engine/session (`AsyncSessionLocal`),
+  `Base` declarative base, and the `get_db` dependency (auto-commits on success, rolls back on
+  exception).
+- `smarthunt/middleware/` — `RateLimitMiddleware` (skipped when `app_env=="test"`),
+  `SecurityHeadersMiddleware`, `RequestIDMiddleware`, `RequestLoggingMiddleware`; all registered in
+  `api/main.py` in a specific order (rate limit → security headers → request id → request logging →
+  CORS).
+- `smarthunt/events/` — an internal event log (`EventLog` model) that other services publish
+  domain events to (`event_service.publish(db, event)`), instrumented with Prometheus counters.
+- `smarthunt/audit/` — separate persisted audit trail (`AuditLog`) for security/compliance-relevant actions.
+- `smarthunt/metrics/` — Prometheus metrics setup (`setup_metrics(app)` in `main.py`) plus
+  per-domain metric definitions (business, audit, events, idempotency, scheduler).
+- `smarthunt/tracing/` — OpenTelemetry tracer setup.
+- `smarthunt/idempotency/` — idempotency-key support for write endpoints prone to duplicate
+  submission (e.g. apply actions).
+
+### Deployment
+
+Container/K8s/OpenShift-oriented: `backend/Dockerfile`, `k8s/`, `helm/smarthunt/`, `gitops/`,
+`docker-compose.yml` (local Postgres + Valkey + backend). `Makefile` targets (`build`, `deploy`,
+`logs`, `status`, `test`) drive an OpenShift (`oc`) deployment, not local dev — `test` there hits a
+live route, it's not the unit test suite.
+
+## Project status & roadmap
+
+Full project history, vision, and rationale live in `/home/badr/SmartHunt-Project-document.docx`
+(the project owner's living reference doc, referred to below as "the project doc") — read it for
+context on *why*, not just *what*. As of the doc's last update (post "Sprint 42"): 228/228 backend
+tests passing, backend deployed successfully on OpenShift. Per the doc's own completion table:
+Backend architecture, DB, AI layer, resume/cover-letter/matching engines, scheduler, event bus,
+notifications, audit, metrics, logging, health checks, OpenShift deployment, Docker, and test
+infra are all listed as 100%; REST API foundation and browser-automation infra ~95%; **Frontend and
+Web Dashboard are 0%, end-to-end user experience is ~10%.** The stated Phase 2 priority order is:
+
+1. Finish converting any remaining multi-user-shaped code to the single-user model above.
+2. Build a professional frontend (doc's proposal: Next.js + TypeScript + Tailwind + shadcn/ui +
+   TanStack Query/Table + React Hook Form + Zod + Axios + Recharts).
+3. Wire the frontend to the existing REST APIs (`/api/v1/...`) — no direct DB access from the frontend.
+4. Build out the full dashboard (jobs, applications, resume, cover letters, AI assistant, scheduler,
+   notifications, settings, system health).
+5. Exercise the complete real-world scenario end to end (resume upload → discovery → matching →
+   cover letter → apply via Playwright → track status → notify), including a real LinkedIn account.
+6. UX polish.
+
+**Do not treat the doc's "Production Ready" / "100%" labels as verified fact without checking the
+code** — they describe architecture completeness, not necessarily wiring correctness. One concrete
+example found by inspection: `smarthunt/auth/router.py` does not call the real `AuthService`
+(`smarthunt/auth/services/auth_service.py`, which does proper bcrypt hashing + JWT + DB lookup via
+`UserRepository`) — the router instead uses an in-memory dict and returns a hardcoded
+`"mock-jwt-token"`. Wiring the auth router to the real service is a prerequisite for any real login
+flow and is a good example of the kind of gap to expect elsewhere: infrastructure/abstraction built,
+but not always fully wired end-to-end. Verify before building on top of an existing module.
+
+Other known, doc-recorded gaps (not exhaustive — treat as a starting list, re-verify against code):
+- AI layer: needs a real provider wired in (OpenAI/Ollama) in place of mocks, per-task prompt
+  tuning, cost tracking, and response caching.
+- Job discovery: provider connectors exist per-site but need hardening against real site behavior
+  and better duplicate-job detection.
+- Resume/cover letter: multiple templates, real PDF/DOCX export, in-app preview.
+- Playwright: more job sites, more robust cookie/session persistence across restarts.
+- Scheduler/automation: no UI yet to trigger, pause, or monitor runs (API-only today).
+
+Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
+the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
+work — check current `git status` / `git log origin/master..master`, don't assume it's still true.
+
+### Standing rules from the project owner (apply every session, not just when repeated)
+
+These come directly from the project doc's "rules for any new chat" section and are treated as
+binding, not suggestions:
+
+- Treat this as an enterprise production system, not a prototype — no shortcuts that wouldn't ship.
+- Never delete a stable, working feature without a clear architectural reason.
+- Never break an existing passing test to land a new feature; run the relevant tests before calling
+  work done.
+- Keep changes backward compatible where reasonably possible.
+- No secrets committed to the repo, ever — all config via environment variables (see
+  `backend/.env.example`); production also expects secrets to live outside the repo
+  (`/home/badr/secrets/` was the owner's stated target location for local secrets).
+- Every new feature should be testable and observable (logs + metrics), consistent with the
+  existing patterns in `smarthunt/metrics/` and structured logging in `smarthunt/logging/`.
+- Work in small, self-contained increments; prefer finishing and validating one thing over
+  spreading changes across many half-done things.
+- Stability first, then performance, then new features — in that priority order when trading off.
