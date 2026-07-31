@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from smarthunt.activity.api import router as activity_router
+from smarthunt.ai.api import router as ai_router
 from smarthunt.audit.router import router as audit_router
 from smarthunt.apply_queue.router import router as apply_queue_router
 from smarthunt.api.routes.auth import router as auth_router
@@ -57,6 +58,11 @@ api_router.include_router(
 api_router.include_router(
     system_router,
     tags=["system"],
+)
+
+api_router.include_router(
+    ai_router,
+    tags=["ai"],
 )
 
 api_router.include_router(

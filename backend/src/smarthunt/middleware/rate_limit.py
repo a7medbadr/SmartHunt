@@ -31,7 +31,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if now - timestamp < self.window_seconds
         ]
 
+        print(
+            f"[RATE LIMIT] ip={client_ip} "
+            f"count_before={len(requests)} "
+            f"id={id(self)}"
+        )
+
         if len(requests) >= self.requests_limit:
+            print("[RATE LIMIT] BLOCKED")
             return JSONResponse(
                 status_code=429,
                 content={
@@ -40,5 +47,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         requests.append(now)
+
+        print(
+            f"[RATE LIMIT] count_after={len(requests)}"
+        )
 
         return await call_next(request)

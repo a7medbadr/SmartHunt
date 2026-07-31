@@ -21,7 +21,28 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str
 
+    # ==========================
+    # AI Configuration
+    # ==========================
+
+    enable_ai_services: bool = True
+
+    ai_provider: str = "openai"
+
+    ai_timeout: float = 30.0
+
+    ai_max_retries: int = 3
+
     openai_api_key: str | None = None
+
+    azure_openai_endpoint: str | None = None
+
+    azure_openai_api_key: str | None = None
+
+    anthropic_api_key: str | None = None
+
+    ollama_url: str = "http://localhost:11434"
+
 
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
@@ -29,9 +50,11 @@ class Settings(BaseSettings):
     linkedin_email: str | None = None
     linkedin_password: str | None = None
 
+
     secret_key: str
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
+
 
     access_token_expire_minutes: int = Field(
         default=60,
@@ -41,17 +64,24 @@ class Settings(BaseSettings):
         ),
     )
 
+
     enable_playwright: bool = True
+
     enable_notifications: bool = True
-    enable_ai_services: bool = True
 
     security_headers_enabled: bool = True
 
+
     BACKEND_CORS_ORIGINS: list[str] = []
+
 
     @field_validator("app_env")
     @classmethod
-    def validate_environment(cls, value: str) -> str:
+    def validate_environment(
+        cls,
+        value: str,
+    ) -> str:
+
         allowed = {
             "development",
             "testing",
@@ -67,8 +97,14 @@ class Settings(BaseSettings):
 
         return value
 
-    def model_post_init(self, __context) -> None:
+
+    def model_post_init(
+        self,
+        __context,
+    ) -> None:
+
         if self.app_env == "production":
+
             required = {
                 "database_url": self.database_url,
                 "secret_key": self.secret_key,
@@ -91,18 +127,22 @@ class Settings(BaseSettings):
                     "DEBUG must be disabled in production"
                 )
 
+
     @computed_field
     @property
     def test_database_url(self) -> str:
+
         return self.database_url.replace(
             "/smarthunt",
             "/smarthunt_test",
         )
 
+
     @computed_field
     @property
     def environment(self) -> str:
         return self.app_env
+
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -11,6 +12,22 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.pool import NullPool
+
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(
+    BACKEND_DIR / ".env.test",
+    override=True,
+)
+
+os.environ["APP_ENV"] = "test"
+os.environ["JWT_SECRET_KEY"] = (
+    "test-jwt-secret-key-32-characters-long"
+)
+os.environ["SECRET_KEY"] = (
+    "test-secret-key-32-characters-long"
+)
 
 from smarthunt.api.dependencies import get_db
 from smarthunt.main import app
@@ -21,11 +38,13 @@ TEST_DATABASE_URL = os.getenv(
     "postgresql+asyncpg://postgres:postgres@localhost:5432/smarthunt_test",
 )
 
+
 engine = create_async_engine(
     TEST_DATABASE_URL,
     echo=False,
     poolclass=NullPool,
 )
+
 
 SessionLocal = async_sessionmaker(
     bind=engine,
@@ -34,19 +53,18 @@ SessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+
 TestSessionLocal = SessionLocal
 
 
 @pytest.fixture(scope="session", autouse=True)
 def migrate_database():
-    backend_dir = Path(__file__).resolve().parent.parent
-
     env = os.environ.copy()
     env["DATABASE_URL"] = TEST_DATABASE_URL
 
     subprocess.run(
         ["uv", "run", "alembic", "upgrade", "head"],
-        cwd=backend_dir,
+        cwd=BACKEND_DIR,
         env=env,
         check=True,
     )
@@ -60,11 +78,13 @@ async def db_session():
         finally:
             if session.in_transaction():
                 await session.rollback()
+
             await session.close()
 
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession):
+
     async def override_get_db():
         yield db_session
 
