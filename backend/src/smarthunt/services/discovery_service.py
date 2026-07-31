@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.browser.provider_executor import ProviderExecutor
 from smarthunt.browser.registry import ProviderRegistry
 from smarthunt.domain import DiscoveredJob
+from smarthunt.metrics import discoveries_total, jobs_created_total
 from smarthunt.services.job_service import JobService
 
 
@@ -21,26 +22,29 @@ class DiscoveryService:
         keyword: str,
         location: str | None = None,
     ):
+        discoveries_total.inc()
 
-        # إعداد الـ Executor والتنفيذ بالتوازي
         executor = ProviderExecutor(timeout=20)
+
         tasks = [
-            executor.execute(provider, keyword, location) for provider in self.registry.get_all()
+            executor.execute(provider, keyword, location)
+            for provider in self.registry.get_all()
         ]
+
         results = await asyncio.gather(*tasks)
 
-        # تجميع الوظائف من الـ نتائج الناجحة فقط
         all_jobs = []
+
         for result in results:
             if not result.success:
                 continue
+
             all_jobs.extend(result.jobs)
 
         inserted = 0
         duplicates = 0
         saved: list[DiscoveredJob] = []
 
-        # الفلترة والحفظ في قاعدة البيانات
         for job in all_jobs:
             try:
                 db_job = await self.jobs.create_job(
@@ -52,6 +56,7 @@ class DiscoveryService:
                 )
 
                 inserted += 1
+                jobs_created_total.inc()
 
                 saved.append(
                     DiscoveredJob(

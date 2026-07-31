@@ -1,13 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from smarthunt.api.routes import api_router
 from smarthunt.core.config import settings
 from smarthunt.core.lifespan import lifespan
 from smarthunt.metrics import setup_metrics
-from smarthunt.middleware.rate_limit import RateLimitMiddleware
 from smarthunt.middleware.request_id import RequestIDMiddleware
+from smarthunt.middleware.request_logging import RequestLoggingMiddleware
 from smarthunt.middleware.security_headers import SecurityHeadersMiddleware
+from smarthunt.shared.exceptions import (
+    http_exception_handler,
+    unhandled_exception_handler,
+)
 
 
 app = FastAPI(
@@ -16,6 +20,18 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+)
+
+
+app.add_exception_handler(
+    HTTPException,
+    http_exception_handler,
+)
+
+
+app.add_exception_handler(
+    Exception,
+    unhandled_exception_handler,
 )
 
 
@@ -30,7 +46,7 @@ app.add_middleware(
 
 
 app.add_middleware(
-    RateLimitMiddleware,
+    RequestLoggingMiddleware,
 )
 
 

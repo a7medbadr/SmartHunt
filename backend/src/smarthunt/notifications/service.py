@@ -4,6 +4,10 @@ from typing import List
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.metrics import (
+    notifications_sent_total,
+    notifications_unread_total,
+)
 from smarthunt.notifications.models import (
     Notification,
     NotificationStatus,
@@ -35,8 +39,14 @@ class NotificationService:
         )
 
         db.add(notification)
+
         await db.flush()
         await db.refresh(notification)
+
+        notifications_sent_total.inc()
+
+        unread = await self.unread_count(db)
+        notifications_unread_total.set(unread)
 
         return notification
 
@@ -99,6 +109,9 @@ class NotificationService:
         await db.flush()
         await db.refresh(notification)
 
+        unread = await self.unread_count(db)
+        notifications_unread_total.set(unread)
+
         return notification
 
     async def mark_all_read(
@@ -116,6 +129,9 @@ class NotificationService:
         )
 
         await db.flush()
+
+        unread = await self.unread_count(db)
+        notifications_unread_total.set(unread)
 
         return result.rowcount or 0
 
@@ -138,6 +154,9 @@ class NotificationService:
 
         await db.flush()
 
+        unread = await self.unread_count(db)
+        notifications_unread_total.set(unread)
+
         return len(rows)
 
     async def delete(
@@ -150,6 +169,9 @@ class NotificationService:
 
         await db.delete(notification)
         await db.flush()
+
+        unread = await self.unread_count(db)
+        notifications_unread_total.set(unread)
 
 
 notification_service = NotificationService()

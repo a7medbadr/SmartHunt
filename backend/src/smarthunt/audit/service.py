@@ -2,6 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.audit.models import AuditLog
 from smarthunt.audit.repository import AuditRepository
+from smarthunt.metrics.audit import (
+    audit_events_total,
+    audit_failures_total,
+)
 
 
 class AuditService:
@@ -11,7 +15,6 @@ class AuditService:
         db: AsyncSession,
     ):
         self.repository = AuditRepository(db)
-
 
     async def log(
         self,
@@ -25,15 +28,24 @@ class AuditService:
         user_agent: str | None = None,
     ):
 
-        audit = AuditLog(
-            actor_id=actor_id,
-            action=action,
-            resource_type=resource,
-            resource_id=str(resource_id) if resource_id else None,
-            old_value=old_value,
-            new_value=new_value,
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
+        try:
+            audit = AuditLog(
+                actor_id=actor_id,
+                action=action,
+                resource_type=resource,
+                resource_id=str(resource_id) if resource_id else None,
+                old_value=old_value,
+                new_value=new_value,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
 
-        return await self.repository.create(audit)
+            result = await self.repository.create(audit)
+
+            audit_events_total.inc()
+
+            return result
+
+        except Exception:
+            audit_failures_total.inc()
+            raise

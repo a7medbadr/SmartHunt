@@ -8,6 +8,10 @@ from smarthunt.auth.security.password import (
 )
 from smarthunt.database.models.user import User
 from smarthunt.database.repositories.user_repository import UserRepository
+from smarthunt.metrics import (
+    login_attempts_total,
+    users_registered_total,
+)
 
 
 class AuthService:
@@ -37,13 +41,19 @@ class AuthService:
             password_hash=hash_password(password),
         )
 
-        return await self.repository.create(user)
+        created_user = await self.repository.create(user)
+
+        users_registered_total.inc()
+
+        return created_user
 
     async def login(
         self,
         username: str,
         password: str,
     ) -> str | None:
+        login_attempts_total.inc()
+
         user = await self.repository.get_by_username(username)
 
         if user is None:

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.database.models.job import Job
 from smarthunt.database.repositories.job_repository import JobRepository
+from smarthunt.metrics import jobs_created_total
 
 
 class JobService:
@@ -33,11 +34,15 @@ class JobService:
         )
 
         try:
-            return await self.repository.create(job)
+            created_job = await self.repository.create(job)
+
+            jobs_created_total.inc()
+
+            return created_job
+
         except IntegrityError:
             await self.repository.session.rollback()
             raise
 
     async def delete_job(self, job_id: int) -> bool:
         return await self.repository.delete(job_id)
-

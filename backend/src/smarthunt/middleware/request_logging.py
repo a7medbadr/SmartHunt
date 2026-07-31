@@ -1,7 +1,11 @@
 import time
 import uuid
+
 import structlog
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from smarthunt.shared.observability.context import request_id
+
 
 logger = structlog.get_logger("smarthunt")
 
@@ -10,47 +14,69 @@ class RequestLoggingMiddleware:
     def __init__(self, app: ASGIApp):
         self.app = app
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+    async def __call__(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        request_id = str(uuid.uuid4())
-        scope.setdefault("state", {})
-        scope["state"]["request_id"] = request_id
+        rid = scope.get("state", {}).get("request_id")
+
+        if not rid:
+            rid = str(uuid.uuid4())
+
+        request_id.set(rid)
 
         path = scope.get("path", "")
         method = scope.get("method", "")
 
-        await logger.ainfo("Incoming request", method=method, path=path, request_id=request_id)
-
         start_time = time.perf_counter()
+
+        await logger.ainfo(
+            "request_started",
+            service="smarthunt-backend",
+            request_id=rid,
+            method=method,
+            path=path,
+        )
 
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
-                process_time = (time.perf_counter() - start_time) * 1000
+
+                duration = (
+                    time.perf_counter() - start_time
+                ) * 1000
 
                 await logger.ainfo(
-                    "Request completed",
+                    "request_completed",
+                    service="smarthunt-backend",
+                    request_id=rid,
                     method=method,
                     path=path,
-                    process_time_ms=f"{process_time:.2f}",
-                    request_id=request_id,
+                    status_code=message["status"],
+                    response_time_ms=round(duration, 2),
                 )
 
             await send(message)
 
         try:
-            await self.app(scope, receive, send_wrapper)
-        except Exception as e:
-            process_time = (time.perf_counter() - start_time) * 1000
+            await self.app(
+                scope,
+                receive,
+                send_wrapper,
+            )
 
-            await logger.aerror(
-                "Request failed",
-                error=str(e),
+        except Exception:
+            await logger.exception(
+                "request_failed",
+                service="smarthunt-backend",
+                request_id=rid,
                 method=method,
                 path=path,
-                process_time_ms=f"{process_time:.2f}",
-                request_id=request_id,
             )
             raise
