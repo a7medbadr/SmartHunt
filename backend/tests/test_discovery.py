@@ -18,3 +18,21 @@ async def test_discovery_run_does_not_crash(client):
     assert data["providers"] == 11
     assert data["discovered"] >= 0
     assert data["inserted"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_discovery_run_records_scheduler_history(client):
+    before = await client.get("/api/v1/scheduler/history")
+    before_count = len(before.json())
+
+    response = await client.post(
+        "/api/v1/discovery/run",
+        params={"query": "engineer"},
+    )
+    assert response.status_code == 200
+
+    after = await client.get("/api/v1/scheduler/history")
+    after_count = len(after.json())
+
+    assert after_count == before_count + 1
+    assert after.json()[0]["provider"] == "manual-run"

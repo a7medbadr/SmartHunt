@@ -22,6 +22,7 @@ const NAV_LINKS = [
   { href: "/cover-letter", label: "خطاب التقديم" },
   { href: "/applications", label: "التقديمات" },
   { href: "/ai-assistant", label: "المساعد الذكي" },
+  { href: "/scheduler", label: "الجدولة" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
