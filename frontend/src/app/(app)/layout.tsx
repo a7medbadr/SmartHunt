@@ -7,7 +7,9 @@ import { useEffect } from "react";
 
 import { getCurrentUser } from "@/lib/auth-api";
 import { clearToken, getToken } from "@/lib/auth";
+import { getUnreadCount } from "@/lib/notifications-api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,7 @@ const NAV_LINKS = [
   { href: "/applications", label: "التقديمات" },
   { href: "/ai-assistant", label: "المساعد الذكي" },
   { href: "/scheduler", label: "الجدولة" },
+  { href: "/notifications", label: "الإشعارات" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -53,6 +56,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isError, router]);
 
+  const { data: unreadCount } = useQuery({
+    queryKey: ["unread-count"],
+    queryFn: getUnreadCount,
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
   function handleLogout() {
     clearToken();
     router.replace("/login");
@@ -78,11 +88,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 href={link.href}
                 className={
                   pathname === link.href
-                    ? "text-sm font-medium text-foreground"
-                    : "text-sm text-muted-foreground hover:text-foreground"
+                    ? "flex items-center gap-1.5 text-sm font-medium text-foreground"
+                    : "flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                 }
               >
                 {link.label}
+                {link.href === "/notifications" && !!unreadCount && (
+                  <Badge className="h-5 min-w-5 justify-center px-1">
+                    {unreadCount}
+                  </Badge>
+                )}
               </Link>
             ))}
           </nav>
