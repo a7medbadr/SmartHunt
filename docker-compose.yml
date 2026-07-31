@@ -32,6 +32,7 @@ services:
       - valkey
     env_file:
       - .env
+      - /home/badr/secrets/secret.env
     environment:
       - PYTHONPATH=/app
 

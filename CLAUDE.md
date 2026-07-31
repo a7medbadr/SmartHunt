@@ -49,6 +49,23 @@ uv run uvicorn smarthunt.main:app --reload --host 0.0.0.0 --port 8000   # run th
 Local infra (Postgres + Valkey/Redis) is provided by `docker-compose.yml` at the repo root:
 `docker compose up -d postgres valkey`.
 
+### Secrets
+
+Non-secret defaults live in the repo-root `.env` (git-ignored, already present locally). Anything
+that shouldn't live inside the project directory at all — job-site login credentials for the
+Playwright auto-apply flow (LinkedIn/Bayt/GulfTalent/Wuzzuf), AI provider keys, Telegram — lives in
+`/home/badr/secrets/secret.env`, outside the repo entirely. `docker-compose.yml`'s `backend` service
+loads both via `env_file`. For running the API directly with `uv run uvicorn` (outside Docker), source
+both first so `Settings` picks them up from the environment:
+
+```bash
+set -a && source /home/badr/secrets/secret.env && source ../.env && set +a
+uv run uvicorn smarthunt.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Never print the contents of `/home/badr/secrets/secret.env` (or paste its values anywhere) — treat
+it the same as any other credential store.
+
 CI (`.github/workflows/ci.yml`) runs, in order: `ruff check`, `black --check`, `compileall`,
 `pytest --envfile=../.env`, then `helm lint ../helm/smarthunt`. Match this before considering work done.
 
