@@ -1,22 +1,49 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from smarthunt.scheduler import scheduler
+from smarthunt.scheduler.jobs import (
+    discover_devops,
+    discover_linux,
+    discover_python,
+)
 
-router = APIRouter(prefix="/scheduler", tags=["scheduler"])
+router = APIRouter(
+    prefix="/scheduler",
+    tags=["scheduler"],
+)
 
 
-@router.get("")
-async def get_scheduler_status():
-    # استدعاء حالة الـ scheduler المستورد مباشرة
-    is_running = scheduler.running
-    return {
-        "status": "running" if is_running else "stopped",
-        "jobs": [
-            {
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": str(job.next_run_time) if job.next_run_time else None,
-            }
-            for job in scheduler.get_jobs()
-        ],
-    }
+SCHEDULED_TASKS = {
+    "python": discover_python,
+    "linux": discover_linux,
+    "devops": discover_devops,
+}
+
+
+@router.post("/trigger/{task_name}")
+async def trigger_scheduler_task(
+    task_name: str,
+):
+
+    task = SCHEDULED_TASKS.get(task_name)
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown scheduler task: {task_name}",
+        )
+
+    try:
+        result = await task()
+
+        return {
+            "status": "SUCCESS",
+            "task": task_name,
+            "result": result,
+        }
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        )

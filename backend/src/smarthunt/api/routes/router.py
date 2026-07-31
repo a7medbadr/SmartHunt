@@ -49,8 +49,15 @@ from smarthunt.settings.router import router as settings_router
 api_router = APIRouter()
 
 
-api_router.include_router(health_router, tags=["health"])
-api_router.include_router(system_router, tags=["system"])
+api_router.include_router(
+    health_router,
+    tags=["health"],
+)
+
+api_router.include_router(
+    system_router,
+    tags=["system"],
+)
 
 api_router.include_router(
     auth_router,
@@ -60,7 +67,6 @@ api_router.include_router(
 
 api_router.include_router(
     recruitment_router,
-    prefix="",
     tags=["recruitment"],
 )
 
@@ -72,7 +78,6 @@ api_router.include_router(
 
 api_router.include_router(
     recommendation_router,
-    prefix="",
     tags=["recommendation"],
 )
 
@@ -130,7 +135,10 @@ api_router.include_router(
     tags=["search"],
 )
 
-api_router.include_router(search_metrics_router)
+api_router.include_router(
+    search_metrics_router,
+    tags=["search-metrics"],
+)
 
 api_router.include_router(
     saved_searches_router,
@@ -144,10 +152,25 @@ api_router.include_router(
     tags=["favorites"],
 )
 
-api_router.include_router(dashboard_router, tags=["dashboard"])
-api_router.include_router(activity_router, tags=["activity"])
-api_router.include_router(audit_router, tags=["audit"])
-api_router.include_router(events_router, tags=["events"])
+api_router.include_router(
+    dashboard_router,
+    tags=["dashboard"],
+)
+
+api_router.include_router(
+    activity_router,
+    tags=["activity"],
+)
+
+api_router.include_router(
+    audit_router,
+    tags=["audit"],
+)
+
+api_router.include_router(
+    events_router,
+    tags=["events"],
+)
 
 api_router.include_router(
     notifications_router,
