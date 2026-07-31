@@ -43,18 +43,15 @@ class Settings(BaseSettings):
 
     ollama_url: str = "http://localhost:11434"
 
-
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
     linkedin_email: str | None = None
     linkedin_password: str | None = None
 
-
     secret_key: str
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
-
 
     access_token_expire_minutes: int = Field(
         default=60,
@@ -64,16 +61,21 @@ class Settings(BaseSettings):
         ),
     )
 
-
     enable_playwright: bool = True
 
     enable_notifications: bool = True
 
     security_headers_enabled: bool = True
 
+    enable_docs: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "ENABLE_DOCS",
+            "enable_docs",
+        ),
+    )
 
     BACKEND_CORS_ORIGINS: list[str] = []
-
 
     @field_validator("app_env")
     @classmethod
@@ -91,12 +93,9 @@ class Settings(BaseSettings):
         }
 
         if value not in allowed:
-            raise ValueError(
-                f"Invalid environment: {value}"
-            )
+            raise ValueError(f"Invalid environment: {value}")
 
         return value
-
 
     def model_post_init(
         self,
@@ -111,22 +110,13 @@ class Settings(BaseSettings):
                 "jwt_secret_key": self.jwt_secret_key,
             }
 
-            missing = [
-                key
-                for key, value in required.items()
-                if not value
-            ]
+            missing = [key for key, value in required.items() if not value]
 
             if missing:
-                raise ValueError(
-                    f"Missing production configuration: {missing}"
-                )
+                raise ValueError(f"Missing production configuration: {missing}")
 
             if self.app_debug:
-                raise ValueError(
-                    "DEBUG must be disabled in production"
-                )
-
+                raise ValueError("DEBUG must be disabled in production")
 
     @computed_field
     @property
@@ -137,12 +127,10 @@ class Settings(BaseSettings):
             "/smarthunt_test",
         )
 
-
     @computed_field
     @property
     def environment(self) -> str:
         return self.app_env
-
 
     model_config = SettingsConfigDict(
         env_file=".env",

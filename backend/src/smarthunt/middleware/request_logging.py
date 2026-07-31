@@ -6,7 +6,6 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from smarthunt.shared.observability.context import request_id
 
-
 logger = structlog.get_logger("smarthunt")
 
 
@@ -47,10 +46,7 @@ class RequestLoggingMiddleware:
 
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
-
-                duration = (
-                    time.perf_counter() - start_time
-                ) * 1000
+                duration = (time.perf_counter() - start_time) * 1000
 
                 await logger.ainfo(
                     "request_completed",
@@ -72,7 +68,7 @@ class RequestLoggingMiddleware:
             )
 
         except Exception:
-            await logger.exception(
+            logger.exception(
                 "request_failed",
                 service="smarthunt-backend",
                 request_id=rid,
