@@ -27,6 +27,7 @@ const NAV_LINKS = [
   { href: "/scheduler", label: "الجدولة" },
   { href: "/notifications", label: "الإشعارات" },
   { href: "/settings", label: "الإعدادات" },
+  { href: "/system-health", label: "حالة النظام" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
