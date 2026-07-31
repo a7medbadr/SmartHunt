@@ -43,6 +43,6 @@ async def test_health_details():
 
     assert body["status"] in ("ok", "degraded")
     assert body["database"] in ("up", "down")
-    assert body["scheduler"] == "up"
+    assert body["scheduler"] in ("up", "down")
     assert body["playwright"] == "idle"
     assert body["version"] == settings.VERSION

@@ -2,6 +2,7 @@ from fastapi import APIRouter, status
 
 from smarthunt.core.config import settings
 from smarthunt.database.health import check_database_health
+from smarthunt.scheduler.scheduler import scheduler
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -28,7 +29,7 @@ async def details():
     return {
         "status": "ok" if database == "up" else "degraded",
         "database": database,
-        "scheduler": "up",
+        "scheduler": "up" if scheduler.running else "down",
         "playwright": "idle",
         "version": settings.VERSION,
     }
