@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -66,8 +67,11 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>SmartHunt</CardTitle>
+        <CardHeader className="items-center text-center">
+          <div className="mb-2 flex size-12 items-center justify-center rounded-xl bg-primary">
+            <Search className="size-6 text-primary-foreground" />
+          </div>
+          <CardTitle className="text-xl">SmartHunt</CardTitle>
           <CardDescription>سجّل دخولك للمتابعة</CardDescription>
         </CardHeader>
         <CardContent>

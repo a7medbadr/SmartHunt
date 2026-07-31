@@ -122,7 +122,12 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--background);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 15% -10%, oklch(0.3 0.05 264 / 25%), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.28 0.04 220 / 20%), transparent);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;

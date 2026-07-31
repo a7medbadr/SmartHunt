@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cairo, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { QueryProvider } from "@/lib/query-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const cairo = Cairo({
+  variable: "--font-sans",
+  subsets: ["arabic", "latin"],
 });
 
 const geistMono = Geist_Mono({
@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SmartHunt",
-  description: "AI-powered job hunting and auto-application platform",
+  description: "منصة البحث الذكي عن الوظائف والتقديم التلقائي بالذكاء الاصطناعي",
 };
 
 export default function RootLayout({
@@ -26,8 +26,9 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      lang="ar"
+      dir="rtl"
+      className={`dark ${cairo.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>{children}</QueryProvider>
