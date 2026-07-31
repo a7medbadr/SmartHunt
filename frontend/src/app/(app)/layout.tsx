@@ -26,6 +26,7 @@ const NAV_LINKS = [
   { href: "/ai-assistant", label: "المساعد الذكي" },
   { href: "/scheduler", label: "الجدولة" },
   { href: "/notifications", label: "الإشعارات" },
+  { href: "/settings", label: "الإعدادات" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
