@@ -1,18 +1,29 @@
 from smarthunt.providers.base.provider import BaseProvider
-from typing import Any
+from smarthunt.providers.models.job import Job
+
 
 class IndeedProvider(BaseProvider):
+
     name = "indeed"
-    supports_login = False
-    supports_apply = False
-    supports_resume_upload = False
-    supports_cover_letter = False
 
     async def search(
         self,
-        query: str | None,
-        location: str | None,
-        page: int,
-        limit: int,
-    ) -> Any:
-        return {"provider": self.name, "results": [], "page": page, "limit": limit}
+        query=None,
+        location=None,
+    ) -> list[Job]:
+
+        return [
+            Job(
+                external_id="indeed-1",
+                provider=self.name,
+                title="OpenShift Administrator",
+                company="Indeed Demo",
+                location=location or "Remote",
+                url="https://indeed.com/job/1",
+                description="OpenShift Kubernetes Linux",
+                salary="16000",
+                remote=False,
+                city="Riyadh",
+                country="Saudi Arabia",
+            )
+        ]

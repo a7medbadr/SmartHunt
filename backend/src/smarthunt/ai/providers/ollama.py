@@ -1,15 +1,27 @@
 from smarthunt.ai.base import BaseAIProvider
 from smarthunt.ai.exceptions import AIProviderError
-from smarthunt.ai.types import AIProvider, AIRequest, AIResponse
+from smarthunt.ai.types import (
+    AIProvider,
+    AIRequest,
+    AIResponse,
+)
+from smarthunt.core.config import settings
 
 
 class OllamaProvider(BaseAIProvider):
+
     name = AIProvider.OLLAMA
 
     async def generate(
         self,
         request: AIRequest,
     ) -> AIResponse:
+
+        if not settings.ollama_url:
+            raise AIProviderError(
+                "Ollama URL is not configured"
+            )
+
         try:
             return AIResponse(
                 provider=self.name,

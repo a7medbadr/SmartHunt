@@ -12,6 +12,7 @@ class AIProvider(str, Enum):
 
 
 class AIRequest(BaseModel):
+
     prompt: str = Field(
         min_length=1,
     )
@@ -36,8 +37,20 @@ class AIRequest(BaseModel):
 
 
 class AIResponse(BaseModel):
+
     content: str
+
     provider: AIProvider
+
     success: bool = True
-    fallback_used: bool = False
-    latency_ms: float | None = None
+
+    error: str | None = None
+
+
+class AIProviderHealth(BaseModel):
+
+    provider: AIProvider
+
+    available: bool = True
+
+    message: str | None = None

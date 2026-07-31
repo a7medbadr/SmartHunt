@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 from smarthunt.ai.exceptions import (
     AIProviderError,
@@ -12,6 +11,7 @@ from smarthunt.ai.types import (
     AIRequest,
     AIResponse,
 )
+from smarthunt.core.config import settings
 from smarthunt.logging.logger import logger
 
 
@@ -19,12 +19,22 @@ class AIService:
 
     def __init__(
         self,
-        provider: AIProvider = AIProvider.OPENAI,
-        retries: int = 3,
-        fallback_provider: AIProvider = AIProvider.LOCAL,
+        provider: AIProvider | None = None,
+        retries: int | None = None,
+        fallback_provider: AIProvider | None = AIProvider.LOCAL,
     ):
-        self.provider = provider
-        self.retries = retries
+
+        self.provider = (
+            provider
+            or AIProvider(settings.ai_provider)
+        )
+
+        self.retries = (
+            retries
+            if retries is not None
+            else settings.ai_max_retries
+        )
+
         self.fallback_provider = fallback_provider
 
 
@@ -32,32 +42,28 @@ class AIService:
         self,
         provider_name: AIProvider,
         request: AIRequest,
-        fallback_used: bool = False,
     ) -> AIResponse:
 
         provider = AIProviderFactory.get(
             provider_name
         )
 
-        start = time.monotonic()
-
-        response = await asyncio.wait_for(
+        return await asyncio.wait_for(
             provider.generate(request),
             timeout=request.timeout,
         )
-
-        response.fallback_used = fallback_used
-        response.latency_ms = (
-            time.monotonic() - start
-        ) * 1000
-
-        return response
 
 
     async def generate(
         self,
         request: AIRequest,
     ) -> AIResponse:
+
+        if not settings.enable_ai_services:
+            raise AIProviderError(
+                "AI services are disabled"
+            )
+
 
         provider = (
             request.provider
@@ -66,6 +72,7 @@ class AIService:
 
         last_exception = None
 
+
         for attempt in range(
             1,
             self.retries + 1,
@@ -73,20 +80,36 @@ class AIService:
 
             try:
 
-                return await self._execute(
+                logger.info(
+                    "AI generation started provider=%s attempt=%s",
+                    provider,
+                    attempt,
+                )
+
+                response = await self._execute(
                     provider,
                     request,
                 )
 
-            except asyncio.TimeoutError:
+                logger.info(
+                    "AI generation completed provider=%s",
+                    provider,
+                )
+
+                return response
+
+
+            except asyncio.TimeoutError as exc:
 
                 last_exception = AITimeoutError(
                     f"Timeout provider={provider}"
                 )
 
+
             except AIProviderError as exc:
 
                 last_exception = exc
+
 
             except Exception as exc:
 
@@ -94,8 +117,9 @@ class AIService:
                     str(exc)
                 )
 
+
             logger.warning(
-                "AI failure provider=%s attempt=%s error=%s",
+                "AI provider failed provider=%s attempt=%s error=%s",
                 provider,
                 attempt,
                 last_exception,
@@ -107,12 +131,16 @@ class AIService:
             and self.fallback_provider != provider
         ):
 
+            logger.warning(
+                "Trying AI fallback provider=%s",
+                self.fallback_provider,
+            )
+
             try:
 
                 return await self._execute(
                     self.fallback_provider,
                     request,
-                    fallback_used=True,
                 )
 
             except Exception as exc:

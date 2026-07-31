@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import List
+import asyncio
+from dataclasses import asdict, is_dataclass
 
+from smarthunt.domain.job import DiscoveredJob
 from smarthunt.providers.base.provider import BaseProvider
 from smarthunt.providers.bayt.provider import BaytProvider
 from smarthunt.providers.drjobs.provider import DrjobsProvider
@@ -17,8 +19,8 @@ from smarthunt.providers.wzayef.provider import WzayefProvider
 
 
 class ProviderRegistry:
-    def providers(self) -> List[BaseProvider]:
-        """Returns a list of all registered job search providers."""
+
+    def providers(self) -> list[BaseProvider]:
         return [
             LinkedInProvider(),
             IndeedProvider(),
@@ -33,6 +35,71 @@ class ProviderRegistry:
             ForasnagulfProvider(),
         ]
 
+    def _normalize(self, item) -> DiscoveredJob:
 
-# Backward-compatible singleton instance (some modules import this name directly)
+        if isinstance(item, DiscoveredJob):
+            return item
+
+        if hasattr(item, "to_domain"):
+            return item.to_domain()
+
+        if is_dataclass(item):
+            item = asdict(item)
+
+        if isinstance(item, dict):
+            return DiscoveredJob(
+                title=item.get("title", ""),
+                company=item.get("company", ""),
+                location=item.get("location", ""),
+                source=item.get(
+                    "source",
+                    item.get("provider", ""),
+                ),
+                url=item.get("url", ""),
+                description=item.get("description", ""),
+                requirements=item.get("requirements", ""),
+            )
+
+        raise TypeError(
+            f"Unsupported provider object: {type(item)}"
+        )
+
+    async def fetch_all_jobs(
+        self,
+        query: str | None = None,
+        location: str | None = None,
+        page: int = 1,
+        limit: int = 25,
+    ) -> list[DiscoveredJob]:
+
+        tasks = [
+            provider.search(
+                query=query,
+                location=location,
+                page=page,
+                limit=limit,
+            )
+            for provider in self.providers()
+        ]
+
+        results = await asyncio.gather(
+            *tasks,
+            return_exceptions=True,
+        )
+
+        jobs: list[DiscoveredJob] = []
+
+        for result in results:
+
+            if isinstance(result, Exception):
+                continue
+
+            for job in result:
+                jobs.append(
+                    self._normalize(job)
+                )
+
+        return jobs
+
+
 provider_registry = ProviderRegistry()

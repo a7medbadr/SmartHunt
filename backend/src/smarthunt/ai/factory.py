@@ -1,5 +1,4 @@
 from threading import Lock
-from typing import Callable
 
 from smarthunt.ai.base import BaseAIProvider
 from smarthunt.ai.providers.anthropic import AnthropicProvider
@@ -14,10 +13,7 @@ class AIProviderFactory:
 
     _lock = Lock()
 
-    _registry: dict[
-        AIProvider,
-        Callable[[], BaseAIProvider]
-    ] = {
+    _provider_classes = {
         AIProvider.OPENAI: OpenAIProvider,
         AIProvider.AZURE_OPENAI: AzureOpenAIProvider,
         AIProvider.ANTHROPIC: AnthropicProvider,
@@ -25,10 +21,7 @@ class AIProviderFactory:
         AIProvider.LOCAL: LocalLLMProvider,
     }
 
-    _instances: dict[
-        AIProvider,
-        BaseAIProvider
-    ] = {}
+    _providers: dict[AIProvider, BaseAIProvider] = {}
 
 
     @classmethod
@@ -37,14 +30,14 @@ class AIProviderFactory:
         provider: AIProvider,
     ) -> BaseAIProvider:
 
-        if provider in cls._instances:
-            return cls._instances[provider]
+        if provider in cls._providers:
+            return cls._providers[provider]
 
         with cls._lock:
 
-            if provider not in cls._instances:
+            if provider not in cls._providers:
 
-                implementation = cls._registry.get(
+                implementation = cls._provider_classes.get(
                     provider
                 )
 
@@ -53,21 +46,27 @@ class AIProviderFactory:
                         f"Unsupported AI provider {provider}"
                     )
 
-                cls._instances[provider] = implementation()
+                cls._providers[provider] = implementation()
 
-        return cls._instances[provider]
+        return cls._providers[provider]
 
 
     @classmethod
     def register(
         cls,
         provider: AIProvider,
-        implementation: Callable[[], BaseAIProvider],
+        implementation: BaseAIProvider,
     ) -> None:
 
         with cls._lock:
-            cls._registry[provider] = implementation
-            cls._instances.pop(
-                provider,
-                None,
-            )
+            cls._providers[provider] = implementation
+
+
+    @classmethod
+    def available_providers(
+        cls,
+    ) -> list[AIProvider]:
+
+        return list(
+            cls._provider_classes.keys()
+        )

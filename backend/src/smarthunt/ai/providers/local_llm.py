@@ -1,15 +1,21 @@
 from smarthunt.ai.base import BaseAIProvider
 from smarthunt.ai.exceptions import AIProviderError
-from smarthunt.ai.types import AIProvider, AIRequest, AIResponse
+from smarthunt.ai.types import (
+    AIProvider,
+    AIRequest,
+    AIResponse,
+)
 
 
 class LocalLLMProvider(BaseAIProvider):
+
     name = AIProvider.LOCAL
 
     async def generate(
         self,
         request: AIRequest,
     ) -> AIResponse:
+
         try:
             return AIResponse(
                 provider=self.name,

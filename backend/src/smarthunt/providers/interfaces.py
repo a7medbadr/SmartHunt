@@ -1,24 +1,25 @@
-from typing import List, Optional, Protocol, runtime_checkable
-from smarthunt.database.models.job import Job
+from __future__ import annotations
+
+from typing import Protocol
+
+from smarthunt.domain.job import DiscoveredJob
 
 
-@runtime_checkable
-class BaseProvider(Protocol):
-    """
-    Standard interface that all real and mock providers must implement.
-    """
+class ProviderProtocol(Protocol):
 
     name: str
 
     async def search(
         self,
-        query: Optional[str] = None,
-        location: Optional[str] = None,
-    ) -> List[Job]:
-        ...
-
-    async def health(self) -> bool:
+        query: str | None = None,
+        location: str | None = None,
+        page: int = 1,
+        limit: int = 25,
+    ) -> list[DiscoveredJob]:
         ...
 
     async def login(self) -> bool:
+        ...
+
+    async def health(self) -> bool:
         ...
