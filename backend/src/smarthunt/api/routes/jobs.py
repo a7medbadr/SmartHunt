@@ -21,6 +21,17 @@ async def list_jobs(db: DB):
     return await JobService(db).list_jobs()
 
 
+@router.get("/{job_id}", response_model=JobResponse)
+async def get_job(job_id: int, db: DB):
+    job = await JobService(db).get_job(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+    return job
+
+
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 async def create_job(
     payload: JobCreate,

@@ -63,3 +63,34 @@ async def test_get_jobs(client):
     assert response.status_code == 200
 
     assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_get_job_by_id(client):
+    token = await create_user(client)
+
+    created = await client.post(
+        "/api/v1/jobs",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "title": "Platform Engineer",
+            "company": "Acme",
+            "location": "Remote",
+            "source": "Manual",
+            "url": f"https://example.com/{uuid.uuid4()}",
+        },
+    )
+    job_id = created.json()["id"]
+
+    response = await client.get(f"/api/v1/jobs/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == job_id
+    assert response.json()["title"] == "Platform Engineer"
+
+
+@pytest.mark.asyncio
+async def test_get_job_by_id_not_found(client):
+    response = await client.get("/api/v1/jobs/999999999")
+
+    assert response.status_code == 404
