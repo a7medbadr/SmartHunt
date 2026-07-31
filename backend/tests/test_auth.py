@@ -83,6 +83,59 @@ async def test_me(client):
 
 
 @pytest.mark.asyncio
+async def test_register_duplicate_username_rejected(client):
+    payload = random_user()
+
+    await client.post("/api/v1/auth/register", json=payload)
+
+    duplicate = {**payload, "email": f"other_{payload['email']}"}
+
+    response = await client.post("/api/v1/auth/register", json=duplicate)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_login_wrong_password_rejected(client):
+    payload = random_user()
+
+    await client.post("/api/v1/auth/register", json=payload)
+
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": payload["username"],
+            "password": "wrong-password",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_unknown_user_rejected(client):
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "no-such-user",
+            "password": "whatever",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_me_rejects_invalid_token(client):
+    response = await client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_protected_endpoint_requires_login(client):
     response = await client.post(
         "/api/v1/jobs",

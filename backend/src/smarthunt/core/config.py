@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     linkedin_email: str | None = None
     linkedin_password: str | None = None
 
+    bayt_email: str | None = None
+    bayt_password: str | None = None
+
+    gulftalent_email: str | None = None
+    gulftalent_password: str | None = None
+
+    wuzzuf_email: str | None = None
+    wuzzuf_password: str | None = None
+
     secret_key: str
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
