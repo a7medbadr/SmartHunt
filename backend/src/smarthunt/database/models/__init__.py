@@ -7,11 +7,13 @@ from smarthunt.database.models.resume import Resume
 from smarthunt.database.models.search_history import SearchHistory
 from smarthunt.database.models.user import User
 from smarthunt.favorites.models import FavoriteJob
+from smarthunt.idempotency.models import IdempotencyKey
 from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
 from smarthunt.notifications.models import Notification
 from smarthunt.providers.health.models import ProviderHealth
 from smarthunt.saved_searches.models import SavedSearch
+from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
 from smarthunt.scheduler.locks.models import SchedulerLock
 from smarthunt.settings.models import UserSettings
@@ -23,7 +25,9 @@ __all__ = [
     "Application",
     "ApplyQueueItem",
     "BrowserSession",
+    "FailedSchedulerJob",
     "FavoriteJob",
+    "IdempotencyKey",
     "Job",
     "JobNote",
     "JobTag",

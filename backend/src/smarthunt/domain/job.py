@@ -12,7 +12,7 @@ class DiscoveredJob:
 
     source: str
 
-    url: str
+    url: str | None
 
     description: str = ""
 

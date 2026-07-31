@@ -1,5 +1,5 @@
 from smarthunt.providers.base.provider import BaseProvider
-from typing import Any
+from smarthunt.providers.models.job import Job
 
 
 class WuzzufProvider(BaseProvider):
@@ -11,9 +11,9 @@ class WuzzufProvider(BaseProvider):
 
     async def search(
         self,
-        query: str | None,
-        location: str | None,
-        page: int,
-        limit: int,
-    ) -> Any:
-        return {"provider": self.name, "results": [], "page": page, "limit": limit}
+        query: str | None = None,
+        location: str | None = None,
+        page: int = 1,
+        limit: int = 25,
+    ) -> list[Job]:
+        return []

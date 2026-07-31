@@ -55,7 +55,7 @@ class ProviderRegistry:
                     "source",
                     item.get("provider", ""),
                 ),
-                url=item.get("url", ""),
+                url=item.get("url") or None,
                 description=item.get("description", ""),
                 requirements=item.get("requirements", ""),
             )

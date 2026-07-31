@@ -10,6 +10,8 @@ class DrjobsProvider(BaseProvider):
         self,
         query=None,
         location=None,
+        page=1,
+        limit=25,
     ) -> list[Job]:
 
         return [

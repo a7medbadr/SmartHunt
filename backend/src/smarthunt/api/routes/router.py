@@ -17,6 +17,7 @@ from smarthunt.cover_letter.reviewer.router import (
     router as cover_letter_reviewer_router,
 )
 from smarthunt.dashboard.api import router as dashboard_router
+from smarthunt.discovery.router import router as discovery_router
 from smarthunt.events.router import router as events_router
 from smarthunt.favorites.router import router as favorites_router
 from smarthunt.idempotency.router import router as idempotency_router
@@ -42,6 +43,9 @@ from smarthunt.scheduler.history.router import (
 )
 from smarthunt.scheduler.locks.router import (
     router as scheduler_locks_router,
+)
+from smarthunt.scheduler.failed_job_router import (
+    router as scheduler_failed_jobs_router,
 )
 from smarthunt.search.router import router as search_router
 from smarthunt.search.metrics_router import router as search_metrics_router
@@ -169,6 +173,11 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    discovery_router,
+    tags=["discovery"],
+)
+
+api_router.include_router(
     activity_router,
     tags=["activity"],
 )
@@ -211,6 +220,12 @@ api_router.include_router(
     scheduler_locks_router,
     prefix="/scheduler/locks",
     tags=["scheduler-locks"],
+)
+
+api_router.include_router(
+    scheduler_failed_jobs_router,
+    prefix="/scheduler",
+    tags=["scheduler-failed-jobs"],
 )
 
 api_router.include_router(

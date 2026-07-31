@@ -30,7 +30,7 @@ class Job:
             company=self.company,
             location=self.location,
             source=self.provider,
-            url=self.url,
+            url=self.url or None,
             description=self.description,
         )
 
