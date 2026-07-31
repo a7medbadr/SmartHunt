@@ -29,9 +29,11 @@ backend/.env
 # Logs
 *.log
 
-# Frontend
-frontend/node_modules
-frontend/dist
+# Frontend — the backend Docker build (backend/Dockerfile) never needs any
+# of this, and frontend/.next churns constantly under a running dev server,
+# which raced an `oc start-build --from-dir=.` tar snapshot and broke the
+# upload (2026-08-01: "no such file or directory" on a turbopack cache file).
+frontend/
 
 # OS
 .DS_Store
