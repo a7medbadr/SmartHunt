@@ -1,91 +1,65 @@
 import logging
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
 from smarthunt.providers.registry import provider_registry
+from smarthunt.scheduler.execution import (
+    track_scheduler_execution,
+)
 
 
-logger = logging.getLogger("smarthunt.scheduler")
-
-scheduler = AsyncIOScheduler()
+logger = logging.getLogger(
+    "smarthunt.scheduler"
+)
 
 
 async def sync_providers_job():
 
-    logger.info(
-        "Starting background provider synchronization..."
-    )
-
-    try:
-        raw_jobs = await provider_registry.fetch_all_jobs_safe()
+    async with track_scheduler_execution(
+        "provider_sync"
+    ):
 
         logger.info(
-            "Fetched %s jobs from healthy providers.",
+            "Starting provider synchronization"
+        )
+
+        raw_jobs = await (
+            provider_registry
+            .fetch_all_jobs_safe()
+        )
+
+        logger.info(
+            "Fetched %s jobs",
             len(raw_jobs),
         )
-
-        return {
-            "jobs_found": len(raw_jobs),
-        }
-
-    except Exception as exc:
-        logger.exception(
-            "Provider sync failed: %s",
-            exc,
-        )
-        raise
 
 
 async def discover_python():
 
-    logger.info(
-        "Running Python jobs discovery task..."
-    )
+    async with track_scheduler_execution(
+        "discover_python"
+    ):
 
-    return {
-        "task": "python",
-        "status": "completed",
-    }
+        logger.info(
+            "Running Python discovery"
+        )
 
 
 async def discover_linux():
 
-    logger.info(
-        "Running Linux jobs discovery task..."
-    )
+    async with track_scheduler_execution(
+        "discover_linux"
+    ):
 
-    return {
-        "task": "linux",
-        "status": "completed",
-    }
+        logger.info(
+            "Running Linux discovery"
+        )
 
 
 async def discover_devops():
 
-    logger.info(
-        "Running DevOps jobs discovery task..."
-    )
-
-    return {
-        "task": "devops",
-        "status": "completed",
-    }
-
-
-def start_scheduler():
-
-    if not scheduler.running:
-
-        scheduler.add_job(
-            sync_providers_job,
-            "interval",
-            minutes=30,
-            id="provider_sync_job",
-            replace_existing=True,
-        )
-
-        scheduler.start()
+    async with track_scheduler_execution(
+        "discover_devops"
+    ):
 
         logger.info(
-            "Provider Scheduler started successfully."
+            "Running DevOps discovery"
         )

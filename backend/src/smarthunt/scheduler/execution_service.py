@@ -1,8 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.scheduler.failed_job_service import failed_scheduler_job_service
+from smarthunt.scheduler.failed_job_service import (
+    failed_scheduler_job_service,
+)
 from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
-from smarthunt.scheduler.history.service import scheduler_history_service
+from smarthunt.scheduler.history.service import (
+    scheduler_history_service,
+)
 
 
 class SchedulerExecutionService:
@@ -19,14 +23,12 @@ class SchedulerExecutionService:
         try:
             result = await handler()
 
-            jobs_found = len(result) if result else 0
-
             await scheduler_history_service.create(
                 db,
                 SchedulerHistoryCreate(
                     provider=provider,
                     status="SUCCESS",
-                    jobs_found=jobs_found,
+                    jobs_found=len(result) if result else 0,
                     message="Scheduler execution completed",
                 ),
             )
@@ -34,6 +36,13 @@ class SchedulerExecutionService:
             return result
 
         except Exception as exc:
+
+            await failed_scheduler_job_service.create(
+                db,
+                provider=provider,
+                job_reference=job_reference,
+                error=str(exc),
+            )
 
             await scheduler_history_service.create(
                 db,
@@ -43,13 +52,6 @@ class SchedulerExecutionService:
                     jobs_found=0,
                     message=str(exc),
                 ),
-            )
-
-            await failed_scheduler_job_service.create(
-                db,
-                provider=provider,
-                job_reference=job_reference,
-                error=str(exc),
             )
 
             raise

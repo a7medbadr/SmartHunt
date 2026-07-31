@@ -18,6 +18,17 @@ from .events import (
     events_published_total,
 )
 
+from .failed_jobs import (
+    scheduler_failed_jobs_retry_total,
+    scheduler_failed_jobs_total,
+)
+
+from .scheduler_lock import (
+    scheduler_lock_acquired_total,
+    scheduler_lock_conflicts_total,
+    scheduler_lock_expired_total,
+)
+
 from .instrumentation import setup_metrics
 
 
@@ -36,5 +47,10 @@ __all__ = [
     "events_published_total",
     "events_failed_total",
     "events_processed_total",
+    "scheduler_failed_jobs_total",
+    "scheduler_failed_jobs_retry_total",
+    "scheduler_lock_acquired_total",
+    "scheduler_lock_conflicts_total",
+    "scheduler_lock_expired_total",
     "setup_metrics",
 ]
