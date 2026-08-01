@@ -22,8 +22,8 @@ MAX_RETRIES is exhausted or the job type is unrecognized."""
 async def _make_failed_job(db: AsyncSession, **overrides) -> FailedSchedulerJob:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     job = FailedSchedulerJob(
-        provider=overrides.get("provider", "scheduler:python"),
-        job_reference=overrides.get("job_reference", "python"),
+        provider=overrides.get("provider", "scheduler:linux"),
+        job_reference=overrides.get("job_reference", "linux"),
         status=overrides.get("status", "FAILED"),
         retry_count=overrides.get("retry_count", 0),
         last_error=overrides.get("last_error", "original failure"),

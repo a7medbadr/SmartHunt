@@ -4,9 +4,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from smarthunt.core.config import settings
 from smarthunt.scheduler import scheduler
 from smarthunt.scheduler.jobs import (
-    discover_devops,
     discover_linux,
-    discover_python,
+    discover_openshift,
+    discover_storage,
+    discover_vmware,
     process_failed_scheduler_jobs,
 )
 
@@ -26,23 +27,30 @@ class SchedulerService:
 
         try:
             scheduler.add_job(
-                discover_python,
-                IntervalTrigger(hours=1),
-                id="discover_python",
-                replace_existing=True,
-            )
-
-            scheduler.add_job(
                 discover_linux,
-                IntervalTrigger(hours=2),
+                IntervalTrigger(hours=1),
                 id="discover_linux",
                 replace_existing=True,
             )
 
             scheduler.add_job(
-                discover_devops,
+                discover_openshift,
+                IntervalTrigger(hours=2),
+                id="discover_openshift",
+                replace_existing=True,
+            )
+
+            scheduler.add_job(
+                discover_vmware,
                 IntervalTrigger(hours=3),
-                id="discover_devops",
+                id="discover_vmware",
+                replace_existing=True,
+            )
+
+            scheduler.add_job(
+                discover_storage,
+                IntervalTrigger(hours=4),
+                id="discover_storage",
                 replace_existing=True,
             )
 
@@ -58,9 +66,10 @@ class SchedulerService:
             logger.info(
                 "scheduler_started",
                 jobs=[
-                    "discover_python",
                     "discover_linux",
-                    "discover_devops",
+                    "discover_openshift",
+                    "discover_vmware",
+                    "discover_storage",
                     "process_failed_scheduler_jobs",
                 ],
             )

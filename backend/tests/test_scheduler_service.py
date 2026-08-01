@@ -43,9 +43,10 @@ async def test_scheduler_service_start_and_shutdown():
         assert scheduler.running is True
         job_ids = {job.id for job in scheduler.get_jobs()}
         assert {
-            "discover_python",
             "discover_linux",
-            "discover_devops",
+            "discover_openshift",
+            "discover_vmware",
+            "discover_storage",
             "process_failed_scheduler_jobs",
         } <= job_ids
 

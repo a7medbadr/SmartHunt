@@ -13,10 +13,18 @@ from smarthunt.scheduler.failed_job_service import (
 # Maps a scheduled discovery job's `job_reference` back to the query it
 # should re-run. Owned here (not scheduler/jobs.py) so both that module
 # and this one can import it without a circular dependency.
+#
+# Matches the project owner's actual profile (2026-08-01, explicit
+# correction after generic "python developer"/"devops engineer" queries
+# were pulling in software-dev/full-stack/network roles they have zero
+# interest in) — a Linux/AIX/OpenShift systems & infrastructure
+# administrator, not a software developer. Verify against the owner's
+# uploaded resume before changing these, don't guess.
 TOPIC_QUERIES = {
-    "python": "python developer",
-    "linux": "linux administrator",
-    "devops": "devops engineer",
+    "linux": "Linux Administrator",
+    "openshift": "OpenShift Administrator",
+    "vmware": "VMware Administrator",
+    "storage": "Storage Administrator",
 }
 
 # Kept in sync with scheduler/jobs.py's DISCOVERY_LOCATION — Saudi Arabia

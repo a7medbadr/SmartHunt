@@ -44,16 +44,20 @@ async def _run_scheduled_discovery(topic: str, query: str) -> None:
             raise
 
 
-async def discover_python():
-    await _run_scheduled_discovery("python", TOPIC_QUERIES["python"])
-
-
 async def discover_linux():
     await _run_scheduled_discovery("linux", TOPIC_QUERIES["linux"])
 
 
-async def discover_devops():
-    await _run_scheduled_discovery("devops", TOPIC_QUERIES["devops"])
+async def discover_openshift():
+    await _run_scheduled_discovery("openshift", TOPIC_QUERIES["openshift"])
+
+
+async def discover_vmware():
+    await _run_scheduled_discovery("vmware", TOPIC_QUERIES["vmware"])
+
+
+async def discover_storage():
+    await _run_scheduled_discovery("storage", TOPIC_QUERIES["storage"])
 
 
 async def process_failed_scheduler_jobs():
