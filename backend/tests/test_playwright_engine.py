@@ -17,6 +17,7 @@ def mock_browser_manager(monkeypatch):
 
     mock_page.wait_for_selector = AsyncMock()
     mock_page.wait_for_load_state = AsyncMock()
+    mock_page.wait_for_timeout = AsyncMock()
 
     mock_page.title = AsyncMock(return_value="Linux Engineer")
 
@@ -33,6 +34,14 @@ def mock_browser_manager(monkeypatch):
     locator.fill = AsyncMock()
 
     mock_page.locator.return_value.all = AsyncMock(return_value=[locator])
+
+    # linkedin_login() locates fields via `.first` (Playwright's real
+    # Locator.first is sync, returns another Locator), then awaits
+    # wait_for/fill/press on it.
+    mock_page.locator.return_value.first = mock_page.locator.return_value
+    mock_page.locator.return_value.wait_for = AsyncMock()
+    mock_page.locator.return_value.fill = AsyncMock()
+    mock_page.locator.return_value.press = AsyncMock()
 
     async def fake_launch(headless: bool = True):
         browser_manager.browser = MagicMock()

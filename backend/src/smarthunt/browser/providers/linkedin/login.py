@@ -26,6 +26,16 @@ async def linkedin_login(page: Page) -> dict:
     Perform LinkedIn login using credentials from settings.
 
     Never attempts to bypass CAPTCHA, MFA or security checkpoints.
+
+    Selectors target stable HTML5 semantics (autocomplete attributes) and
+    submit via Enter-in-password-field rather than a specific button
+    selector/text, since LinkedIn's login page (as of 2026-08) renders
+    the username/password field `id`s as per-request-random React IDs
+    (e.g. `id="«R3jvtkejj35655j6»"`), serves the page in the visitor's
+    detected locale (Arabic here), and its "submit" button is a plain
+    `<button type="button">` driven by JS, not a real form submit —
+    hardcoded `#username`/`#password`/`button[type='submit']` selectors
+    time out against the real, current page.
     """
 
     email = settings.linkedin_email
@@ -44,17 +54,24 @@ async def linkedin_login(page: Page) -> dict:
             timeout=60000,
         )
 
-        await page.wait_for_selector("#username", timeout=30000)
-        await page.wait_for_selector("#password", timeout=30000)
+        email_field = page.locator('input[autocomplete*="username"]:visible').first
+        password_field = page.locator('input[autocomplete*="current-password"]:visible').first
+
+        await email_field.wait_for(state="visible", timeout=30000)
+        await password_field.wait_for(state="visible", timeout=30000)
 
         logger.info("Submitting LinkedIn credentials...")
 
-        await page.fill("#username", email)
-        await page.fill("#password", password)
+        await email_field.fill(email)
+        await password_field.fill(password)
+        await password_field.press("Enter")
 
-        await page.click("button[type='submit']")
+        try:
+            await page.wait_for_load_state("networkidle", timeout=15000)
+        except PlaywrightTimeoutError:
+            pass
 
-        await page.wait_for_load_state("domcontentloaded")
+        await page.wait_for_timeout(2000)
 
         current_url = page.url.lower()
 
@@ -74,8 +91,12 @@ async def linkedin_login(page: Page) -> dict:
             logger.info("LinkedIn login successful.")
             return {"status": "SUCCESS"}
 
+        if "login" in current_url or "checkpoint" in current_url:
+            logger.warning("Still on login/checkpoint page — credentials rejected.")
+            return {"status": "FAILED"}
+
         logger.warning("Login finished but success conditions were not met.")
-        return {"status": "FAILED"}
+        return {"status": "MANUAL_REQUIRED"}
 
     except PlaywrightTimeoutError:
         logger.exception("Timed out while waiting for LinkedIn login page.")

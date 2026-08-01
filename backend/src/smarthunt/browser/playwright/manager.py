@@ -58,6 +58,20 @@ class BrowserManager:
             ],
         )
 
+    def _context_options(self) -> dict:
+        return {
+            "ignore_https_errors": True,
+            "viewport": {
+                "width": 1366,
+                "height": 768,
+            },
+            "user_agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/138.0.0.0 Safari/537.36"
+            ),
+        }
+
     async def get_page(
         self,
         provider: str,
@@ -68,18 +82,7 @@ class BrowserManager:
 
         if provider not in self.contexts:
 
-            context = await self.browser.new_context(
-                ignore_https_errors=True,
-                viewport={
-                    "width": 1366,
-                    "height": 768,
-                },
-                user_agent=(
-                    "Mozilla/5.0 (X11; Linux x86_64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/138.0.0.0 Safari/537.36"
-                ),
-            )
+            context = await self.browser.new_context(**self._context_options())
 
             context.set_default_timeout(10000)
 
@@ -92,6 +95,25 @@ class BrowserManager:
             self.pages[provider] = await self.contexts[provider].new_page()
 
         return self.pages[provider]
+
+    async def new_isolated_page(self, timeout_ms: int = 20000) -> tuple[BrowserContext, Page]:
+        """A dedicated context+page for a single one-off task (e.g. an
+        unauthenticated search scrape run concurrently with other
+        providers), separate from the named, session-persisting contexts
+        get_page() manages — reusing a shared named context across
+        concurrent callers would race on the same page's navigation.
+        Caller is responsible for closing the returned context."""
+
+        if self.browser is None:
+            raise RuntimeError("Browser is not started. Call launch() first.")
+
+        context = await self.browser.new_context(**self._context_options())
+        context.set_default_timeout(timeout_ms)
+        context.set_default_navigation_timeout(timeout_ms)
+
+        page = await context.new_page()
+
+        return context, page
 
     async def close(self) -> None:
 

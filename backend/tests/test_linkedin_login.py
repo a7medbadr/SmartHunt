@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from smarthunt.browser.providers.linkedin.login import linkedin_login
 
@@ -16,12 +16,28 @@ def linkedin_credentials(monkeypatch):
     )
 
 
+class FakeLocator:
+    """Mimics the slice of Playwright's Locator API login.py uses.
+    Real Locator.first/locator() are synchronous (return immediately);
+    only actions like wait_for/fill/press are async — a plain AsyncMock
+    page would make locator() itself async, which doesn't match reality."""
+
+    def __init__(self):
+        self.wait_for = AsyncMock()
+        self.fill = AsyncMock()
+        self.press = AsyncMock()
+
+    @property
+    def first(self):
+        return self
+
+
 def make_mock_page(url: str, content: str = "<html></html>"):
     page = AsyncMock()
     page.goto = AsyncMock()
-    page.fill = AsyncMock()
-    page.click = AsyncMock()
+    page.locator = MagicMock(return_value=FakeLocator())
     page.wait_for_load_state = AsyncMock()
+    page.wait_for_timeout = AsyncMock()
     page.url = url
     page.content = AsyncMock(return_value=content)
     return page

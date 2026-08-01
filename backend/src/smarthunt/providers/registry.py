@@ -68,6 +68,7 @@ class ProviderRegistry:
         location: str | None = None,
         page: int = 1,
         limit: int = 25,
+        providers: list[BaseProvider] | None = None,
     ) -> list[DiscoveredJob]:
 
         tasks = [
@@ -77,7 +78,7 @@ class ProviderRegistry:
                 page=page,
                 limit=limit,
             )
-            for provider in self.providers()
+            for provider in (providers if providers is not None else self.providers())
         ]
 
         results = await asyncio.gather(
