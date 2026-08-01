@@ -36,3 +36,8 @@ export async function getCurrentUser(): Promise<CurrentUser> {
   const { data } = await apiClient.get<CurrentUser>("/auth/me");
   return data;
 }
+
+export async function refreshToken(): Promise<TokenResponse> {
+  const { data } = await apiClient.post<TokenResponse>("/auth/refresh");
+  return data;
+}

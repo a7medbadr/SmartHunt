@@ -136,6 +136,38 @@ async def test_me_rejects_invalid_token(client):
 
 
 @pytest.mark.asyncio
+async def test_refresh_issues_a_new_valid_token(client):
+    payload = random_user()
+    await client.post("/api/v1/auth/register", json=payload)
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    old_token = login.json()["access_token"]
+
+    response = await client.post(
+        "/api/v1/auth/refresh", headers={"Authorization": f"Bearer {old_token}"}
+    )
+
+    assert response.status_code == 200
+    new_token = response.json()["access_token"]
+    assert new_token
+
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert me.status_code == 200
+    assert me.json()["username"] == payload["username"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_invalid_token(client):
+    response = await client.post(
+        "/api/v1/auth/refresh", headers={"Authorization": "Bearer not-a-real-token"}
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_protected_endpoint_requires_login(client):
     response = await client.post(
         "/api/v1/jobs",

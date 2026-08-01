@@ -10,7 +10,7 @@ from smarthunt.auth.schemas.auth import (
     UserOut,
     UserRegister,
 )
-from smarthunt.auth.security import get_current_user
+from smarthunt.auth.security import create_access_token, get_current_user
 from smarthunt.auth.services.auth_service import AuthService
 from smarthunt.database.models.user import User
 
@@ -78,4 +78,24 @@ async def me(
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
+    }
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+)
+async def refresh(
+    current_user: CurrentUser,
+):
+    """Issues a fresh token with a full new expiry window. Only reachable
+    with a still-valid token — this is what makes the session sliding:
+    the frontend calls it periodically while the user is active, so an
+    active session never hits its expiry; an idle one just expires
+    normally after ACCESS_TOKEN_EXPIRE_MINUTES with no calls to renew it."""
+    token = create_access_token(data={"sub": current_user.username})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
     }

@@ -21,8 +21,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { getCurrentUser } from "@/lib/auth-api";
-import { clearToken, getToken } from "@/lib/auth";
+import { getCurrentUser, refreshToken } from "@/lib/auth-api";
+import { clearToken, getToken, setToken } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/notifications-api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +77,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [isError, router]);
+
+  // Sliding session: keep renewing the token while the user is actually
+  // active, so it never expires mid-use — but stop renewing once idle,
+  // so an abandoned tab still logs out ACCESS_TOKEN_EXPIRE_MINUTES (60)
+  // after the last real activity, not never. ACTIVITY_WINDOW_MS must
+  // stay under the backend's token lifetime or refresh could fire on an
+  // already-expired token and fail.
+  useEffect(() => {
+    if (!user) return;
+
+    const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+    const ACTIVITY_WINDOW_MS = 55 * 60 * 1000;
+    const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+
+    let lastActivity = Date.now();
+    const onActivity = () => {
+      lastActivity = Date.now();
+    };
+    ACTIVITY_EVENTS.forEach((event) =>
+      window.addEventListener(event, onActivity, { passive: true }),
+    );
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivity < ACTIVITY_WINDOW_MS) {
+        refreshToken()
+          .then((data) => setToken(data.access_token))
+          .catch(() => {
+            // A failed refresh just means the current token expires on
+            // its own schedule — the existing 401 handling covers that.
+          });
+      }
+    }, REFRESH_INTERVAL_MS);
+
+    return () => {
+      ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, onActivity));
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const { data: unreadCount } = useQuery({
     queryKey: ["unread-count"],
