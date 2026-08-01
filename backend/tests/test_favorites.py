@@ -63,6 +63,8 @@ async def test_list_favorites(client: AsyncClient, test_job: int):
     data = response.json()
     assert len(data) == 1
     assert data[0]["job_id"] == test_job
+    assert data[0]["job"]["title"] == "Senior Linux Administrator"
+    assert data[0]["job"]["company"] == "SmartHunt Test Co"
 
 
 @pytest.mark.asyncio

@@ -7,6 +7,7 @@ import {
   Briefcase,
   CalendarClock,
   FileText,
+  Heart,
   Home,
   LogOut,
   Mail,
@@ -34,6 +35,7 @@ import { cn } from "@/lib/utils";
 const NAV_LINKS = [
   { href: "/", label: "الرئيسية", icon: Home },
   { href: "/jobs", label: "الوظائف", icon: Search },
+  { href: "/favorites", label: "المفضلة", icon: Heart },
   { href: "/resume", label: "السيرة الذاتية", icon: FileText },
   { href: "/cover-letter", label: "خطاب التقديم", icon: Mail },
   { href: "/applications", label: "التقديمات", icon: Briefcase },

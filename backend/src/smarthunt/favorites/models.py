@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from smarthunt.database.base import Base
+from smarthunt.database.models.job import Job
 
 
 class FavoriteJob(Base):
@@ -16,3 +17,5 @@ class FavoriteJob(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+    job: Mapped[Job] = relationship(Job, lazy="joined")

@@ -44,6 +44,7 @@ export async function getJob(id: number): Promise<Job> {
 export interface Favorite {
   id: number;
   job_id: number;
+  job: Job | null;
 }
 
 export async function listFavorites(): Promise<Favorite[]> {
