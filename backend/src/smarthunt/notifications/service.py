@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List
 
+import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,11 +9,14 @@ from smarthunt.metrics import (
     notifications_sent_total,
     notifications_unread_total,
 )
+from smarthunt.notifications.channels.telegram import send_telegram_message
 from smarthunt.notifications.models import (
     Notification,
     NotificationStatus,
 )
 from smarthunt.notifications.schemas import NotificationCreate
+
+logger = structlog.get_logger("smarthunt")
 
 
 class NotificationNotFoundError(Exception):
@@ -47,6 +51,14 @@ class NotificationService:
 
         unread = await self.unread_count(db)
         notifications_unread_total.set(unread)
+
+        if data.channel.upper() == "TELEGRAM":
+            sent = await send_telegram_message(f"{data.title}\n\n{data.message}")
+            if not sent:
+                logger.warning(
+                    "telegram_notification_not_delivered",
+                    notification_id=notification.id,
+                )
 
         return notification
 

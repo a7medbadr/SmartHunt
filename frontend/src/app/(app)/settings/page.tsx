@@ -5,16 +5,10 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useState } from "react";
 
 import { getSettings, updateSettings, type UserSettings } from "@/lib/settings-api";
+import { createNotification } from "@/lib/notifications-api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
@@ -36,38 +30,6 @@ function SettingsForm({ initial }: { initial: UserSettings }) {
         <CardTitle className="text-base">التفضيلات العامة</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <Label>المظهر</Label>
-          <Select
-            value={form.theme}
-            onValueChange={(theme) => theme && setForm({ ...form, theme })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dark">داكن</SelectItem>
-              <SelectItem value="light">فاتح</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label>اللغة</Label>
-          <Select
-            value={form.language}
-            onValueChange={(language) => language && setForm({ ...form, language })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ar">العربية</SelectItem>
-              <SelectItem value="en">English</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex items-center justify-between">
           <Label htmlFor="email-notif">إشعارات البريد الإلكتروني</Label>
           <Switch
@@ -101,6 +63,49 @@ function SettingsForm({ initial }: { initial: UserSettings }) {
   );
 }
 
+function TelegramTestCard() {
+  const testMutation = useMutation({
+    mutationFn: () =>
+      createNotification({
+        type: "TEST",
+        title: "إشعار تجريبي من SmartHunt",
+        message: "لو وصلك ده على تيليجرام، يبقى الإعداد شغال صح.",
+        channel: "TELEGRAM",
+      }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">إشعارات تيليجرام</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          محتاج TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID متظبطين في السيرفر الأول. دوس
+          هنا تبعت رسالة تجريبية تتأكد إنها شغالة.
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => testMutation.mutate()}
+          disabled={testMutation.isPending}
+          className="self-start"
+        >
+          {testMutation.isPending ? "جاري الإرسال..." : "ابعت إشعار تجريبي"}
+        </Button>
+        {testMutation.isSuccess && (
+          <p className="text-sm text-muted-foreground">
+            اتبعتت — لو معطلتش الـ Telegram هتلاقيها في تبويب الإشعارات بس مش هتوصلك
+            على تيليجرام لحد ما تظبط الإعدادات.
+          </p>
+        )}
+        {testMutation.isError && (
+          <p className="text-sm text-destructive">حصل خطأ أثناء الإرسال.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data, isPending } = useQuery({
     queryKey: ["settings"],
@@ -119,6 +124,8 @@ export default function SettingsPage() {
       ) : (
         <SettingsForm initial={data} />
       )}
+
+      <TelegramTestCard />
     </div>
   );
 }

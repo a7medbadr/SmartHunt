@@ -28,6 +28,17 @@ reports back" over ones that still need a human in the loop for routine cases. C
 unanswerable application question remain the only cases that should ever pause and wait for the
 owner — everything else should complete on its own.
 
+**Telegram delivery is real, not yet activated.** `notifications/channels/telegram.py` sends via the
+real Telegram Bot API when a `Notification` is created with `channel="TELEGRAM"` (hooked in
+`NotificationService.create()`) — needs `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in
+`/home/badr/secrets/secret.env` (fields already exist on `Settings`, just unset as of 2026-08-01); a
+missing/failed send is logged and swallowed, never breaks notification creation. Settings page has a
+"ابعت إشعار تجريبي" button to verify once configured. No email/SMTP or WhatsApp sender exists yet —
+build the same way (a `channels/` module + a `channel` value the service checks for) if/when needed.
+This channel isn't wired to anything real *yet* since it's meant to fire when an application is
+auto-submitted, and real auto-apply is still the explicitly-deferred, credentials-gated piece — see
+above.
+
 ### Single-user architecture — a deliberate, permanent constraint
 
 This is a standing architectural decision, not a temporary shortcut: SmartHunt serves **one owner
