@@ -307,16 +307,27 @@ function's actual signature took a handler callable and returned a plain dict �
 context manager. Every automatic run crashed immediately with a `TypeError` and did nothing;
 APScheduler swallows job exceptions into its own logger, so **the product's core "discovers jobs
 automatically" promise had not been happening in the background at all**, invisibly, for as long as
-that mismatch existed. `scheduler/retry_worker.py`'s `scheduler_retry_worker` has the same
-"looks wired, isn't" shape and is still unfixed: nothing calls `.process()`, so failed scheduler
-jobs (real ones now, since the discovery fix) accumulate in `FAILED`/`RETRY_PENDING` state forever
-with no dispatcher ever consuming them — needs an actual re-execution loop (map `job_reference`
-back to the right discover_* callable), not just a periodic call to `.process()`, which only
-transitions status and never re-runs anything itself. This category of bug — infrastructure/
-abstraction built, sometimes with a test that only asserts `x is not None`, but never actually
-wired or exercised end-to-end — is the single most common gap in this codebase. Verify before
-building on top of an existing module, and be suspicious of any test whose only assertion is that
-an object exists.
+that mismatch existed. `scheduler/retry_worker.py`'s `scheduler_retry_worker` had the same
+"looks wired, isn't" shape (also fixed 2026-08-01): `.process()` only called `prepare_retry()`
+(flip status FAILED → RETRY_PENDING/FAILED_FINAL) and nothing ever consumed RETRY_PENDING to
+actually re-run the job — its only test asserted the singleton wasn't `None`. It now does the full
+loop and is registered as its own 30-minute scheduler job (`process_failed_scheduler_jobs`).
+This category of bug — infrastructure/abstraction built, sometimes with a test that only asserts
+`x is not None`, but never actually wired or exercised end-to-end — is the single most common gap
+in this codebase. Verify before building on top of an existing module, and be suspicious of any
+test whose only assertion is that an object exists.
+
+Next known instance, not yet fixed: `smarthunt/idempotency/` (router + service + metrics) is a
+fully-built generic idempotency-key system, mounted at `/api/v1/idempotency`, but nothing in
+`apply_queue/router.py`'s `POST /apply-queue` (the endpoint CLAUDE.md's own architecture notes
+say it's *for* — "write endpoints prone to duplicate submission (e.g. apply actions)") actually
+depends on or calls it. `ApplyQueueItem.job_id` also has no unique constraint, so nothing currently
+stops the same job being queued twice (double-click, a retry racing a legitimate re-queue, etc.).
+Wiring this needs care, not a quick unique-constraint patch: a hard DB uniqueness on `job_id` would
+also block legitimate re-queueing after a prior FAILED/CANCELLED attempt, which is presumably
+wanted — the idempotency-key pattern (client sends a header, server dedupes only *that specific
+request*, not the job generally) is the right tool, but needs frontend changes too (generate and
+send the header) to be worth doing properly.
 
 Other known, doc-recorded gaps (not exhaustive — treat as a starting list, re-verify against code):
 - AI layer: needs a real provider wired in (OpenAI/Ollama) in place of mocks, per-task prompt
