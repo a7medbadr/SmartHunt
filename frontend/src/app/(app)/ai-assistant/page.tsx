@@ -1,10 +1,12 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { generateAIResponse } from "@/lib/ai-api";
+import { getResumeText } from "@/lib/resume-api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,11 @@ export default function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const { data: resumeText } = useQuery({
+    queryKey: ["resume-text"],
+    queryFn: getResumeText,
+  });
 
   const mutation = useMutation({
     mutationFn: generateAIResponse,
@@ -46,7 +53,10 @@ export default function AIAssistantPage() {
     if (!prompt.trim() || mutation.isPending) return;
     setMessages((prev) => [...prev, { role: "user", content: prompt }]);
     setInput("");
-    mutation.mutate(prompt);
+    const fullPrompt = resumeText
+      ? `سيرتي الذاتية:\n\n${resumeText}\n\n---\n\n${prompt}`
+      : prompt;
+    mutation.mutate(fullPrompt);
   }
 
   return (
@@ -55,6 +65,16 @@ export default function AIAssistantPage() {
         <Bot className="size-6 text-primary" />
         المساعد الذكي
       </h1>
+
+      {resumeText ? (
+        <Badge variant="secondary" className="w-fit text-xs">
+          شايف سيرتك الذاتية المرفوعة
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="w-fit text-xs">
+          لسه مرفعتليش سيرة ذاتية — ارفعها من صفحة السيرة الذاتية علشان أقدر أقيّمها
+        </Badge>
+      )}
 
       {messages.length === 0 && (
         <div className="flex flex-wrap gap-2">
