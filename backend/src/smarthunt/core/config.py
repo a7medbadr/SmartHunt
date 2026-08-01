@@ -76,6 +76,8 @@ class Settings(BaseSettings):
 
     enable_notifications: bool = True
 
+    scheduler_enabled: bool = True
+
     security_headers_enabled: bool = True
 
     enable_docs: bool = Field(
