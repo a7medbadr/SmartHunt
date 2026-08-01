@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Settings as SettingsIcon } from "lucide-react";
 import { useState } from "react";
 
 import { getSettings, updateSettings, type UserSettings } from "@/lib/settings-api";
@@ -108,7 +109,10 @@ export default function SettingsPage() {
 
   return (
     <div className="flex max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-semibold">الإعدادات</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <SettingsIcon className="size-6 text-primary" />
+        الإعدادات
+      </h1>
 
       {isPending || !data ? (
         <Skeleton className="h-64 w-full" />

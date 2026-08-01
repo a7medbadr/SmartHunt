@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell } from "lucide-react";
 
 import {
   deleteNotification,
@@ -43,7 +44,10 @@ export default function NotificationsPage() {
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">الإشعارات</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <Bell className="size-6 text-primary" />
+          الإشعارات
+        </h1>
         {unreadCount > 0 && (
           <Button
             variant="outline"

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   FileText,
   Heart,
+  Home,
   Mail,
   Send,
   BookmarkPlus,
@@ -59,7 +60,10 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">الداشبورد</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <Home className="size-6 text-primary" />
+        الداشبورد
+      </h1>
 
       {isError && (
         <p className="text-sm text-destructive">

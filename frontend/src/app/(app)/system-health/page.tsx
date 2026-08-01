@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Activity as ActivityIcon } from "lucide-react";
 
 import {
   getAIHealth,
@@ -42,7 +43,10 @@ export default function SystemHealthPage() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">حالة النظام</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <ActivityIcon className="size-6 text-primary" />
+        حالة النظام
+      </h1>
 
       <Card>
         <CardHeader>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Briefcase } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -74,7 +75,10 @@ export default function ApplicationsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">التقديمات</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <Briefcase className="size-6 text-primary" />
+          التقديمات
+        </h1>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger className={buttonVariants()}>تقديم جديد</DialogTrigger>

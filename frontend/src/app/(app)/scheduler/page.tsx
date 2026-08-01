@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarClock } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -51,7 +52,10 @@ export default function SchedulerPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">الجدولة والبحث</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <CalendarClock className="size-6 text-primary" />
+        الجدولة والبحث
+      </h1>
 
       <Card>
         <CardHeader>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { generateAIResponse } from "@/lib/ai-api";
@@ -50,7 +51,10 @@ export default function AIAssistantPage() {
 
   return (
     <div className="flex h-full max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold">المساعد الذكي</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <Bot className="size-6 text-primary" />
+        المساعد الذكي
+      </h1>
 
       {messages.length === 0 && (
         <div className="flex flex-wrap gap-2">

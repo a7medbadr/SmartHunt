@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -39,7 +40,10 @@ export default function JobsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">الوظائف</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <Search className="size-6 text-primary" />
+        الوظائف
+      </h1>
 
       <form onSubmit={handleSearch} className="flex flex-wrap gap-2">
         <Input
