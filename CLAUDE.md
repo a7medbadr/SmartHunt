@@ -204,6 +204,18 @@ present-but-empty line silently overrides and blanks out the real one (hit this 
 login, not at startup, so it doesn't fail fast). Only put a key in `secret.env` at all once it has a
 real value to contribute.
 
+**A successful `oc start-build` does NOT mean the fix is live** — found 2026-08-01 after several
+builds in a row succeeded and pushed to the `smarthunt-backend:latest` image tag, yet the running
+pod was still 3+ hours old and serving pre-fix code. `deployment.apps/smarthunt-backend` is a plain
+Kubernetes `Deployment` with **no `ImageChange` trigger** (`oc get deployment smarthunt-backend -o
+yaml` has no `triggers:` section) — pushing a new image to the same `:latest` tag doesn't change the
+pod spec, so the Deployment controller sees no diff and never creates a new ReplicaSet on its own.
+`imagePullPolicy: Always` only matters once a *new* pod actually starts. After any build you expect
+to be live, run `oc rollout restart deployment/smarthunt-backend` and then `oc rollout status
+deployment/smarthunt-backend --timeout=180s` — don't just check the build succeeded. Verify with a
+real request afterward (e.g. curl a field/endpoint that only exists in the new code), not just a
+generic health check, since the pod can be "Running" and healthy while still serving the old image.
+
 ## Frontend
 
 `frontend/` is a Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind v4 + shadcn/ui app, added
