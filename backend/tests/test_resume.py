@@ -2,6 +2,7 @@ import io
 import uuid
 
 import pytest
+from docx import Document
 
 from smarthunt.database.models.resume import Resume
 
@@ -152,3 +153,41 @@ async def test_resume_upload_persists_to_database_as_canonical_reference(
     rows_after = (await db_session.execute(Resume.__table__.select())).all()
     matching_after = [r for r in rows_after if r.user_id == user_id]
     assert len(matching_after) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_resume_text_returns_extracted_text(tmp_path, monkeypatch, client):
+    """Other features (cover letter, AI assistant) read the resume via
+    this endpoint instead of asking the user to paste it again."""
+    storage_dir = tmp_path / "resumes"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("smarthunt.resume.storage.storage.STORAGE_DIR", storage_dir)
+
+    headers = await _auth_headers(client)
+
+    # Not asserting "no resume yet returns None" here — the resumes table
+    # is shared across this whole test file's real DB, so an earlier
+    # test's upload may already be the most-recently-updated row.
+
+    doc_buffer = io.BytesIO()
+    doc = Document()
+    doc.add_paragraph("Senior Python Engineer with 10 years of experience.")
+    doc.save(doc_buffer)
+    doc_buffer.seek(0)
+
+    upload_response = await client.post(
+        "/api/v1/resume/upload",
+        files={
+            "file": (
+                "resume.docx",
+                doc_buffer,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        headers=headers,
+    )
+    assert upload_response.status_code == 200
+
+    text_response = await client.get("/api/v1/resume/text")
+    assert text_response.status_code == 200
+    assert "Senior Python Engineer" in text_response.json()["text"]

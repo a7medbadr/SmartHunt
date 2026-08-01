@@ -12,6 +12,11 @@ export async function getResume(): Promise<ResumeInfo> {
   return data;
 }
 
+export async function getResumeText(): Promise<string | null> {
+  const { data } = await apiClient.get<{ text: string | null }>("/resume/text");
+  return data.text;
+}
+
 export async function uploadResume(file: File): Promise<unknown> {
   const form = new FormData();
   form.append("file", file);

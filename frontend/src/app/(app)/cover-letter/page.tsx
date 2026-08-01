@@ -1,22 +1,28 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
-import { Mail } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { CheckCircle2, Mail, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import {
   generateCoverLetter,
   reviewCoverLetter,
 } from "@/lib/cover-letter-api";
+import { getResumeText } from "@/lib/resume-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function CoverLetterPage() {
-  const [resume, setResume] = useState("");
   const [job, setJob] = useState("");
   const [letterText, setLetterText] = useState("");
+
+  const { data: resumeText, isPending: resumePending } = useQuery({
+    queryKey: ["resume-text"],
+    queryFn: getResumeText,
+  });
 
   const generateMutation = useMutation({
     mutationFn: generateCoverLetter,
@@ -39,17 +45,20 @@ export default function CoverLetterPage() {
           <CardTitle className="text-base">إنشاء خطاب جديد</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <div>
-            <label className="mb-1 block text-sm text-muted-foreground">
-              نص السيرة الذاتية
-            </label>
-            <Textarea
-              value={resume}
-              onChange={(e) => setResume(e.target.value)}
-              rows={5}
-              placeholder="الصق نص سيرتك الذاتية هنا..."
-            />
-          </div>
+          {resumePending ? null : resumeText ? (
+            <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
+              <CheckCircle2 className="size-4 shrink-0" />
+              هنستخدم سيرتك الذاتية المرفوعة تلقائيًا
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <TriangleAlert className="size-4 shrink-0" />
+              لسه مفيش سيرة ذاتية مرفوعة —{" "}
+              <Link href="/resume" className="underline">
+                ارفعها الأول
+              </Link>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm text-muted-foreground">
               وصف الوظيفة
@@ -62,8 +71,8 @@ export default function CoverLetterPage() {
             />
           </div>
           <Button
-            onClick={() => generateMutation.mutate({ resume, job })}
-            disabled={!resume.trim() || !job.trim() || generateMutation.isPending}
+            onClick={() => generateMutation.mutate({ resume: resumeText ?? "", job })}
+            disabled={!resumeText || !job.trim() || generateMutation.isPending}
             className="self-start"
           >
             {generateMutation.isPending ? "جاري الإنشاء..." : "إنشاء خطاب"}

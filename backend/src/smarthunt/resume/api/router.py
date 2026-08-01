@@ -10,6 +10,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pydantic import BaseModel, Field
@@ -18,6 +19,7 @@ from smarthunt.activity.models import ActivityType
 from smarthunt.activity.service import log_activity
 from smarthunt.api.dependencies import get_db
 from smarthunt.auth.security import get_current_user
+from smarthunt.database.models.resume import Resume
 from smarthunt.database.models.user import User
 from smarthunt.resume.api.schemas import (
     ResumeProfileRequest,
@@ -89,6 +91,22 @@ def build_resume_profile(
 def get_resume():
 
     return resume_service.get_resume()
+
+
+@router.get(
+    "/text",
+    status_code=status.HTTP_200_OK,
+)
+async def get_resume_text(db: AsyncSession = Depends(get_db)):
+    """The stored resume's already-extracted text — same source
+    search/router.py uses for match scoring — so other features (cover
+    letter, AI assistant) can use the real uploaded resume instead of
+    asking the user to paste it again."""
+
+    result = await db.execute(select(Resume).order_by(Resume.updated_at.desc()).limit(1))
+    resume = result.scalar_one_or_none()
+
+    return {"text": resume.extracted_text if resume else None}
 
 
 @router.post(
