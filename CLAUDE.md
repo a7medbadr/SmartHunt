@@ -15,6 +15,19 @@ The Python package lives at `backend/src/smarthunt/`. The repo root is a uv work
 member is `backend/`; `pyproject.toml` at the root and `backend/pyproject.toml` both define pytest
 config pointing at `backend/tests`.
 
+### The product vision is full automation — hold this as the target, not just discovery
+
+Restated explicitly by the project owner 2026-08-01 because earlier work had drifted toward
+"discover jobs and show them to the user": **the end state is that SmartHunt discovers jobs, scores
+them, and applies to the good ones completely on its own on a schedule — no human clicking
+"apply" — then tells the owner afterward** (notifications and/or email/messages: "applied to N jobs
+today, here they are") rather than just surfacing a list for manual review. Discovery-only or
+apply-only-on-manual-trigger is an intermediate state, not the goal — when extending the
+scheduler/apply-queue/notifications, prefer designs that move toward "runs unattended end-to-end and
+reports back" over ones that still need a human in the loop for routine cases. CAPTCHA/MFA/an
+unanswerable application question remain the only cases that should ever pause and wait for the
+owner — everything else should complete on its own.
+
 ### Single-user architecture — a deliberate, permanent constraint
 
 This is a standing architectural decision, not a temporary shortcut: SmartHunt serves **one owner
@@ -113,22 +126,81 @@ implements `BaseProvider` (`smarthunt/providers/base/provider.py`): an async `se
 location, page, limit) -> list[DiscoveredJob]`, plus capability flags (`supports_login`,
 `supports_apply`, `supports_resume_upload`, `supports_cover_letter`).
 
+**Found 2026-08-01, the biggest "looks real but is fake" finding in the project so far: all 11
+providers' `search()` returned hardcoded fake data** — literal Python objects like `title="Senior
+Linux Engineer", company="LinkedIn Demo"` or `{"title": "Cyber Security Specialist", "location":
+"Doha", "salary": 15500, "score": 87}`, completely ignoring the `query`/`location` arguments. This
+was true *before* the scheduler-jobs fix earlier that same day too — that fix made the discovery
+*pipeline* run for real (scheduling → provider call → DB save → history), but every "discovered
+job" it ever produced, including in that fix's own verification, was one of these hardcoded stubs
+cycling through. Don't trust "it discovered N jobs" as proof of anything real without checking what
+the provider's `search()` body actually does.
+
+**`linkedin` is the first (and so far only) provider with a real implementation** — scrapes
+LinkedIn's public job search (`https://www.linkedin.com/jobs/search/?keywords=...&location=...`),
+which serves a first batch of real results before its sign-in wall, no login required. Selectors:
+`.job-search-card` per listing, `.base-search-card__title` / `.base-search-card__subtitle` /
+`.job-search-card__location` / `a.base-card__full-link` — verify these still match if LinkedIn
+redesigns again (their login page's `#username`/`#password` IDs already broke once, see below).
+Runs in its own `browser_manager.new_isolated_page()` context (not the shared, session-persisting
+`get_page("linkedin")` used for login/apply) so a concurrent discovery job can't race it. The other
+10 providers still return their original hardcoded stubs — building each for real is a per-site
+scraper, not a quick fix; do not claim a provider is real without checking its `search()` body.
+
+**Providers can be enabled/disabled** via `GET/PATCH /api/v1/providers` (`providers/settings/`,
+table `provider_settings` — a provider with no row defaults to enabled) and the frontend's
+Providers page (`/providers`). `DiscoveryService.discover()` filters `provider_registry.providers()`
+down to enabled ones before calling `fetch_all_jobs(providers=...)` — a disabled provider is
+genuinely excluded from discovery, not just hidden in the UI. The `real_discovery` flag returned by
+that endpoint is a hardcoded set (`REAL_DISCOVERY_PROVIDERS` in `providers/settings/router.py`) —
+add a provider's name there only once its `search()` is actually real, so the UI never claims a
+still-fake provider is real.
+
+**Discovery scope is Saudi Arabia only** — an explicit, current requirement from the project owner
+(2026-08-01), not a technical default that happened to land there. `scheduler/jobs.py`'s
+`DISCOVERY_LOCATION` constant (kept duplicated in `scheduler/retry_worker.py` for the same value,
+to avoid a circular import) and `DiscoveryService.discover()`'s post-fetch location filter (`needle
+in job.location.lower()`) both enforce this. If broadening beyond Saudi Arabia is ever wanted,
+that's a deliberate scope change to confirm with the owner first, not just deleting the filter.
+
 **Only 4 of the 11 providers currently set `supports_login`/`supports_apply` to `True`: LinkedIn,
 Bayt, GulfTalent, Wuzzuf.** The other 7 (Indeed, NaukriGulf, MonsterGulf, Wzayef, Tanqeeb, DrJobs,
 ForasnaGulf) inherit the `BaseProvider` defaults (all `False`) — they are discovery/search-only
-today. Auto-apply (`recruitment/auto_apply_worker.py`, `apply_queue/`) only works where
-`supports_apply` is `True` and credentials for that site exist in `Settings` (currently only
-`linkedin_email`/`linkedin_password` — Bayt/GulfTalent/Wuzzuf credential fields still need adding).
-Even within a supported site, not every posting is auto-appliable: many job boards (LinkedIn
-included) mix native "Easy Apply"-style postings with ones that redirect to the employer's own
-external ATS (Greenhouse, Workday, etc.), which the current Playwright layer does not handle.
+today (and currently fake even at that, per above). Auto-apply (`recruitment/auto_apply_worker.py`,
+`apply_queue/`) only works where `supports_apply` is `True` and credentials for that site exist in
+`Settings` (currently only `linkedin_email`/`linkedin_password` — Bayt/GulfTalent/Wuzzuf credential
+fields still need adding). Even within a supported site, not every posting is auto-appliable: many
+job boards (LinkedIn included) mix native "Easy Apply"-style postings with ones that redirect to
+the employer's own external ATS (Greenhouse, Workday, etc.), which the current Playwright layer
+does not handle. **`PlaywrightEngine.apply()` (`browser/playwright/engine.py`) is also currently a
+no-op stub — always returns `{"status": "SUCCESS"}` without opening a browser at all** — this is
+what `AutoApplyWorker.process_next()` calls, so the auto-apply queue currently "succeeds" on every
+item without ever really applying. The real building blocks it should be composed from already
+exist and work (`login()`, `open_job()`, `detect_form()`, `easy_apply()`) — wiring them into a real
+`apply()` is the next step, deliberately not done yet pending the project owner being present to
+supervise real-credential testing (see the standing rule below).
 
 `smarthunt/providers/registry.py` (`provider_registry`) fan-outs `search()` across every provider
 concurrently via `asyncio.gather(..., return_exceptions=True)` and normalizes results to
 `DiscoveredJob` — a single provider failing/raising does not fail the whole search.
-`smarthunt/providers/manager.py` (`provider_manager`) is a separate registration-based lookup used
-for provider metadata/statistics endpoints. `smarthunt/providers/circuit_breaker.py` and
-`circuit_registry.py` guard against a flaky provider being hammered repeatedly.
+`fetch_all_jobs()` accepts an optional `providers=` override list (used by `DiscoveryService` to
+pass only the enabled ones); omit it to fall back to the full `providers()` list.
+`smarthunt/providers/manager.py` (`provider_manager`) is dead code — a separate registration-based
+registry that's never populated (`register_provider()` has no callers) and never imported by
+anything; don't build on it, it's not what actually backs provider metadata (that's
+`providers/settings/` now). `smarthunt/providers/circuit_breaker.py` and `circuit_registry.py`
+guard against a flaky provider being hammered repeatedly.
+
+**LinkedIn's login page markup changes over time** — `browser/providers/linkedin/login.py` used to
+target `#username`/`#password`/`button[type='submit']`, which broke when LinkedIn switched to
+per-request-random React `id`s and a JS-driven `<button type="button">` (not a real form submit).
+Fixed by locating fields via stable `autocomplete` attributes
+(`input[autocomplete*="username"]:visible`, `input[autocomplete*="current-password"]:visible`) and
+submitting via `Enter` in the password field instead of clicking a specific button — both survive
+markup/locale changes (LinkedIn serves the page in the visitor's detected locale; this host got
+Arabic). If login starts failing again, screenshot the actual page
+(`page.screenshot(path=..., full_page=True)`) before assuming the credentials are wrong — check the
+markup first.
 
 ### Browser automation / auto-apply
 

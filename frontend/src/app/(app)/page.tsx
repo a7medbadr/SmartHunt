@@ -11,6 +11,7 @@ import {
   Clock,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 import { getDashboardStatistics } from "@/lib/dashboard-api";
 import { getRecentActivities, type ActivityType } from "@/lib/activity-api";
@@ -20,12 +21,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 const STAT_CARDS: Array<{
   key: keyof Awaited<ReturnType<typeof getDashboardStatistics>>;
   label: string;
+  href?: string;
 }> = [
-  { key: "jobs", label: "الوظائف المكتشفة" },
-  { key: "applications", label: "التقديمات" },
-  { key: "favorites", label: "المفضلة" },
+  { key: "jobs", label: "الوظائف المكتشفة", href: "/jobs" },
+  { key: "applications", label: "التقديمات", href: "/applications" },
+  { key: "favorites", label: "المفضلة", href: "/favorites" },
   { key: "saved_searches", label: "عمليات البحث المحفوظة" },
-  { key: "providers", label: "مواقع التوظيف المفعّلة" },
+  { key: "providers", label: "مواقع التوظيف المفعّلة", href: "/providers" },
 ];
 
 const ACTIVITY_ICONS: Record<ActivityType, LucideIcon> = {
@@ -72,24 +74,40 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {STAT_CARDS.map((stat) => (
-          <Card key={stat.key}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-normal text-muted-foreground">
-                {stat.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isPending ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <span className="text-3xl font-semibold">
-                  {data?.[stat.key] ?? 0}
-                </span>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        {STAT_CARDS.map((stat) => {
+          const card = (
+            <Card
+              className={
+                stat.href
+                  ? "h-full transition-colors hover:border-primary hover:bg-muted/50"
+                  : "h-full"
+              }
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-normal text-muted-foreground">
+                  {stat.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isPending ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <span className="text-3xl font-semibold">
+                    {data?.[stat.key] ?? 0}
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          );
+
+          return stat.href ? (
+            <Link key={stat.key} href={stat.href}>
+              {card}
+            </Link>
+          ) : (
+            <div key={stat.key}>{card}</div>
+          );
+        })}
       </div>
 
       <Card>
