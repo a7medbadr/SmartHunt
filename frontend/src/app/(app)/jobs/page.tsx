@@ -1,11 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { searchJobs } from "@/lib/jobs-api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,18 +18,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export default function JobsPage() {
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("");
   const [appliedFilters, setAppliedFilters] = useState({ keyword: "", location: "" });
+  const [sortByMatch, setSortByMatch] = useState(false);
 
   const { data, isPending, isError } = useQuery({
-    queryKey: ["search-jobs", appliedFilters],
+    queryKey: ["search-jobs", appliedFilters, sortByMatch],
     queryFn: () =>
       searchJobs({
         keyword: appliedFilters.keyword || undefined,
         location: appliedFilters.location || undefined,
+        sort: sortByMatch ? "score" : undefined,
+        order: sortByMatch ? "desc" : undefined,
         limit: 50,
       }),
   });
@@ -59,6 +64,15 @@ export default function JobsPage() {
           className="max-w-xs"
         />
         <Button type="submit">بحث</Button>
+        <Button
+          type="button"
+          variant={sortByMatch ? "default" : "outline"}
+          className={cn("gap-1.5")}
+          onClick={() => setSortByMatch((v) => !v)}
+        >
+          <Sparkles className="size-4" />
+          الأكثر توافقًا مع سيرتي الذاتية
+        </Button>
       </form>
 
       {isError && (
@@ -79,6 +93,7 @@ export default function JobsPage() {
               <TableHead>الشركة</TableHead>
               <TableHead>الموقع</TableHead>
               <TableHead>المصدر</TableHead>
+              {sortByMatch && <TableHead>التوافق</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -92,6 +107,17 @@ export default function JobsPage() {
                 <TableCell>{job.company}</TableCell>
                 <TableCell>{job.location ?? "—"}</TableCell>
                 <TableCell>{job.source ?? "—"}</TableCell>
+                {sortByMatch && (
+                  <TableCell>
+                    {job.score != null ? (
+                      <Badge variant={job.score >= 50 ? "default" : "secondary"}>
+                        {job.score}%
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

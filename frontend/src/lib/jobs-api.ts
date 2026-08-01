@@ -10,6 +10,7 @@ export interface Job {
   description: string | null;
   requirements: string | null;
   created_at: string;
+  score?: number | null;
 }
 
 export interface SearchResult {

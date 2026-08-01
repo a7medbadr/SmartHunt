@@ -6,8 +6,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.database.session import get_db
 from smarthunt.services.search_service import SearchService
 from smarthunt.search.filtering import filter_jobs, sort_jobs, paginate_jobs
+from smarthunt.resume.parser.parser import extract_text
+from smarthunt.resume.storage.storage import resume_storage
 
 router = APIRouter(prefix="", tags=["search"])
+
+
+def _get_resume_text() -> str | None:
+    """Load the currently uploaded resume's text, if any. Used to compute
+    a real resume-fit `score` per job instead of a fabricated field."""
+    info = resume_storage.get_resume_info()
+    if not info.get("uploaded"):
+        return None
+    path = resume_storage.get_resume_path(info["filename"])
+    if path is None:
+        return None
+    try:
+        return extract_text(path)
+    except ValueError:
+        return None
 
 
 @router.get("/jobs")
@@ -18,11 +35,11 @@ async def search_jobs(
     title: str | None = Query(None, alias="title"),
     company: str | None = Query(None),
     provider: str | None = Query(None),
-    salary_min: int | None = Query(None, ge=0),
-    salary_max: int | None = Query(None, ge=0),
-    score_min: int | None = Query(None, ge=0, le=100),
+    score_min: int | None = Query(
+        None, ge=0, le=100, description="Minimum resume-match score (needs an uploaded resume)"
+    ),
     score_max: int | None = Query(None, ge=0, le=100),
-    sort: str = Query("title", description="Sort field: title, location, source, etc."),
+    sort: str = Query("title", description="Sort field: title, location, source, score, etc."),
     order: str = Query("asc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
@@ -33,17 +50,15 @@ async def search_jobs(
         eff_keyword = keyword if keyword is not None else title
         eff_source = source if source is not None else provider
 
+        needs_score = sort == "score" or score_min is not None or score_max is not None
+        resume_text = _get_resume_text() if needs_score else None
+
         res = await search_service.search(
             query=eff_keyword or "",
             company=company,
             location=location or "",
             provider=eff_source or "",
-            salary_min=salary_min,
-            salary_max=salary_max,
-            score_min=score_min,
-            score_max=score_max,
-            sort=sort,
-            order=order,
+            resume_text=resume_text,
             page=1,
             limit=1000,
         )
@@ -57,6 +72,11 @@ async def search_jobs(
             location=location,
             source=eff_source,
         )
+
+        if score_min is not None:
+            filtered_jobs = [j for j in filtered_jobs if (j.get("score") or 0) >= score_min]
+        if score_max is not None:
+            filtered_jobs = [j for j in filtered_jobs if (j.get("score") or 0) <= score_max]
 
         # 2. الترتيب (Sorting)
         sorted_jobs = sort_jobs(
