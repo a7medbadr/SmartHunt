@@ -3,6 +3,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.activity.models import ActivityType
+from smarthunt.activity.service import log_activity
 from smarthunt.api.dependencies import get_db
 from smarthunt.saved_searches.schemas import SavedSearchCreate, SavedSearchResponse
 from smarthunt.saved_searches.service import (
@@ -15,7 +17,15 @@ router = APIRouter(prefix="", tags=["saved-searches"])
 
 @router.post("", response_model=SavedSearchResponse, status_code=status.HTTP_201_CREATED)
 async def create_saved_search(payload: SavedSearchCreate, db: AsyncSession = Depends(get_db)):
-    return await saved_search_service.create(db, payload)
+    search = await saved_search_service.create(db, payload)
+
+    await log_activity(
+        db,
+        ActivityType.SAVED_SEARCH_CREATED,
+        f"حفظ بحث جديد: {payload.name}",
+    )
+
+    return search
 
 
 @router.get("", response_model=List[SavedSearchResponse])

@@ -2,14 +2,19 @@ import shutil
 
 from fastapi import (
     APIRouter,
+    Depends,
     File,
     HTTPException,
     UploadFile,
     status,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pydantic import BaseModel, Field
 
+from smarthunt.activity.models import ActivityType
+from smarthunt.activity.service import log_activity
+from smarthunt.api.dependencies import get_db
 from smarthunt.resume.api.schemas import (
     ResumeProfileRequest,
     ResumeProfileResponse,
@@ -89,9 +94,18 @@ def get_resume():
 )
 async def upload_resume(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
 ):
 
-    return await resume_service.upload_resume(file)
+    result = await resume_service.upload_resume(file)
+
+    await log_activity(
+        db,
+        ActivityType.RESUME_UPLOADED,
+        f"تم رفع سيرة ذاتية: {file.filename}",
+    )
+
+    return result
 
 
 @router.delete(

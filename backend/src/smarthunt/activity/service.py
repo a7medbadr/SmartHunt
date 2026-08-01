@@ -1,8 +1,12 @@
-from typing import List
+from typing import List, Optional
+
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from smarthunt.activity.models import Activity
+from smarthunt.activity.models import Activity, ActivityType
 from smarthunt.activity.schemas import ActivityCreate
+
+logger = structlog.get_logger("smarthunt")
 
 
 class ActivityService:
@@ -20,3 +24,19 @@ class ActivityService:
         query = select(Activity).order_by(Activity.created_at.desc()).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())
+
+
+async def log_activity(
+    db: AsyncSession,
+    activity_type: ActivityType,
+    title: str,
+    details: Optional[str] = None,
+) -> None:
+    """Best-effort activity log — never let a logging failure break the
+    real operation it's attached to."""
+    try:
+        await ActivityService(db).create_activity(
+            ActivityCreate(type=activity_type, title=title, details=details)
+        )
+    except Exception:
+        logger.exception("activity_log_failed", activity_type=activity_type.value)

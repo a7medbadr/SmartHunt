@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.activity.models import ActivityType
+from smarthunt.activity.service import log_activity
 from smarthunt.api.dependencies import get_db
 from smarthunt.applications.repository import ApplicationRepository
 from smarthunt.applications.schemas import (
@@ -32,12 +34,20 @@ async def list_applications(db: DB):
 async def create_application(payload: ApplicationCreate, db: DB):
     _validate_status(payload.status)
 
-    return await ApplicationRepository(db).create(
+    application = await ApplicationRepository(db).create(
         job_title=payload.job_title,
         company=payload.company,
         url=str(payload.url) if payload.url else None,
         status=payload.status,
     )
+
+    await log_activity(
+        db,
+        ActivityType.APPLICATION_CREATED,
+        f"تقديم جديد: {payload.job_title} في {payload.company}",
+    )
+
+    return application
 
 
 @router.patch("/{application_id}", response_model=ApplicationResponse)

@@ -3,6 +3,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.activity.models import ActivityType
+from smarthunt.activity.service import log_activity
 from smarthunt.api.dependencies import get_db
 from smarthunt.favorites.schemas import FavoriteJobCreate, FavoriteJobResponse
 from smarthunt.favorites.service import (
@@ -17,9 +19,17 @@ router = APIRouter(prefix="", tags=["favorites"])
 @router.post("", response_model=FavoriteJobResponse, status_code=status.HTTP_201_CREATED)
 async def add_favorite(payload: FavoriteJobCreate, db: AsyncSession = Depends(get_db)):
     try:
-        return await favorites_service.add_favorite(db, payload)
+        favorite = await favorites_service.add_favorite(db, payload)
     except FavoriteAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    await log_activity(
+        db,
+        ActivityType.FAVORITE_ADDED,
+        f"إضافة وظيفة رقم {payload.job_id} للمفضلة",
+    )
+
+    return favorite
 
 
 @router.get("", response_model=List[FavoriteJobResponse])
