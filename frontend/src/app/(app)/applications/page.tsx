@@ -12,6 +12,7 @@ import {
   listApplications,
   updateApplicationStatus,
 } from "@/lib/applications-api";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -139,13 +140,25 @@ export default function ApplicationsPage() {
             {data.map((app) => (
               <TableRow key={app.id}>
                 <TableCell className="font-medium">
-                  {app.url ? (
-                    <a href={app.url} target="_blank" rel="noopener noreferrer" className="underline">
-                      {app.job_title}
-                    </a>
-                  ) : (
-                    app.job_title
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {app.url ? (
+                      <a
+                        href={app.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        {app.job_title}
+                      </a>
+                    ) : (
+                      app.job_title
+                    )}
+                    {app.needs_follow_up && (
+                      <Badge variant="secondary" className="text-xs">
+                        محتاج متابعة ({app.days_since_applied} يوم)
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>{app.company}</TableCell>
                 <TableCell>

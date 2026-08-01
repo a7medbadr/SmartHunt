@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from httpx import AsyncClient
 
@@ -42,6 +44,29 @@ async def test_application_persists_in_real_database(client: AsyncClient, db_ses
     assert delete_res.status_code == 204
 
     assert await db_session.get(Application, app_id) is None
+
+
+@pytest.mark.asyncio
+async def test_needs_follow_up_flag(client: AsyncClient, db_session) -> None:
+    """An application sitting in 'Applied' for a week+ with no status
+    change should surface as needing a follow-up; a fresh one shouldn't."""
+    create_res = await client.post(
+        "/api/v1/applications",
+        json={"job_title": "Follow-up Test Job", "company": "Acme", "status": "Applied"},
+    )
+    assert create_res.status_code == 201
+    app_id = create_res.json()["id"]
+    assert create_res.json()["needs_follow_up"] is False
+    assert create_res.json()["days_since_applied"] == 0
+
+    row = await db_session.get(Application, app_id)
+    row.created_at = datetime.now(timezone.utc) - timedelta(days=10)
+    await db_session.commit()
+
+    list_res = await client.get("/api/v1/applications")
+    application = next(a for a in list_res.json() if a["id"] == app_id)
+    assert application["needs_follow_up"] is True
+    assert application["days_since_applied"] >= 10
 
 
 @pytest.mark.asyncio

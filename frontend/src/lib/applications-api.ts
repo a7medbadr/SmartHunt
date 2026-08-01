@@ -18,6 +18,8 @@ export interface Application {
   url: string | null;
   status: ApplicationStatus;
   created_at: string;
+  days_since_applied: number;
+  needs_follow_up: boolean;
 }
 
 export interface ApplicationCreatePayload {

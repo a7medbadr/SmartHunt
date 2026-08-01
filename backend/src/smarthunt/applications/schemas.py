@@ -34,5 +34,7 @@ class ApplicationResponse(BaseModel):
     url: str | None = None
     status: str
     created_at: datetime
+    days_since_applied: int
+    needs_follow_up: bool
 
     model_config = ConfigDict(from_attributes=True)

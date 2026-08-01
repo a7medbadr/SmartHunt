@@ -21,3 +21,20 @@ class Application(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    _AWAITING_RESPONSE_STATUSES = {"applied", "pending"}
+    _FOLLOW_UP_AFTER_DAYS = 7
+
+    @property
+    def days_since_applied(self) -> int:
+        applied_at = self.created_at
+        if applied_at.tzinfo is None:
+            applied_at = applied_at.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - applied_at).days
+
+    @property
+    def needs_follow_up(self) -> bool:
+        return (
+            self.status.lower() in self._AWAITING_RESPONSE_STATUSES
+            and self.days_since_applied >= self._FOLLOW_UP_AFTER_DAYS
+        )
