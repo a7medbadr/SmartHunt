@@ -19,6 +19,10 @@ TOPIC_QUERIES = {
     "devops": "devops engineer",
 }
 
+# Kept in sync with scheduler/jobs.py's DISCOVERY_LOCATION — Saudi Arabia
+# only, per the project owner's explicit requirement.
+DISCOVERY_LOCATION = "Saudi Arabia"
+
 
 class SchedulerRetryWorker:
     """Actually retries FAILED scheduler jobs, up to MAX_RETRIES, instead
@@ -55,6 +59,7 @@ class SchedulerRetryWorker:
                     try:
                         await DiscoveryService(db).discover(
                             query=query,
+                            location=DISCOVERY_LOCATION,
                             provider=updated.provider,
                         )
                         updated = await failed_scheduler_job_service.mark_success(db, updated)

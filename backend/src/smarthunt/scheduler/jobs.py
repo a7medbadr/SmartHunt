@@ -7,6 +7,10 @@ from smarthunt.scheduler.retry_worker import TOPIC_QUERIES, scheduler_retry_work
 
 logger = logging.getLogger("smarthunt.scheduler")
 
+# Saudi Arabia only, per the project owner's explicit requirement — see
+# CLAUDE.md's "Discovery scope" note before broadening this.
+DISCOVERY_LOCATION = "Saudi Arabia"
+
 
 async def _run_scheduled_discovery(topic: str, query: str) -> None:
     """Run a real discovery pass for `query` across every provider and
@@ -17,7 +21,11 @@ async def _run_scheduled_discovery(topic: str, query: str) -> None:
 
     async with AsyncSessionLocal() as db:
         try:
-            result = await DiscoveryService(db).discover(query=query, provider=provider_label)
+            result = await DiscoveryService(db).discover(
+                query=query,
+                location=DISCOVERY_LOCATION,
+                provider=provider_label,
+            )
             await db.commit()
             logger.info(
                 "scheduled_discovery_completed",

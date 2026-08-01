@@ -12,6 +12,7 @@ from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
 from smarthunt.notifications.models import Notification
 from smarthunt.providers.health.models import ProviderHealth
+from smarthunt.providers.settings.models import ProviderSetting
 from smarthunt.saved_searches.models import SavedSearch
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
@@ -33,6 +34,7 @@ __all__ = [
     "JobTag",
     "Notification",
     "ProviderHealth",
+    "ProviderSetting",
     "Resume",
     "SavedSearch",
     "SchedulerHistory",

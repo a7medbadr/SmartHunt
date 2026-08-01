@@ -19,6 +19,21 @@ export async function listNotifications(): Promise<Notification[]> {
   return data;
 }
 
+export interface NotificationCreatePayload {
+  type?: string;
+  title: string;
+  message: string;
+  channel?: string;
+  priority?: string;
+}
+
+export async function createNotification(
+  payload: NotificationCreatePayload,
+): Promise<Notification> {
+  const { data } = await apiClient.post<Notification>("/notifications", payload);
+  return data;
+}
+
 export async function getUnreadCount(): Promise<number> {
   const { data } = await apiClient.get<{ count: number }>(
     "/notifications/unread-count",

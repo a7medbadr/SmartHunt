@@ -28,6 +28,9 @@ from smarthunt.notifications.router import router as notifications_router
 from smarthunt.providers.health.router import (
     router as provider_health_router,
 )
+from smarthunt.providers.settings.router import (
+    router as provider_settings_router,
+)
 from smarthunt.recommendation.router import router as recommendation_router
 from smarthunt.recruitment.api import router as recruitment_router
 from smarthunt.recruitment.auto_apply_worker import (
@@ -208,6 +211,11 @@ api_router.include_router(
     provider_health_router,
     prefix="/providers/health",
     tags=["provider-health"],
+)
+
+api_router.include_router(
+    provider_settings_router,
+    tags=["providers"],
 )
 
 api_router.include_router(
