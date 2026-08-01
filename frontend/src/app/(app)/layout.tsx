@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
+  BookmarkPlus,
   Bot,
   Briefcase,
   Building2,
@@ -37,6 +38,7 @@ const NAV_LINKS = [
   { href: "/", label: "الرئيسية", icon: Home },
   { href: "/jobs", label: "الوظائف", icon: Search },
   { href: "/favorites", label: "المفضلة", icon: Heart },
+  { href: "/saved-searches", label: "عمليات البحث المحفوظة", icon: BookmarkPlus },
   { href: "/resume", label: "السيرة الذاتية", icon: FileText },
   { href: "/cover-letter", label: "خطاب التقديم", icon: Mail },
   { href: "/applications", label: "التقديمات", icon: Briefcase },

@@ -26,7 +26,7 @@ const STAT_CARDS: Array<{
   { key: "jobs", label: "الوظائف المكتشفة", href: "/jobs" },
   { key: "applications", label: "التقديمات", href: "/applications" },
   { key: "favorites", label: "المفضلة", href: "/favorites" },
-  { key: "saved_searches", label: "عمليات البحث المحفوظة" },
+  { key: "saved_searches", label: "عمليات البحث المحفوظة", href: "/saved-searches" },
   { key: "providers", label: "مواقع التوظيف المفعّلة", href: "/providers" },
 ];
 

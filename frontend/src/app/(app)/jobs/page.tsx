@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Search, Sparkles } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookmarkPlus, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 import { searchJobs } from "@/lib/jobs-api";
+import { createSavedSearch } from "@/lib/saved-searches-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +23,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function JobsPage() {
-  const [keyword, setKeyword] = useState("");
-  const [location, setLocation] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({ keyword: "", location: "" });
+  return (
+    <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+      <JobsPageContent />
+    </Suspense>
+  );
+}
+
+function JobsPageContent() {
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
+  const [location, setLocation] = useState(searchParams.get("location") ?? "");
+  const [appliedFilters, setAppliedFilters] = useState({
+    keyword: searchParams.get("keyword") ?? "",
+    location: searchParams.get("location") ?? "",
+  });
   const [sortByMatch, setSortByMatch] = useState(false);
+
+  const saveSearchMutation = useMutation({
+    mutationFn: createSavedSearch,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saved-searches"] }),
+  });
 
   const { data, isPending, isError } = useQuery({
     queryKey: ["search-jobs", appliedFilters, sortByMatch],
@@ -73,6 +93,24 @@ export default function JobsPage() {
           <Sparkles className="size-4" />
           الأكثر توافقًا مع سيرتي الذاتية
         </Button>
+        {(appliedFilters.keyword || appliedFilters.location) && (
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-1.5"
+            disabled={saveSearchMutation.isPending}
+            onClick={() =>
+              saveSearchMutation.mutate({
+                name: appliedFilters.keyword || appliedFilters.location,
+                keyword: appliedFilters.keyword || undefined,
+                location: appliedFilters.location || undefined,
+              })
+            }
+          >
+            <BookmarkPlus className="size-4" />
+            {saveSearchMutation.isPending ? "جاري الحفظ..." : "احفظ البحث ده"}
+          </Button>
+        )}
       </form>
 
       {isError && (
