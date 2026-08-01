@@ -20,6 +20,7 @@ class DiscoveryService:
         location: str | None = None,
         page: int = 1,
         limit: int = 25,
+        provider: str = "manual-run",
     ) -> dict:
 
         jobs = await provider_registry.fetch_all_jobs(
@@ -41,7 +42,7 @@ class DiscoveryService:
         await scheduler_history_service.create(
             self.session,
             SchedulerHistoryCreate(
-                provider="manual-run",
+                provider=provider,
                 status="completed",
                 jobs_found=len(jobs),
                 message=f"query={query!r} location={location!r} inserted={inserted}",
