@@ -1,7 +1,25 @@
+import io
+import uuid
+
 import pytest
 from docx import Document
 
 from smarthunt.database.models.job import Job
+
+
+async def _auth_headers(client) -> dict:
+    uid = uuid.uuid4().hex[:8]
+    payload = {
+        "username": f"search_user_{uid}",
+        "email": f"{uid}@example.com",
+        "password": "Secret123",
+    }
+    await client.post("/api/v1/auth/register", json=payload)
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
 @pytest.mark.asyncio
@@ -9,7 +27,7 @@ async def test_search_jobs_endpoint(client, db_session):
     """Job search hits the real database, not a hardcoded fixture list."""
     db_session.add(
         Job(
-            title="Senior Backend Engineer",
+            title="Senior Backend Engineer Unique Marker",
             company="Acme",
             location="Remote",
             source="linkedin",
@@ -18,14 +36,20 @@ async def test_search_jobs_endpoint(client, db_session):
     )
     await db_session.commit()
 
-    response = await client.get("/api/v1/search/jobs")
+    # Filter by keyword rather than relying on default pagination order —
+    # the jobs table is real and shared with live discovery runs (including
+    # this same test DB), so unrelated jobs can easily outnumber the
+    # default page size.
+    response = await client.get(
+        "/api/v1/search/jobs", params={"keyword": "Senior Backend Engineer Unique Marker"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert "jobs" in data
     assert "total" in data
     assert isinstance(data["jobs"], list)
     assert len(data["jobs"]) > 0
-    assert any(job["title"] == "Senior Backend Engineer" for job in data["jobs"])
+    assert any(job["title"] == "Senior Backend Engineer Unique Marker" for job in data["jobs"])
 
 
 @pytest.mark.asyncio
@@ -37,9 +61,26 @@ async def test_search_score_reflects_real_resume_match(tmp_path, monkeypatch, cl
     storage_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("smarthunt.resume.storage.storage.STORAGE_DIR", storage_dir)
 
+    headers = await _auth_headers(client)
+
+    doc_buffer = io.BytesIO()
     doc = Document()
     doc.add_paragraph("Experienced Python and Docker engineer.")
-    doc.save(storage_dir / "resume.docx")
+    doc.save(doc_buffer)
+    doc_buffer.seek(0)
+
+    upload_response = await client.post(
+        "/api/v1/resume/upload",
+        files={
+            "file": (
+                "resume.docx",
+                doc_buffer,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        headers=headers,
+    )
+    assert upload_response.status_code == 200
 
     db_session.add_all(
         [

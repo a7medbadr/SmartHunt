@@ -1,30 +1,26 @@
 from fastapi import APIRouter, Query, Depends, HTTPException
 import traceback
 import sys
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from smarthunt.database.models.resume import Resume
 from smarthunt.database.session import get_db
 from smarthunt.services.search_service import SearchService
 from smarthunt.search.filtering import filter_jobs, sort_jobs, paginate_jobs
-from smarthunt.resume.parser.parser import extract_text
-from smarthunt.resume.storage.storage import resume_storage
 
 router = APIRouter(prefix="", tags=["search"])
 
 
-def _get_resume_text() -> str | None:
-    """Load the currently uploaded resume's text, if any. Used to compute
-    a real resume-fit `score` per job instead of a fabricated field."""
-    info = resume_storage.get_resume_info()
-    if not info.get("uploaded"):
-        return None
-    path = resume_storage.get_resume_path(info["filename"])
-    if path is None:
-        return None
-    try:
-        return extract_text(path)
-    except ValueError:
-        return None
+async def _get_resume_text(db: AsyncSession) -> str | None:
+    """The currently uploaded resume's already-extracted text, straight
+    from the DB (the canonical reference — set on upload, see
+    resume/api/router.py) rather than re-parsing the file on every
+    search call. Single-user app: whichever resume was uploaded most
+    recently is "the" resume, regardless of which account uploaded it."""
+    result = await db.execute(select(Resume).order_by(Resume.updated_at.desc()).limit(1))
+    resume = result.scalar_one_or_none()
+    return resume.extracted_text if resume else None
 
 
 @router.get("/jobs")
@@ -51,7 +47,7 @@ async def search_jobs(
         eff_source = source if source is not None else provider
 
         needs_score = sort == "score" or score_min is not None or score_max is not None
-        resume_text = _get_resume_text() if needs_score else None
+        resume_text = await _get_resume_text(session) if needs_score else None
 
         res = await search_service.search(
             query=eff_keyword or "",

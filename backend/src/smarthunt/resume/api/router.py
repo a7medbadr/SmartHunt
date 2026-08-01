@@ -1,5 +1,7 @@
 import shutil
+from pathlib import Path
 
+import structlog
 from fastapi import (
     APIRouter,
     Depends,
@@ -15,6 +17,8 @@ from pydantic import BaseModel, Field
 from smarthunt.activity.models import ActivityType
 from smarthunt.activity.service import log_activity
 from smarthunt.api.dependencies import get_db
+from smarthunt.auth.security import get_current_user
+from smarthunt.database.models.user import User
 from smarthunt.resume.api.schemas import (
     ResumeProfileRequest,
     ResumeProfileResponse,
@@ -22,6 +26,7 @@ from smarthunt.resume.api.schemas import (
 from smarthunt.resume.parser.parser import extract_text
 from smarthunt.resume.parser.skills import extract_skills
 from smarthunt.resume.profile_builder import ResumeProfileBuilder
+from smarthunt.resume.repositories.repository import ResumeRepository
 from smarthunt.resume.reviewer.router import (
     router as reviewer_router,
 )
@@ -34,6 +39,8 @@ from smarthunt.resume.services.persistence import (
 from smarthunt.resume.storage.storage import (
     STORAGE_DIR,
 )
+
+logger = structlog.get_logger("smarthunt")
 
 router = APIRouter()
 
@@ -95,9 +102,31 @@ def get_resume():
 async def upload_resume(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
     result = await resume_service.upload_resume(file)
+
+    extracted_text = None
+    try:
+        extracted_text = extract_text(Path(result["stored_path"]))
+    except Exception:
+        # A corrupt/unparseable file shouldn't fail the upload — the file
+        # itself is still stored and valid; just no extracted text to
+        # match against until a readable one is uploaded.
+        logger.warning("resume_text_extraction_failed", filename=result["filename"])
+
+    repository = ResumeRepository(db)
+
+    for existing in await repository.get_by_user(current_user.id):
+        await repository.delete(existing)
+
+    await repository.create(
+        user_id=current_user.id,
+        filename=result["filename"],
+        stored_path=result["stored_path"],
+        extracted_text=extracted_text,
+    )
 
     await log_activity(
         db,
@@ -112,7 +141,15 @@ async def upload_resume(
     "",
     status_code=status.HTTP_200_OK,
 )
-def delete_resume():
+async def delete_resume(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+
+    repository = ResumeRepository(db)
+
+    for existing in await repository.get_by_user(current_user.id):
+        await repository.delete(existing)
 
     return resume_service.delete_resume()
 
