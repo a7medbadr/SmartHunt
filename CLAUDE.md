@@ -280,10 +280,15 @@ The AI layer is wired to a real local Ollama provider (not a mock), used for dee
 Dark mode is the permanent default (`className="dark"` on `<html>`, not user-toggleable).
 Local dev mirrors prod via `docker compose build backend && docker compose up -d --no-deps backend`
 (never `up -d backend` — that recreates `postgres`/`valkey` too, which conflicts with the
-long-running host containers holding real data) — the frontend `next dev` process proxies to
-that container on :8000. OpenShift builds: `oc start-build smarthunt-backend --from-dir=. --wait`;
-retry once on `FetchSourceFailed` — it's a known race between the binary tar and a live `next dev`
-process mutating `frontend/.next` during upload, not a real failure.
+long-running host containers holding real data) — the frontend proxies to that container on :8000.
+The frontend itself runs as a production server on this host (`npm run build && npm run start -- -p
+3000`, backgrounded via `nohup ... & disown`), not `next dev` — switched 2026-08-01 specifically to
+stop `frontend/.next` being continuously rewritten during `oc start-build`'s binary tar (see below).
+After frontend changes, rebuild+restart: kill the `next-server` process, `npm run build`, relaunch.
+OpenShift builds: `oc start-build smarthunt-backend --from-dir=. --wait`; a `FetchSourceFailed` or a
+dropped `oc` connection mid-upload is usually transient — check `oc get builds`, the build often
+keeps running server-side even after the CLI's own connection resets; retry only if it's genuinely
+not progressing.
 `smarthunt/search/` had ~11 files (cache*, deduplication, ranking, repository, database_router,
 history*, models, schemas) that were dead scaffolding from an abandoned earlier attempt — removed
 2026-08-01; the real search implementation is `services/search_service.py` + `search/filtering.py`.
