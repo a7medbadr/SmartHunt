@@ -22,5 +22,6 @@ class JobResponse(BaseModel):
     description: Optional[str] = None
     requirements: Optional[str] = None
     created_at: datetime
+    no_sponsorship_signal: bool = False
 
     model_config = ConfigDict(from_attributes=True)

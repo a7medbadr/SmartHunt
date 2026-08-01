@@ -2,6 +2,8 @@ import uuid
 
 import pytest
 
+from smarthunt.database.models.job import Job
+
 
 async def create_user(client):
     uid = uuid.uuid4().hex[:8]
@@ -94,3 +96,23 @@ async def test_get_job_by_id_not_found(client):
     response = await client.get("/api/v1/jobs/999999999")
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_job_response_surfaces_no_sponsorship_signal(client, db_session):
+    job = Job(
+        title="Backend Engineer",
+        company="Acme",
+        location="Remote",
+        source="test",
+        url=f"https://example.com/{uuid.uuid4()}",
+        description="Note: we are unable to sponsor visas for this role.",
+    )
+    db_session.add(job)
+    await db_session.commit()
+    await db_session.refresh(job)
+
+    response = await client.get(f"/api/v1/jobs/{job.id}")
+
+    assert response.status_code == 200
+    assert response.json()["no_sponsorship_signal"] is True

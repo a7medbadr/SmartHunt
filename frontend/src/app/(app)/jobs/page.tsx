@@ -100,9 +100,16 @@ export default function JobsPage() {
             {data.jobs.map((job) => (
               <TableRow key={job.id}>
                 <TableCell>
-                  <Link href={`/jobs/${job.id}`} className="font-medium underline">
-                    {job.title}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/jobs/${job.id}`} className="font-medium underline">
+                      {job.title}
+                    </Link>
+                    {job.no_sponsorship_signal && (
+                      <Badge variant="destructive" className="text-xs">
+                        بدون رعاية تأشيرة
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>{job.company}</TableCell>
                 <TableCell>{job.location ?? "—"}</TableCell>

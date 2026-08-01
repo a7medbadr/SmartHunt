@@ -46,6 +46,7 @@ class SearchService:
                 "requirements": job.requirements,
                 "description": job.description,
                 "created_at": job.created_at.isoformat() if job.created_at else None,
+                "no_sponsorship_signal": job.no_sponsorship_signal,
                 "score": (
                     match_resume(
                         resume_text or "",

@@ -155,7 +155,14 @@ export default function JobDetailsPage() {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
-            <CardTitle className="text-xl">{job.title}</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-xl">{job.title}</CardTitle>
+              {job.no_sponsorship_signal && (
+                <Badge variant="destructive" className="text-xs">
+                  بدون رعاية تأشيرة
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               {job.company} · {job.location ?? "—"} · {job.source ?? "—"}
             </p>

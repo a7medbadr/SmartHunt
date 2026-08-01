@@ -5,6 +5,7 @@ from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from smarthunt.database.base import Base
+from smarthunt.matching.services.job_signals import detect_no_sponsorship
 
 
 class Job(Base):
@@ -21,3 +22,7 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
+
+    @property
+    def no_sponsorship_signal(self) -> bool:
+        return detect_no_sponsorship(f"{self.description or ''} {self.requirements or ''}")

@@ -11,6 +11,7 @@ export interface Job {
   requirements: string | null;
   created_at: string;
   score?: number | null;
+  no_sponsorship_signal?: boolean;
 }
 
 export interface SearchResult {
