@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star } from "lucide-react";
+import { Sparkles, Star } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -17,12 +17,45 @@ import {
   listJobTags,
   removeFavorite,
 } from "@/lib/jobs-api";
+import { deepAnalyzeJob } from "@/lib/matching-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+
+const RESUME_DRAFT_KEY = "smarthunt_resume_draft";
+
+function AnalysisMarkdown({ text }: { text: string }) {
+  const lines = text.split("\n").filter((l) => l.trim().length > 0);
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("## ")) {
+          return (
+            <h4 key={i} className="mt-2 font-semibold first:mt-0">
+              {trimmed.slice(3)}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          return (
+            <p key={i} className="text-muted-foreground">
+              • {trimmed.slice(2)}
+            </p>
+          );
+        }
+        return (
+          <p key={i} className="text-muted-foreground">
+            {trimmed}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function JobDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -60,6 +93,25 @@ export default function JobDetailsPage() {
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  });
+
+  const [resumeText, setResumeText] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (window.localStorage.getItem(RESUME_DRAFT_KEY) ?? ""),
+  );
+  const analyzeMutation = useMutation({
+    mutationFn: () => {
+      window.localStorage.setItem(RESUME_DRAFT_KEY, resumeText);
+      const jobText = [
+        jobQuery.data?.title,
+        jobQuery.data?.description,
+        jobQuery.data?.requirements,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return deepAnalyzeJob(resumeText, jobText);
+    },
   });
 
   const [noteText, setNoteText] = useState("");
@@ -168,6 +220,51 @@ export default function JobDetailsPage() {
               إضافة
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="size-4" />
+            تحليل عميق بالذكاء الاصطناعي
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Textarea
+            placeholder="الصق نص سيرتك الذاتية هنا (بيتحفظ تلقائيًا لباقي الوظائف)..."
+            value={resumeText}
+            onChange={(e) => setResumeText(e.target.value)}
+            rows={4}
+          />
+          <Button
+            onClick={() => analyzeMutation.mutate()}
+            disabled={!resumeText.trim() || analyzeMutation.isPending}
+            className="self-start"
+          >
+            {analyzeMutation.isPending ? "جاري التحليل (لحد دقيقة تقريبًا)..." : "ابدأ التحليل"}
+          </Button>
+
+          {analyzeMutation.isError && (
+            <p className="text-sm text-destructive">
+              التحليل فشل — ممكن يكون النموذج مشغول، جرب تاني.
+            </p>
+          )}
+
+          {analyzeMutation.data && (
+            <div className="flex flex-col gap-3 rounded-md border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">نسبة التطابق:</span>
+                <Badge>{analyzeMutation.data.score}%</Badge>
+                {analyzeMutation.data.missing_skills.map((skill) => (
+                  <Badge key={skill} variant="outline">
+                    ناقص: {skill}
+                  </Badge>
+                ))}
+              </div>
+              <AnalysisMarkdown text={analyzeMutation.data.ai_summary} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
