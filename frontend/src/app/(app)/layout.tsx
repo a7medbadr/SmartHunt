@@ -158,7 +158,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   active
                     ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary",
                 )}
               >
                 <Icon className="size-4 shrink-0" />
