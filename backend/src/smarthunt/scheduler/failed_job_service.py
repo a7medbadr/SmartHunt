@@ -102,5 +102,23 @@ class FailedSchedulerJobService:
 
         return record
 
+    async def mark_failed(
+        self,
+        db: AsyncSession,
+        record: FailedSchedulerJob,
+        error: str,
+    ):
+        """A retry attempt (RUNNING) failed again — reset to FAILED (with
+        the new error) so it's picked up for another retry attempt next
+        sweep, up to MAX_RETRIES."""
+
+        record.status = "FAILED"
+        record.last_error = error
+        record.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        await db.flush()
+
+        return record
+
 
 failed_scheduler_job_service = FailedSchedulerJobService()

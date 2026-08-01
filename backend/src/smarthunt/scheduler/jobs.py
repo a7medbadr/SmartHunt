@@ -3,6 +3,7 @@ import logging
 from smarthunt.database.session import AsyncSessionLocal
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.scheduler.failed_job_service import failed_scheduler_job_service
+from smarthunt.scheduler.retry_worker import TOPIC_QUERIES, scheduler_retry_worker
 
 logger = logging.getLogger("smarthunt.scheduler")
 
@@ -36,12 +37,24 @@ async def _run_scheduled_discovery(topic: str, query: str) -> None:
 
 
 async def discover_python():
-    await _run_scheduled_discovery("python", "python developer")
+    await _run_scheduled_discovery("python", TOPIC_QUERIES["python"])
 
 
 async def discover_linux():
-    await _run_scheduled_discovery("linux", "linux administrator")
+    await _run_scheduled_discovery("linux", TOPIC_QUERIES["linux"])
 
 
 async def discover_devops():
-    await _run_scheduled_discovery("devops", "devops engineer")
+    await _run_scheduled_discovery("devops", TOPIC_QUERIES["devops"])
+
+
+async def process_failed_scheduler_jobs():
+    """Periodic sweep that retries FAILED scheduler jobs (with backoff via
+    retry_count) instead of letting them accumulate forever unprocessed."""
+    async with AsyncSessionLocal() as db:
+        processed = await scheduler_retry_worker.process(db)
+        await db.commit()
+        logger.info(
+            "scheduler_retry_sweep_completed",
+            extra={"processed": len(processed)},
+        )

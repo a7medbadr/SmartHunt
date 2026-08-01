@@ -7,6 +7,7 @@ from smarthunt.scheduler.jobs import (
     discover_devops,
     discover_linux,
     discover_python,
+    process_failed_scheduler_jobs,
 )
 
 logger = structlog.get_logger()
@@ -45,6 +46,13 @@ class SchedulerService:
                 replace_existing=True,
             )
 
+            scheduler.add_job(
+                process_failed_scheduler_jobs,
+                IntervalTrigger(minutes=30),
+                id="process_failed_scheduler_jobs",
+                replace_existing=True,
+            )
+
             scheduler.start()
 
             logger.info(
@@ -53,6 +61,7 @@ class SchedulerService:
                     "discover_python",
                     "discover_linux",
                     "discover_devops",
+                    "process_failed_scheduler_jobs",
                 ],
             )
 
