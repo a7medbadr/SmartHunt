@@ -255,7 +255,10 @@ tests passing, backend deployed successfully on OpenShift. Per the doc's own com
 Backend architecture, DB, AI layer, resume/cover-letter/matching engines, scheduler, event bus,
 notifications, audit, metrics, logging, health checks, OpenShift deployment, Docker, and test
 infra are all listed as 100%; REST API foundation and browser-automation infra ~95%; **Frontend and
-Web Dashboard are 0%, end-to-end user experience is ~10%.** The stated Phase 2 priority order is:
+Web Dashboard are 0%, end-to-end user experience is ~10%.** (This was true as of the doc's last
+update — **it is no longer true**: the frontend now exists and every page below has been built.
+Don't re-scaffold it from scratch; check `frontend/src/app/(app)/` first.) The stated Phase 2
+priority order is:
 
 1. Finish converting any remaining multi-user-shaped code to the single-user model above.
 2. Build a professional frontend (doc's proposal: Next.js + TypeScript + Tailwind + shadcn/ui +
@@ -266,6 +269,26 @@ Web Dashboard are 0%, end-to-end user experience is ~10%.** The stated Phase 2 p
 5. Exercise the complete real-world scenario end to end (resume upload → discovery → matching →
    cover letter → apply via Playwright → track status → notify), including a real LinkedIn account.
 6. UX polish.
+
+**Current state (as of 2026-08-01, superseding the "0%" line above):** all of the above is built.
+`frontend/src/app/(app)/` has: Dashboard (stats + a real Recent Activity feed), Jobs search
+(with real resume-match scoring via `sort=score`, and a no-sponsorship-language badge),
+Favorites (full job data via a joined query, not just bare IDs), Resume, Cover Letter,
+Applications (with a needs-follow-up flag for stale ones), AI Assistant, Scheduler,
+Notifications, Settings, System Health — each with a sidebar icon and matching page-header icon.
+The AI layer is wired to a real local Ollama provider (not a mock), used for deep job analysis.
+Dark mode is the permanent default (`className="dark"` on `<html>`, not user-toggleable).
+Local dev mirrors prod via `docker compose build backend && docker compose up -d --no-deps backend`
+(never `up -d backend` — that recreates `postgres`/`valkey` too, which conflicts with the
+long-running host containers holding real data) — the frontend `next dev` process proxies to
+that container on :8000. OpenShift builds: `oc start-build smarthunt-backend --from-dir=. --wait`;
+retry once on `FetchSourceFailed` — it's a known race between the binary tar and a live `next dev`
+process mutating `frontend/.next` during upload, not a real failure.
+`smarthunt/search/` had ~11 files (cache*, deduplication, ranking, repository, database_router,
+history*, models, schemas) that were dead scaffolding from an abandoned earlier attempt — removed
+2026-08-01; the real search implementation is `services/search_service.py` + `search/filtering.py`.
+If you find query params or sort/filter options that look plausible but don't affect results,
+verify they're actually wired before trusting them — this codebase has had more than one of those.
 
 **Do not treat the doc's "Production Ready" / "100%" labels as verified fact without checking the
 code** — they describe architecture completeness, not necessarily wiring correctness. One concrete
