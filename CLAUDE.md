@@ -53,11 +53,26 @@ uv run pytest --envfile=../.env            # run full test suite (as CI does)
 uv run pytest tests/test_jobs.py           # run a single test file
 uv run pytest tests/test_jobs.py::test_name -v   # run a single test
 
-uv run alembic upgrade head                # apply DB migrations
+uv run alembic upgrade head                # apply DB migrations — see the warning below first
 uv run alembic revision --autogenerate -m "message"   # new migration
 
 uv run uvicorn smarthunt.main:app --reload --host 0.0.0.0 --port 8000   # run the API locally
 ```
+
+**`uv run alembic upgrade head`, run bare from `backend/`, silently migrates the *test* database,
+not the real dev one** — found 2026-08-01 chasing a schema-drift bug. `alembic/env.py` does
+`load_dotenv(".env.test", override=False)` *before* `load_dotenv(".env", override=False)`, and
+`backend/.env.test` sets its own `DATABASE_URL` (pointing at `smarthunt_test`) — `override=False`
+means whichever file's value lands first in `os.environ` wins, and `.env.test` always loads first
+whenever it exists. Real-world effect: a migration can report "Running upgrade ... -> ..." and look
+completely successful while never touching the database the app (or `docker compose`'s backend
+container) actually uses. To target the real dev DB from the host, either `cd backend && DATABASE_URL=$(grep ^DATABASE_URL ../.env | cut -d= -f2-) uv run alembic upgrade head`,
+or — simpler and how this project actually keeps the dev DB current — **just rebuild and restart the
+backend container** (`docker compose build backend && docker compose up -d --no-deps backend`):
+`core/lifespan.py` runs `run_migrations()` on every container startup using the container's own
+real environment (`env_file: .env` + `secret.env` via docker-compose, not `.env.test`), so that path
+isn't affected by this bug at all. Verify a migration actually landed with a real `psql` check
+against the dev DB, not just by trusting the alembic command's own "success" output.
 
 Local infra (Postgres + Valkey/Redis) is provided by `docker-compose.yml` at the repo root:
 `docker compose up -d postgres valkey`.
