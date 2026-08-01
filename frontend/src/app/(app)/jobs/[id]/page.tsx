@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Star } from "lucide-react";
+import { MessageCircleQuestion, Sparkles, Star } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -18,14 +18,14 @@ import {
   removeFavorite,
 } from "@/lib/jobs-api";
 import { deepAnalyzeJob } from "@/lib/matching-api";
+import { generateInterviewPrep } from "@/lib/ai-api";
+import { getResumeText } from "@/lib/resume-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-
-const RESUME_DRAFT_KEY = "smarthunt_resume_draft";
 
 function AnalysisMarkdown({ text }: { text: string }) {
   const lines = text.split("\n").filter((l) => l.trim().length > 0);
@@ -95,23 +95,24 @@ export default function JobDetailsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
   });
 
-  const [resumeText, setResumeText] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : (window.localStorage.getItem(RESUME_DRAFT_KEY) ?? ""),
-  );
+  const resumeQuery = useQuery({
+    queryKey: ["resume-text"],
+    queryFn: getResumeText,
+  });
+  const resumeText = resumeQuery.data ?? "";
+
+  function jobText() {
+    return [jobQuery.data?.title, jobQuery.data?.description, jobQuery.data?.requirements]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const analyzeMutation = useMutation({
-    mutationFn: () => {
-      window.localStorage.setItem(RESUME_DRAFT_KEY, resumeText);
-      const jobText = [
-        jobQuery.data?.title,
-        jobQuery.data?.description,
-        jobQuery.data?.requirements,
-      ]
-        .filter(Boolean)
-        .join("\n");
-      return deepAnalyzeJob(resumeText, jobText);
-    },
+    mutationFn: () => deepAnalyzeJob(resumeText, jobText()),
+  });
+
+  const interviewPrepMutation = useMutation({
+    mutationFn: () => generateInterviewPrep(resumeText, jobText()),
   });
 
   const [noteText, setNoteText] = useState("");
@@ -238,12 +239,11 @@ export default function JobDetailsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Textarea
-            placeholder="الصق نص سيرتك الذاتية هنا (بيتحفظ تلقائيًا لباقي الوظائف)..."
-            value={resumeText}
-            onChange={(e) => setResumeText(e.target.value)}
-            rows={4}
-          />
+          {!resumeQuery.isPending && !resumeText && (
+            <p className="text-sm text-destructive">
+              لسه مفيش سيرة ذاتية مرفوعة — ارفعها من صفحة السيرة الذاتية الأول.
+            </p>
+          )}
           <Button
             onClick={() => analyzeMutation.mutate()}
             disabled={!resumeText.trim() || analyzeMutation.isPending}
@@ -270,6 +270,38 @@ export default function JobDetailsPage() {
                 ))}
               </div>
               <AnalysisMarkdown text={analyzeMutation.data.ai_summary} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MessageCircleQuestion className="size-4" />
+            جهزني للمقابلة الشخصية
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Button
+            onClick={() => interviewPrepMutation.mutate()}
+            disabled={!resumeText.trim() || interviewPrepMutation.isPending}
+            className="self-start"
+          >
+            {interviewPrepMutation.isPending
+              ? "جاري التجهيز (لحد دقيقتين تقريبًا)..."
+              : "جهزلي أسئلة المقابلة"}
+          </Button>
+
+          {interviewPrepMutation.isError && (
+            <p className="text-sm text-destructive">
+              حصل خطأ — ممكن يكون النموذج مشغول، جرب تاني.
+            </p>
+          )}
+
+          {interviewPrepMutation.data && (
+            <div className="rounded-md border p-3">
+              <AnalysisMarkdown text={interviewPrepMutation.data.content} />
             </div>
           )}
         </CardContent>
