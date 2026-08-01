@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, Optional
 
 from playwright.async_api import (
@@ -7,6 +8,8 @@ from playwright.async_api import (
     Playwright,
     async_playwright,
 )
+
+LAUNCH_TIMEOUT_SECONDS = 30
 
 
 class BrowserManager:
@@ -46,17 +49,36 @@ class BrowserManager:
         if self.browser is not None:
             return
 
-        self.playwright = await async_playwright().start()
+        try:
+            self.playwright = await asyncio.wait_for(
+                async_playwright().start(),
+                timeout=LAUNCH_TIMEOUT_SECONDS,
+            )
 
-        self.browser = await self.playwright.chromium.launch(
-            headless=headless,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-            ],
-        )
+            self.browser = await asyncio.wait_for(
+                self.playwright.chromium.launch(
+                    headless=headless,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled",
+                    ],
+                ),
+                timeout=LAUNCH_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            # A hung Playwright driver subprocess (seen after many
+            # launch/close cycles across different asyncio event loops —
+            # each pytest test gets its own loop, and this manager is a
+            # process-wide singleton) must fail fast and clearly instead
+            # of hanging the caller (a scheduled discovery/apply run, or
+            # the test suite / CI) forever.
+            self.playwright = None
+            self.browser = None
+            raise RuntimeError(
+                f"Browser launch timed out after {LAUNCH_TIMEOUT_SECONDS}s"
+            ) from None
 
     def _context_options(self) -> dict:
         return {

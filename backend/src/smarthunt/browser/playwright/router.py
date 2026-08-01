@@ -83,8 +83,16 @@ async def detect_form(payload: DetectFormRequest):
     "/apply",
     response_model=StatusResponse,
 )
-async def apply(payload: ApplyRequest):
-    return await playwright_engine.apply(payload.job_url)
+async def apply(
+    payload: ApplyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    return await playwright_engine.apply(
+        payload.job_url,
+        provider=payload.provider,
+        application_id=payload.application_id,
+        db=db,
+    )
 
 
 @router.post(

@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.apply_queue.models import ApplyQueueItem
@@ -110,3 +110,99 @@ async def test_delete_from_queue(client: AsyncClient, test_job: int):
 async def test_delete_nonexistent_queue_item(client: AsyncClient):
     response = await client.delete("/api/v1/apply-queue/999999")
     assert response.status_code == 404
+
+
+@pytest.fixture(autouse=True)
+def mock_playwright_apply(monkeypatch):
+    """quick-apply drives the real playwright_engine.apply() through
+    AutoApplyWorker.process_item() — mocked here for the same reason as
+    test_auto_apply_worker.py: these tests are about the queue/Job
+    plumbing (creating a Job from a bare URL, inferring provider,
+    running the specific item just created), not the browser mechanics,
+    which already have their own coverage in test_playwright_engine.py."""
+
+    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None):
+        return {"status": "SUCCESS", "job_url": job_url}
+
+    monkeypatch.setattr(
+        "smarthunt.recruitment.auto_apply_worker.playwright_engine.apply",
+        fake_apply,
+    )
+
+
+@pytest.mark.asyncio
+async def test_quick_apply_creates_job_and_applies(client: AsyncClient, db_session: AsyncSession):
+    await db_session.execute(delete(ApplyQueueItem))
+    await db_session.execute(delete(Job))
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v1/apply-queue/quick-apply",
+        json={
+            "url": "https://www.linkedin.com/jobs/view/quick-apply-test",
+            "title": "Storage Administrator",
+            "company": "Acme Gulf",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert data["provider"] == "linkedin"
+
+    result = await db_session.execute(
+        select(Job).where(Job.url == "https://www.linkedin.com/jobs/view/quick-apply-test")
+    )
+    job = result.scalar_one()
+    assert job.title == "Storage Administrator"
+    assert job.company == "Acme Gulf"
+
+    await db_session.execute(delete(ApplyQueueItem))
+    await db_session.execute(delete(Job))
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_quick_apply_reuses_existing_job_for_same_url(
+    client: AsyncClient, test_job: int, db_session: AsyncSession
+):
+    result = await db_session.execute(select(Job).where(Job.id == test_job))
+    existing_job = result.scalar_one()
+
+    response = await client.post(
+        "/api/v1/apply-queue/quick-apply",
+        json={
+            "url": existing_job.url,
+            "title": "Different title, should be ignored",
+            "company": "Different company, should be ignored",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job_id"] == test_job
+
+    count = await db_session.execute(select(Job).where(Job.url == existing_job.url))
+    assert len(list(count.scalars().all())) == 1
+
+
+@pytest.mark.asyncio
+async def test_quick_apply_infers_provider_from_url(client: AsyncClient, db_session: AsyncSession):
+    await db_session.execute(delete(ApplyQueueItem))
+    await db_session.execute(delete(Job))
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/v1/apply-queue/quick-apply",
+        json={
+            "url": "https://www.bayt.com/en/saudi-arabia/jobs/quick-apply-test",
+            "title": "VMware Administrator",
+            "company": "Acme Gulf",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "bayt"
+
+    await db_session.execute(delete(ApplyQueueItem))
+    await db_session.execute(delete(Job))
+    await db_session.commit()

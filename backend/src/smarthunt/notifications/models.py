@@ -21,6 +21,7 @@ class NotificationChannel(str, Enum):
     WEBHOOK = "WEBHOOK"
     SLACK = "SLACK"
     TEAMS = "TEAMS"
+    TELEGRAM = "TELEGRAM"
 
 
 class NotificationStatus(str, Enum):

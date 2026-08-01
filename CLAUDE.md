@@ -209,13 +209,67 @@ today (and currently fake even at that, per above). Auto-apply (`recruitment/aut
 fields still need adding). Even within a supported site, not every posting is auto-appliable: many
 job boards (LinkedIn included) mix native "Easy Apply"-style postings with ones that redirect to
 the employer's own external ATS (Greenhouse, Workday, etc.), which the current Playwright layer
-does not handle. **`PlaywrightEngine.apply()` (`browser/playwright/engine.py`) is also currently a
-no-op stub — always returns `{"status": "SUCCESS"}` without opening a browser at all** — this is
-what `AutoApplyWorker.process_next()` calls, so the auto-apply queue currently "succeeds" on every
-item without ever really applying. The real building blocks it should be composed from already
-exist and work (`login()`, `open_job()`, `detect_form()`, `easy_apply()`) — wiring them into a real
-`apply()` is the next step, deliberately not done yet pending the project owner being present to
-supervise real-credential testing (see the standing rule below).
+does not handle.
+
+**`PlaywrightEngine.apply()` (`browser/playwright/engine.py`) is real as of 2026-08-01** — it now
+composes the pre-existing `login()` → `open_job()` → `detect_form()` → `easy_apply()` steps into a
+full unattended application instead of the old no-op stub that always returned `{"status":
+"SUCCESS"}` without opening a browser. Each step's failure short-circuits into a `FAILED` with a
+`reason` (`login_failed`, `job_page_unavailable`, `no_application_form`,
+`external_ats_not_supported`) rather than raising, so one bad posting can't take down a scheduled
+batch; a `MANUAL_REQUIRED` login (CAPTCHA/MFA) and `easy_apply()`'s `PAUSED_UNKNOWN_QUESTION` are
+the only two statuses that propagate through unflattened, matching the vision doc's "only these two
+things should ever pause for the owner" rule. `AutoApplyWorker.process_next()`
+(`recruitment/auto_apply_worker.py`) was also fixed the same day: it used to call
+`playwright_engine.apply(job_url=f"job:{item.job_id}")` — a literal placeholder string, never a real
+URL — so even a "successful" run never actually navigated anywhere; it now looks up the queued
+`Job` row and passes its real `url`/`item.provider`, and on a real `SUCCESS` creates a `channel=
+"TELEGRAM"` `Notification` (via `NotificationService`) so the owner is told afterward, matching
+"discovers, scores, and applies on its own, then tells the owner" from the vision section above. A
+notification-send failure is caught separately and logged rather than flipping an already-successful
+application back to `FAILED`. **Still unverified end-to-end with real credentials** — the stored
+LinkedIn password is wrong (see the standing-blocker note below), so this has only been exercised
+against mocks (`tests/test_playwright_engine.py`, `tests/test_auto_apply_worker.py`); confirm a real
+apply the first time the password is fixed rather than assuming the composition is correct just
+because it's unit-tested.
+
+**`browser_manager.launch()` (`browser/playwright/manager.py`) now has a 30s timeout — found
+2026-08-01 chasing a full test-suite hang.** `BrowserManager` is a process-wide singleton
+(`__new__`-based), and `launch()`/`close()` are real (unmocked) in several tests
+(`tests/test_discovery.py`, `tests/test_linkedin_provider.py`, `tests/test_easy_apply.py`) that each
+get their own event loop under pytest-asyncio's `asyncio_default_fixture_loop_scope="function"`.
+Running the full suite sequentially on this dev machine, a real `chromium.launch()` deep into the
+run would occasionally hang indefinitely with no error — traced to genuine CPU contention on this
+shared host (a long-lived, unrelated root-owned Playwright/chromium process, most likely the live
+`smarthunt-backend` container's own browser session from a real scheduled discovery run, was already
+competing for the same machine's resources — confirmed via `ps -eo pid,ppid,user,etime,cmd`, not a
+leak from the test run itself). `launch()` now wraps both `async_playwright().start()` and
+`chromium.launch()` in `asyncio.wait_for(..., timeout=30)` and raises a clear `RuntimeError` instead
+of hanging forever — callers that already catch broadly (`LinkedInProvider.search()`) degrade
+gracefully; callers that don't (most `PlaywrightEngine` methods) now surface a fast, diagnosable
+500 instead of an unbounded hang. This is a safety net, not a fix for the underlying resource
+contention — `get_page()`/`new_isolated_page()`'s `browser.new_context()` calls are still
+unprotected; if hangs recur there, apply the same `asyncio.wait_for` pattern. When running the full
+suite locally, prefer `--deselect` on the handful of real-network tests
+(`test_discovery.py::test_discovery_run_records_scheduler_history`,
+`test_linkedin_provider.py`'s two tests, `test_easy_apply.py::test_easy_apply`) to get a fast, clean
+signal, then verify those specific tests separately in isolation — each passes standalone in
+10-20s; it's only deep in a long sequential run under real machine load that they've been seen to
+stall.
+
+**Bayt, GulfTalent, and Wuzzuf cannot be scraped anonymously the way LinkedIn was — found
+2026-08-01 while trying to extend LinkedIn's real-search treatment to them.** A plain headless
+Playwright request to Bayt's or Wuzzuf's public search page gets served a Cloudflare "Just a
+moment..." interstitial (a bot challenge, not real content); GulfTalent returns a flat "Access
+Denied". This is a materially different problem than LinkedIn's case (LinkedIn only walls off
+*login*, not the first page of anonymous search results) — do not attempt to defeat these
+challenges (headless-detection bypasses, residential proxies, CAPTCHA-solving services); that is
+anti-bot evasion against these sites' own protections, not the kind of scraping this project should
+be doing. If these three are ever made real, the credentialed **login** path (`supports_login=True`
+already set for all three, though the credential fields don't exist in `Settings` yet) is the more
+plausible route in — an authenticated session may not face the same anonymous-bot challenge — but
+that's unverified, needs real credentials to test, and even then may not work. Don't re-attempt the
+anonymous-scrape approach for these three without a genuinely different technique in hand.
 
 `smarthunt/providers/registry.py` (`provider_registry`) fan-outs `search()` across every provider
 concurrently via `asyncio.gather(..., return_exceptions=True)` and normalizes results to

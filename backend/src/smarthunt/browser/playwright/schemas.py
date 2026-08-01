@@ -9,6 +9,8 @@ class LoginRequest(BaseModel):
 
 class ApplyRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
+    provider: str = Field(default="linkedin")
+    application_id: Optional[str] = None
 
 
 class EasyApplyRequest(BaseModel):
@@ -37,6 +39,7 @@ class StatusResponse(BaseModel):
     status: str
     provider: Optional[str] = None
     job_url: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class PlaywrightStatusResponse(BaseModel):

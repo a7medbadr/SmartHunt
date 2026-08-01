@@ -200,11 +200,47 @@ class PlaywrightEngine:
             "unknown_questions": result["unknown_questions"],
         }
 
-    async def apply(self, job_url: str):
-        return {
-            "status": "SUCCESS",
-            "job_url": job_url,
-        }
+    async def apply(
+        self,
+        job_url: str,
+        provider: str = "linkedin",
+        application_id: str | None = None,
+        db: AsyncSession | None = None,
+    ):
+        """Composes the already-real login/open_job/detect_form/easy_apply
+        steps into a full unattended application. Only CAPTCHA/MFA
+        (surfaced as login MANUAL_REQUIRED) or an unanswerable question
+        (surfaced as easy_apply's PAUSED_UNKNOWN_QUESTION) should ever
+        stop this short of a final SUCCESS/FAILED - everything else
+        degrades to a FAILED with a `reason` rather than raising, so a
+        scheduled batch of applications can't be taken down by one bad
+        job posting."""
+
+        login_result = await self.login(provider)
+
+        if login_result.get("status") != "SUCCESS":
+            return {
+                "status": login_result.get("status", "FAILED"),
+                "job_url": job_url,
+                "reason": "login_" + login_result.get("status", "failed").lower(),
+            }
+
+        open_result = await self.open_job(job_url)
+
+        if open_result.get("status") != "SUCCESS":
+            return {"status": "FAILED", "job_url": job_url, "reason": "job_page_unavailable"}
+
+        form_result = await self.detect_form(job_url)
+
+        if not form_result.get("available"):
+            return {"status": "FAILED", "job_url": job_url, "reason": "no_application_form"}
+
+        if not form_result.get("easy_apply"):
+            return {"status": "FAILED", "job_url": job_url, "reason": "external_ats_not_supported"}
+
+        result = await self.easy_apply(job_url, application_id=application_id, db=db)
+
+        return {**result, "job_url": job_url}
 
     async def take_screenshot(self, path: str | None = None):
         if not self.manager.is_running:

@@ -9,6 +9,17 @@ class ApplyQueueCreate(BaseModel):
     priority: int = 1
 
 
+class QuickApplyRequest(BaseModel):
+    """Lets the owner paste a job link directly and apply to it right
+    away, instead of only being able to queue jobs SmartHunt already
+    discovered itself."""
+
+    url: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+    company: str = Field(..., min_length=1)
+    provider: str | None = Field(default=None)
+
+
 class ApplyQueueStatusUpdate(BaseModel):
     status: str = Field(..., min_length=1)
 

@@ -8,6 +8,7 @@ from smarthunt.apply_queue.schemas import (
     ApplyQueueCreate,
     ApplyQueueResponse,
     ApplyQueueStatusUpdate,
+    QuickApplyRequest,
 )
 from smarthunt.apply_queue.service import (
     ApplyQueueInvalidStatusError,
@@ -21,6 +22,11 @@ router = APIRouter(prefix="", tags=["apply-queue"])
 @router.post("", response_model=ApplyQueueResponse, status_code=status.HTTP_201_CREATED)
 async def add_to_queue(payload: ApplyQueueCreate, db: AsyncSession = Depends(get_db)):
     return await apply_queue_service.add(db, payload)
+
+
+@router.post("/quick-apply", response_model=ApplyQueueResponse)
+async def quick_apply(payload: QuickApplyRequest, db: AsyncSession = Depends(get_db)):
+    return await apply_queue_service.quick_apply(db, payload)
 
 
 @router.get("", response_model=List[ApplyQueueResponse])

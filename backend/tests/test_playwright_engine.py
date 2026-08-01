@@ -151,8 +151,39 @@ async def test_detect_form(client: AsyncClient):
     assert "easy_apply" in data
 
 
+@pytest.fixture
+def mock_easy_apply_flow(monkeypatch):
+    """apply() now really composes login -> open_job -> detect_form ->
+    easy_apply (CLAUDE.md's "next step" for PlaywrightEngine.apply()).
+    Mocked at the easy_apply_engine method level, same as
+    test_easy_apply_application_status.py, rather than trying to thread a
+    full Easy Apply modal interaction through the raw Playwright mock."""
+
+    async def fake_click_easy_apply(page):
+        return True
+
+    async def fake_wait_modal(page):
+        return True
+
+    async def fake_run(page):
+        return {"status": "SUCCESS"}
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.easy_apply_engine.click_easy_apply",
+        fake_click_easy_apply,
+    )
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.easy_apply_engine.wait_modal",
+        fake_wait_modal,
+    )
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.easy_apply_engine.run",
+        fake_run,
+    )
+
+
 @pytest.mark.asyncio
-async def test_apply(client: AsyncClient):
+async def test_apply(client: AsyncClient, mock_easy_apply_flow):
     response = await client.post(
         "/api/v1/browser/playwright/apply",
         json={"job_url": "https://example.com/job/1"},
@@ -164,6 +195,134 @@ async def test_apply(client: AsyncClient):
 
     assert data["status"] == "SUCCESS"
     assert data["job_url"] == "https://example.com/job/1"
+
+
+@pytest.mark.asyncio
+async def test_apply_fails_when_login_fails(client: AsyncClient, monkeypatch):
+    async def fake_login(page):
+        return {"status": "FAILED"}
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.linkedin_login",
+        fake_login,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "FAILED"
+    assert data["reason"] == "login_failed"
+
+
+@pytest.mark.asyncio
+async def test_apply_stops_for_manual_required_login(client: AsyncClient, monkeypatch):
+    """CAPTCHA/MFA is one of the two cases that should ever pause instead
+    of just failing — apply() must surface MANUAL_REQUIRED as-is, not
+    flatten it into a generic FAILED."""
+
+    async def fake_login(page):
+        return {"status": "MANUAL_REQUIRED"}
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.linkedin_login",
+        fake_login,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "MANUAL_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_apply_fails_when_job_page_unavailable(client: AsyncClient, monkeypatch):
+    from smarthunt.core.exceptions import JobPageNotFound
+
+    async def fake_open_job(page, url):
+        raise JobPageNotFound("gone")
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.navigation_service.open_job",
+        fake_open_job,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "FAILED"
+    assert data["reason"] == "job_page_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_apply_fails_when_no_application_form(client: AsyncClient, monkeypatch):
+    from smarthunt.browser.form_detector import ApplicationForm
+
+    async def fake_detect(page):
+        return ApplicationForm(available=False)
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.form_detector.detect",
+        fake_detect,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "FAILED"
+    assert data["reason"] == "no_application_form"
+
+
+@pytest.mark.asyncio
+async def test_apply_fails_for_external_ats_form(client: AsyncClient, monkeypatch):
+    """A posting that only offers a "apply on employer site" form
+    (external ATS like Greenhouse/Workday) should fail cleanly rather
+    than mis-click through a form Easy Apply logic doesn't understand."""
+
+    from smarthunt.browser.form_detector import ApplicationForm
+
+    async def fake_detect(page):
+        return ApplicationForm(available=True, easy_apply=False, selector="apply_now")
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.form_detector.detect",
+        fake_detect,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "FAILED"
+    assert data["reason"] == "external_ats_not_supported"
 
 
 @pytest.mark.asyncio

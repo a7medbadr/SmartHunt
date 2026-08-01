@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Zap } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +12,7 @@ import {
   listApplications,
   updateApplicationStatus,
 } from "@/lib/applications-api";
+import { quickApply } from "@/lib/apply-queue-api";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ export default function ApplicationsPage() {
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [url, setUrl] = useState("");
+  const [quickApplyResult, setQuickApplyResult] = useState<string | null>(null);
 
   const { data, isPending } = useQuery({
     queryKey: ["applications"],
@@ -73,6 +75,18 @@ export default function ApplicationsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications"] }),
   });
 
+  const quickApplyMutation = useMutation({
+    mutationFn: quickApply,
+    onSuccess: (item) => {
+      setQuickApplyResult(
+        item.status === "SUCCESS"
+          ? "تم التقديم تلقائيًا بنجاح! هتوصلك رسالة تأكيد."
+          : `التقديم التلقائي فشل (الحالة: ${item.status}). ممكن الوظيفة محتاجة تدخل يدوي.`,
+      );
+    },
+    onError: () => setQuickApplyResult("حصل خطأ أثناء محاولة التقديم التلقائي."),
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -81,7 +95,13 @@ export default function ApplicationsPage() {
           التقديمات
         </h1>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setQuickApplyResult(null);
+          }}
+        >
           <DialogTrigger className={buttonVariants()}>تقديم جديد</DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -115,9 +135,26 @@ export default function ApplicationsPage() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "جاري الحفظ..." : "حفظ"}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={createMutation.isPending} className="flex-1">
+                  {createMutation.isPending ? "جاري الحفظ..." : "حفظ فقط"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1 gap-1.5"
+                  disabled={!url || !jobTitle || !company || quickApplyMutation.isPending}
+                  onClick={() =>
+                    quickApplyMutation.mutate({ url, title: jobTitle, company })
+                  }
+                >
+                  <Zap className="size-4" />
+                  {quickApplyMutation.isPending ? "بيقدّم دلوقتي..." : "قدّم تلقائيًا الآن"}
+                </Button>
+              </div>
+              {quickApplyResult && (
+                <p className="text-sm text-muted-foreground">{quickApplyResult}</p>
+              )}
             </form>
           </DialogContent>
         </Dialog>
