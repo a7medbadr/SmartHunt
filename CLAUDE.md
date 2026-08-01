@@ -296,13 +296,27 @@ If you find query params or sort/filter options that look plausible but don't af
 verify they're actually wired before trusting them — this codebase has had more than one of those.
 
 **Do not treat the doc's "Production Ready" / "100%" labels as verified fact without checking the
-code** — they describe architecture completeness, not necessarily wiring correctness. One concrete
-example found by inspection: `smarthunt/auth/router.py` does not call the real `AuthService`
-(`smarthunt/auth/services/auth_service.py`, which does proper bcrypt hashing + JWT + DB lookup via
-`UserRepository`) — the router instead uses an in-memory dict and returns a hardcoded
-`"mock-jwt-token"`. Wiring the auth router to the real service is a prerequisite for any real login
-flow and is a good example of the kind of gap to expect elsewhere: infrastructure/abstraction built,
-but not always fully wired end-to-end. Verify before building on top of an existing module.
+code** — they describe architecture completeness, not necessarily wiring correctness.
+`smarthunt/auth/router.py` returning a hardcoded mock JWT instead of calling the real `AuthService`
+was one historical example of this (since fixed — it now properly uses
+`smarthunt/auth/services/auth_service.py`). A second, more severe example found and fixed
+2026-08-01: the three APScheduler-registered automatic discovery jobs
+(`scheduler/jobs.py::discover_python/linux/devops`, meant to run every 1-3h per
+`services/scheduler_service.py`) called `async with track_scheduler_execution(...)`, but that
+function's actual signature took a handler callable and returned a plain dict — never an async
+context manager. Every automatic run crashed immediately with a `TypeError` and did nothing;
+APScheduler swallows job exceptions into its own logger, so **the product's core "discovers jobs
+automatically" promise had not been happening in the background at all**, invisibly, for as long as
+that mismatch existed. `scheduler/retry_worker.py`'s `scheduler_retry_worker` has the same
+"looks wired, isn't" shape and is still unfixed: nothing calls `.process()`, so failed scheduler
+jobs (real ones now, since the discovery fix) accumulate in `FAILED`/`RETRY_PENDING` state forever
+with no dispatcher ever consuming them — needs an actual re-execution loop (map `job_reference`
+back to the right discover_* callable), not just a periodic call to `.process()`, which only
+transitions status and never re-runs anything itself. This category of bug — infrastructure/
+abstraction built, sometimes with a test that only asserts `x is not None`, but never actually
+wired or exercised end-to-end — is the single most common gap in this codebase. Verify before
+building on top of an existing module, and be suspicious of any test whose only assertion is that
+an object exists.
 
 Other known, doc-recorded gaps (not exhaustive — treat as a starting list, re-verify against code):
 - AI layer: needs a real provider wired in (OpenAI/Ollama) in place of mocks, per-task prompt
