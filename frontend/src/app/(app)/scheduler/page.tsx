@@ -64,13 +64,13 @@ export default function SchedulerPage() {
         <CardContent className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
             <Input
-              placeholder="كلمة مفتاحية"
+              placeholder="كلمة مفتاحية (مطلوبة)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="max-w-xs"
             />
             <Input
-              placeholder="الموقع (اختياري)"
+              placeholder="الموقع (افتراضيًا: السعودية)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               className="max-w-xs"
