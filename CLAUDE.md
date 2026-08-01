@@ -182,6 +182,17 @@ that endpoint is a hardcoded set (`REAL_DISCOVERY_PROVIDERS` in `providers/setti
 add a provider's name there only once its `search()` is actually real, so the UI never claims a
 still-fake provider is real.
 
+**The 10 still-fake providers are disabled on the local dev DB as of 2026-08-01** (via the above
+enable/disable, not a code change) after their stub data leaked past the Saudi-Arabia location
+filter: several of them (`indeed`, `drjobs`) build their fake `Job.location` as `location or
+"Remote"` — i.e. they *echo back whatever location the caller searched for* — so a query for
+"Saudi Arabia" made their obviously-fake rows (`company="Indeed Demo"`) pass the exact substring
+filter that's supposed to guarantee real, Saudi-only results. Others (`monstergulf`, `naukrigulf`,
+`wzayef`, `tanqeeb`, `forasnagulf`) have a hardcoded non-Saudi fake location (`"Doha"`, `"Abu
+Dhabi"`, etc.) and got filtered out correctly, but only by accident. Re-enable a provider only once
+its `search()` is real — don't re-enable to "get more results," that's exactly how fake data gets
+back into a real user's job list.
+
 **Discovery scope is Saudi Arabia only** — an explicit, current requirement from the project owner
 (2026-08-01), not a technical default that happened to land there. `scheduler/jobs.py`'s
 `DISCOVERY_LOCATION` constant (kept duplicated in `scheduler/retry_worker.py` for the same value,
