@@ -204,17 +204,22 @@ present-but-empty line silently overrides and blanks out the real one (hit this 
 login, not at startup, so it doesn't fail fast). Only put a key in `secret.env` at all once it has a
 real value to contribute.
 
-**A successful `oc start-build` does NOT mean the fix is live** — found 2026-08-01 after several
-builds in a row succeeded and pushed to the `smarthunt-backend:latest` image tag, yet the running
-pod was still 3+ hours old and serving pre-fix code. `deployment.apps/smarthunt-backend` is a plain
-Kubernetes `Deployment` with **no `ImageChange` trigger** (`oc get deployment smarthunt-backend -o
-yaml` has no `triggers:` section) — pushing a new image to the same `:latest` tag doesn't change the
-pod spec, so the Deployment controller sees no diff and never creates a new ReplicaSet on its own.
-`imagePullPolicy: Always` only matters once a *new* pod actually starts. After any build you expect
-to be live, run `oc rollout restart deployment/smarthunt-backend` and then `oc rollout status
-deployment/smarthunt-backend --timeout=180s` — don't just check the build succeeded. Verify with a
-real request afterward (e.g. curl a field/endpoint that only exists in the new code), not just a
-generic health check, since the pod can be "Running" and healthy while still serving the old image.
+**A successful `oc start-build` did NOT used to mean the fix was live** — found 2026-08-01 after
+several builds in a row succeeded and pushed to the `smarthunt-backend:latest` image tag, yet the
+running pod was still 3+ hours old and serving pre-fix code. `deployment.apps/smarthunt-backend` is
+a plain Kubernetes `Deployment`, which had no `ImageChange` trigger — pushing a new image to the
+same `:latest` tag doesn't change the pod spec, so the Deployment controller saw no diff and never
+created a new ReplicaSet on its own. **Fixed the same day**: an `smarthunt-backend` ImageStream
+already existed and was being updated on every push (`oc get imagestream smarthunt-backend`
+showed `latest` updating), so
+`oc set triggers deployment/smarthunt-backend --from-image=a-badr-dev/smarthunt-backend:latest -c backend`
+now auto-restarts the pod whenever a new build lands (verified: build → new pod within ~30s, no
+manual restart needed) — this should now be permanent, but if a future build ever again doesn't
+show up live, check `oc get deployment smarthunt-backend -o jsonpath='{.metadata.annotations.image\.openshift\.io/triggers}'`
+first (empty/missing means the trigger got dropped somehow) before assuming the fix itself is
+wrong. Either way, still verify with a real request after a deploy you care about (e.g. curl a
+field/endpoint that only exists in the new code), not just a generic health check — the pod being
+"Running" and healthy doesn't by itself prove which image it's running.
 
 ## Frontend
 
