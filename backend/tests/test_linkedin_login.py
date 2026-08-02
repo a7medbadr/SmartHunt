@@ -53,6 +53,40 @@ async def test_login_success():
 
 
 @pytest.mark.asyncio
+async def test_login_clicks_sign_in_button_as_enter_fallback():
+    """Regression test: Enter-in-password-field (this module's original
+    fix for LinkedIn's JS-driven, non-submit button) stopped reliably
+    triggering the real submit as of 2026-08 — confirmed live, the page
+    just sat on /login with the form filled in and no navigation at
+    all. login() must also click the actual sign-in button (the last
+    visible <button> — Apple SSO renders first) so submission still
+    happens even when Enter alone is a no-op."""
+
+    page = make_mock_page("https://www.linkedin.com/feed/")
+
+    button_locator = MagicMock()
+    button_locator.count = AsyncMock(return_value=2)
+    sign_in_button = MagicMock()
+    sign_in_button.click = AsyncMock()
+    button_locator.nth = MagicMock(return_value=sign_in_button)
+
+    field_locator = page.locator.return_value
+
+    def locator_side_effect(selector, *args, **kwargs):
+        if selector == "button:visible":
+            return button_locator
+        return field_locator
+
+    page.locator = MagicMock(side_effect=locator_side_effect)
+
+    result = await linkedin_login(page)
+
+    assert result == {"status": "SUCCESS"}
+    button_locator.nth.assert_called_once_with(1)
+    sign_in_button.click.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_login_manual_required_on_checkpoint():
     page = make_mock_page("https://www.linkedin.com/checkpoint/challenge")
 

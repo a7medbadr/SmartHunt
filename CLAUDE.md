@@ -227,11 +227,13 @@ URL — so even a "successful" run never actually navigated anywhere; it now loo
 "TELEGRAM"` `Notification` (via `NotificationService`) so the owner is told afterward, matching
 "discovers, scores, and applies on its own, then tells the owner" from the vision section above. A
 notification-send failure is caught separately and logged rather than flipping an already-successful
-application back to `FAILED`. **Still unverified end-to-end with real credentials** — the stored
-LinkedIn password is wrong (see the standing-blocker note below), so this has only been exercised
-against mocks (`tests/test_playwright_engine.py`, `tests/test_auto_apply_worker.py`); confirm a real
-apply the first time the password is fixed rather than assuming the composition is correct just
-because it's unit-tested.
+application back to `FAILED`. **Still unverified end-to-end with real credentials** — real login now
+reaches LinkedIn's actual device-approval checkpoint (see the LinkedIn login notes below; the
+password is not the blocker), but getting *past* that checkpoint needs the owner to approve a push
+notification on their phone at the right moment, which hasn't lined up yet — so `apply()` itself has
+only been exercised against mocks (`tests/test_playwright_engine.py`,
+`tests/test_auto_apply_worker.py`). Confirm a real apply the first time a login actually clears the
+checkpoint rather than assuming the composition is correct just because it's unit-tested.
 
 **`browser_manager.launch()` (`browser/playwright/manager.py`) now has a 30s timeout — found
 2026-08-01 chasing a full test-suite hang.** `BrowserManager` is a process-wide singleton
@@ -286,12 +288,28 @@ guard against a flaky provider being hammered repeatedly.
 target `#username`/`#password`/`button[type='submit']`, which broke when LinkedIn switched to
 per-request-random React `id`s and a JS-driven `<button type="button">` (not a real form submit).
 Fixed by locating fields via stable `autocomplete` attributes
-(`input[autocomplete*="username"]:visible`, `input[autocomplete*="current-password"]:visible`) and
-submitting via `Enter` in the password field instead of clicking a specific button — both survive
-markup/locale changes (LinkedIn serves the page in the visitor's detected locale; this host got
-Arabic). If login starts failing again, screenshot the actual page
-(`page.screenshot(path=..., full_page=True)`) before assuming the credentials are wrong — check the
-markup first.
+(`input[autocomplete*="username"]:visible`, `input[autocomplete*="current-password"]:visible`).
+Submission itself broke a second time as of 2026-08-02: `Enter` in the password field — which used
+to reliably submit — stopped doing anything at all (confirmed live twice: filled form, pressed
+Enter, page just sat on `/login` with no navigation for 2+ minutes). Fixed by also clicking the
+actual sign-in button as a fallback after Enter (the last visible `<button>` — LinkedIn's Apple SSO
+button renders first, still no stable id/name/type to select by). If login starts failing again,
+screenshot the actual page (`page.screenshot(path=..., full_page=True)`) before assuming the
+credentials are wrong — check the markup first, and specifically check whether the page navigated
+away from `/login` at all after submission, not just whether it reached `/feed/`.
+
+**The stored LinkedIn password is very likely correct — earlier "password rejected" conclusion in
+this doc was wrong, corrected 2026-08-02.** A live, careful test (real credentials, real submit,
+generous wait) reached LinkedIn's real device-approval checkpoint
+(`linkedin.com/checkpoint/challengesV2/...`, matches `MANUAL_REQUIRED_URL_MARKERS`) — LinkedIn only
+shows a device-approval prompt *after* accepting valid credentials; a wrong password is rejected
+immediately with no checkpoint at all. The actual remaining blocker is that the owner's phone needs
+to approve the LinkedIn app's push notification while headless Playwright is waiting, and that
+hasn't successfully completed in either of two real attempts today — the checkpoint page just sat
+unresolved for the full ~2-minute wait window both times, not because of a code or credential bug,
+but because the notification didn't get tapped in time. If retried, use a generous wait (2+ minutes)
+and confirm with the owner beforehand that they're watching their phone at the exact moment the
+attempt starts.
 
 ### Browser automation / auto-apply
 

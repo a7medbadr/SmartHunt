@@ -66,6 +66,25 @@ async def linkedin_login(page: Page) -> dict:
         await password_field.fill(password)
         await password_field.press("Enter")
 
+        # Enter-key submission (previously the reliable path — see the
+        # module docstring) stopped consistently triggering the real
+        # submit as of 2026-08: confirmed live, the page just sat on
+        # /login with the form filled and no navigation. LinkedIn's
+        # button is <button type="button"> with no stable id/name/type
+        # to select by, so fall back to clicking the last visible
+        # <button> on the page — confirmed live that this is the real
+        # sign-in button (the Apple SSO button renders first). Harmless
+        # if Enter already worked: by the time this runs the page has
+        # already navigated away and this click becomes a no-op/timeout
+        # that's swallowed below.
+        try:
+            buttons = page.locator("button:visible")
+            count = await buttons.count()
+            if count > 0:
+                await buttons.nth(count - 1).click(timeout=5000)
+        except Exception:
+            logger.warning("Could not click LinkedIn sign-in button as Enter fallback.")
+
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
         except PlaywrightTimeoutError:
