@@ -35,6 +35,11 @@ services:
     env_file:
       - .env
       - /home/badr/secrets/secret.env
+    environment:
+      - RESUME_STORAGE_DIR=/data/resumes
+    volumes:
+      - resume_storage:/data/resumes
 
 volumes:
   postgres_data:
+  resume_storage:
