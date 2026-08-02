@@ -457,7 +457,12 @@ Favorites (full job data via a joined query, not just bare IDs), Resume, Cover L
 Applications (with a needs-follow-up flag for stale ones), AI Assistant, Scheduler,
 Notifications, Settings, System Health — each with a sidebar icon and matching page-header icon.
 The AI layer is wired to a real local Ollama provider (not a mock), used for deep job analysis.
-Dark mode is the permanent default (`className="dark"` on `<html>`, not user-toggleable).
+Dark mode is the permanent default (`className="dark"` on `<html>`, not user-toggleable). Sidebar
+nav icons and each page's header icon carry a fixed, distinct Tailwind color per section (e.g. jobs
+= emerald, favorites = rose, resume = violet, applications = orange — see `NAV_LINKS` in
+`(app)/layout.tsx`) rather than a uniform `text-primary` blue — added 2026-08-02 after explicit
+feedback that an all-one-color UI read as unfinished/"بدائي". Keep new pages consistent with this
+palette instead of defaulting new icons back to `text-primary`.
 Local dev mirrors prod via `docker compose build backend && docker compose up -d --no-deps backend`
 (never `up -d backend` — that recreates `postgres`/`valkey` too, which conflicts with the
 long-running host containers holding real data) — the frontend proxies to that container on :8000.
@@ -474,6 +479,63 @@ history*, models, schemas) that were dead scaffolding from an abandoned earlier 
 2026-08-01; the real search implementation is `services/search_service.py` + `search/filtering.py`.
 If you find query params or sort/filter options that look plausible but don't affect results,
 verify they're actually wired before trusting them — this codebase has had more than one of those.
+
+**Uploaded resumes were silently disappearing — found and fixed 2026-08-02, another instance of
+this codebase's "looks wired, isn't" pattern.** `GET /api/v1/resume` (what the Resume page calls to
+check "is there an uploaded resume") called `resume_service.get_resume()` →
+`resume_storage.get_resume_info()`, which just lists files in `STORAGE_DIR` (default
+`/tmp/smarthunt/resumes`, or now `RESUME_STORAGE_DIR` if set) — completely disconnected from the
+`resumes` DB table the upload endpoint actually writes to via `ResumeRepository`. Every backend
+restart/redeploy wipes that local directory (it's inside the container, no volume), so the page
+would report "nothing uploaded" even though the DB row — and its `extracted_text`, the thing
+matching/cover-letter/AI-assistant actually read via the already-correct `GET /resume/text` — was
+still there the whole time. `GET /resume` now queries the DB directly, same as `/resume/text`
+already did. Also added a real persistent volume so the uploaded *file* survives restarts too (not
+just its DB metadata, which `form_filler.py`'s real-apply resume-upload step needs a live path to):
+`k8s/base/backend-resume-pvc.yaml` (EFS/ReadWriteMany — deliberately not the default gp3/EBS, which
+is ReadWriteOnly and would hang the Deployment's `maxSurge: 1` rolling update trying to attach the
+same volume to two pods at once) plus a matching named volume in `docker-compose.yml` for local dev,
+both mounted at `RESUME_STORAGE_DIR=/data/resumes`. Resumes uploaded before this fix are unrecoverable
+(their file lived in the now-long-wiped ephemeral path) — re-upload once to get the file itself into
+the persistent volume; the DB text was never lost.
+
+**The real Ollama AI calls were reliably timing out and silently falling back to a fake
+`"[LOCAL LLM] {prompt}"` echo stub — found and fixed 2026-08-02.** `AIRequest` defaulted to
+`max_tokens=2048`/`timeout=30.0`; the actual configured model (`settings.ollama_model`, a small
+CPU-bound model — see `ollama_url`/`ollama_model` in `secret.env`) routinely takes 60-90s+ to
+generate that many tokens on this hardware. Any caller that didn't explicitly override those (the
+AI Assistant chat's `/ai/generate`, used for things like "قيّم السيرة الذاتية بتاعتي") hit
+`AITimeoutError` on every real attempt, retried into the same too-short timeout up to
+`ai_max_retries` (3) times, then fell through to `AIProvider.LOCAL` — which is a hardcoded stub, not
+a real model — so the user got a fake echo back with no visible error, or (via the frontend's own
+shorter axios timeout) just "حصل خطأ، جرب تاني." Fixed by lowering `max_tokens` to 512 and raising
+`timeout` to 90.0 (`ai/types.py`). Confirmed live via `journalctl`-style backend logs: one real
+`/ai/generate` call timed out at exactly 90s on attempt 1, then succeeded in 87s on attempt 2 — the
+retry mechanism itself works correctly, but every frontend axios timeout for AI calls
+(`ai-api.ts`, `matching-api.ts`) was shorter than one retry cycle (100-120s vs the ~177s actually
+observed), so the frontend would abort and show a false failure while the backend was still working.
+All AI-related frontend timeouts are now 240s. `matching/services/deep_analysis.py`'s deep-analysis
+call already had a more reasonable `timeout=115.0`/`max_tokens=280` — if it's ever reported broken
+again, check this same fallback-to-stub failure mode first (`ai_response.provider` in the response
+tells you which — `"ollama"` vs `"local"` — before assuming it's a different bug).
+
+**This host's system clock drifts by hours (once by over a day) and silently reverts to the wrong
+time after being manually fixed — found and durably fixed 2026-08-02.** Root cause:
+`chronyd.service` has been running continuously since 2026-07-15 and was never restarted; its
+`makestep 1.0 3` directive in `/etc/chrony.conf` (correct/step the clock on large offsets) only
+applies for the *first 3 clock updates after chronyd itself starts* — weeks later, any new large
+drift can only be slewed (a few ppm/s), which can never catch up a multi-hour gap, so `chronyc
+tracking` just sits reporting "not synchronised" forever instead of self-correcting. `journalctl -u
+chronyd` showed this had already silently happened twice before (`System clock wrong by 6771
+seconds`, then `48054 seconds`) with no corresponding step — explains why a prior manual fix
+"reverted": nothing was ever automatically re-stepping it. `hwclock`/RTC is inaccessible in this
+sandboxed environment (`Cannot access the Hardware Clock via any known method`), so there's no
+lower-level fix available from inside the guest. Fixed by adding a systemd timer,
+`chrony-makestep.timer` (`/etc/systemd/system/`, enabled, runs `chronyc makestep` 1 min after boot
+and every 5 min after that) — a no-op when already in sync, but self-corrects any future drift
+within 5 minutes without needing manual intervention again. Verify it's still active with
+`systemctl list-timers chrony-makestep.timer`; if it's ever missing after a host rebuild, that's
+the first thing to recreate, not another one-off `chronyc makestep`.
 
 **Do not treat the doc's "Production Ready" / "100%" labels as verified fact without checking the
 code** — they describe architecture completeness, not necessarily wiring correctness.
