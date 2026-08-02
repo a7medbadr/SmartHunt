@@ -35,7 +35,7 @@ async def test_resume_lifecycle(tmp_path, monkeypatch, client):
     headers = await _auth_headers(client)
 
     # 1. GET resume when empty
-    response = await client.get("/api/v1/resume")
+    response = await client.get("/api/v1/resume", headers=headers)
     assert response.status_code == 200
     assert response.json() == {"uploaded": False}
 
@@ -57,7 +57,7 @@ async def test_resume_lifecycle(tmp_path, monkeypatch, client):
     assert response.json()["size"] == len(pdf_content)
 
     # 4. GET resume after upload
-    response = await client.get("/api/v1/resume")
+    response = await client.get("/api/v1/resume", headers=headers)
     assert response.status_code == 200
     assert response.json()["uploaded"] is True
     assert response.json()["filename"] == "resume.pdf"
@@ -68,7 +68,7 @@ async def test_resume_lifecycle(tmp_path, monkeypatch, client):
     assert response.json() == {"status": "deleted"}
 
     # 6. GET resume after deletion
-    response = await client.get("/api/v1/resume")
+    response = await client.get("/api/v1/resume", headers=headers)
     assert response.status_code == 200
     assert response.json() == {"uploaded": False}
 
@@ -153,6 +153,42 @@ async def test_resume_upload_persists_to_database_as_canonical_reference(
     rows_after = (await db_session.execute(Resume.__table__.select())).all()
     matching_after = [r for r in rows_after if r.user_id == user_id]
     assert len(matching_after) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_resume_survives_ephemeral_storage_being_wiped(tmp_path, monkeypatch, client):
+    """Regression test: GET /resume used to read resume_service.get_resume(),
+    which just lists files in the local STORAGE_DIR — a directory that
+    lives inside the container and is wiped on every restart/redeploy.
+    The DB row (written by upload) is the durable source of truth; GET
+    must read that, not the ephemeral directory listing, so the Resume
+    page doesn't falsely report "nothing uploaded" after a routine
+    backend restart."""
+    storage_dir = tmp_path / "resumes"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("smarthunt.resume.storage.storage.STORAGE_DIR", storage_dir)
+    monkeypatch.setattr(
+        "smarthunt.resume.storage.storage.RESUME_FILE_PATH", storage_dir / "resume.pdf"
+    )
+
+    headers = await _auth_headers(client)
+
+    pdf_content = b"%PDF-1.4 dummy pdf content"
+    valid_file = ("resume.pdf", io.BytesIO(pdf_content), "application/pdf")
+    response = await client.post(
+        "/api/v1/resume/upload", files={"file": valid_file}, headers=headers
+    )
+    assert response.status_code == 200
+
+    # Simulate a container restart wiping the ephemeral storage directory —
+    # the DB row must still be found.
+    for f in storage_dir.iterdir():
+        f.unlink()
+
+    response = await client.get("/api/v1/resume", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["uploaded"] is True
+    assert response.json()["filename"] == "resume.pdf"
 
 
 @pytest.mark.asyncio

@@ -115,7 +115,7 @@ export default function SettingsPage() {
   return (
     <div className="flex max-w-md flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <SettingsIcon className="size-6 text-primary" />
+        <SettingsIcon className="size-6 text-slate-400" />
         الإعدادات
       </h1>
 

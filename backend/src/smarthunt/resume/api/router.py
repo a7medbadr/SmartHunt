@@ -88,9 +88,39 @@ def build_resume_profile(
     "",
     status_code=status.HTTP_200_OK,
 )
-def get_resume():
+async def get_resume(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Regression fix: this used to read resume_service.get_resume(),
+    which lists whatever file happens to be sitting in the container's
+    local STORAGE_DIR (default /tmp/smarthunt/resumes) — completely
+    disconnected from the `resumes` DB table the upload endpoint
+    actually writes to. Every container restart wipes that ephemeral
+    directory, so the Resume page would report "nothing uploaded" even
+    though the DB row (and its extracted_text, used by matching/cover
+    letter/AI assistant) was still there the whole time. Reads the same
+    DB row /resume/text already correctly uses."""
 
-    return resume_service.get_resume()
+    result = await db.execute(
+        select(Resume).where(Resume.user_id == current_user.id).order_by(Resume.updated_at.desc())
+    )
+    resume = result.scalars().first()
+
+    if resume is None:
+        return {"uploaded": False}
+
+    size = None
+    path = Path(resume.stored_path)
+    if path.exists():
+        size = path.stat().st_size
+
+    return {
+        "uploaded": True,
+        "filename": resume.filename,
+        "stored_path": resume.stored_path,
+        "size": size,
+    }
 
 
 @router.get(

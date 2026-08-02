@@ -53,7 +53,7 @@ export default function SchedulerPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <CalendarClock className="size-6 text-primary" />
+        <CalendarClock className="size-6 text-teal-400" />
         الجدولة والبحث
       </h1>
 

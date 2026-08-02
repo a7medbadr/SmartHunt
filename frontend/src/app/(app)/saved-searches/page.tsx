@@ -69,7 +69,7 @@ export default function SavedSearchesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <BookmarkPlus className="size-6 text-primary" />
+          <BookmarkPlus className="size-6 text-amber-400" />
           عمليات البحث المحفوظة
         </h1>
 

@@ -35,19 +35,24 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/", label: "الرئيسية", icon: Home },
-  { href: "/jobs", label: "الوظائف", icon: Search },
-  { href: "/favorites", label: "المفضلة", icon: Heart },
-  { href: "/saved-searches", label: "عمليات البحث المحفوظة", icon: BookmarkPlus },
-  { href: "/resume", label: "السيرة الذاتية", icon: FileText },
-  { href: "/cover-letter", label: "خطاب التقديم", icon: Mail },
-  { href: "/applications", label: "التقديمات", icon: Briefcase },
-  { href: "/ai-assistant", label: "المساعد الذكي", icon: Bot },
-  { href: "/scheduler", label: "الجدولة", icon: CalendarClock },
-  { href: "/providers", label: "مواقع التوظيف", icon: Building2 },
-  { href: "/notifications", label: "الإشعارات", icon: Bell },
-  { href: "/settings", label: "الإعدادات", icon: Settings },
-  { href: "/system-health", label: "حالة النظام", icon: Activity },
+  { href: "/", label: "الرئيسية", icon: Home, color: "text-blue-400" },
+  { href: "/jobs", label: "الوظائف", icon: Search, color: "text-emerald-400" },
+  { href: "/favorites", label: "المفضلة", icon: Heart, color: "text-rose-400" },
+  {
+    href: "/saved-searches",
+    label: "عمليات البحث المحفوظة",
+    icon: BookmarkPlus,
+    color: "text-amber-400",
+  },
+  { href: "/resume", label: "السيرة الذاتية", icon: FileText, color: "text-violet-400" },
+  { href: "/cover-letter", label: "خطاب التقديم", icon: Mail, color: "text-cyan-400" },
+  { href: "/applications", label: "التقديمات", icon: Briefcase, color: "text-orange-400" },
+  { href: "/ai-assistant", label: "المساعد الذكي", icon: Bot, color: "text-fuchsia-400" },
+  { href: "/scheduler", label: "الجدولة", icon: CalendarClock, color: "text-teal-400" },
+  { href: "/providers", label: "مواقع التوظيف", icon: Building2, color: "text-indigo-400" },
+  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "text-yellow-400" },
+  { href: "/settings", label: "الإعدادات", icon: Settings, color: "text-slate-400" },
+  { href: "/system-health", label: "حالة النظام", icon: Activity, color: "text-red-400" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -157,11 +162,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   active
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary",
+                    ? "bg-primary/10 font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
                 )}
               >
-                <Icon className="size-4 shrink-0" />
+                <Icon className={cn("size-4 shrink-0", link.color)} />
                 <span className="flex-1">{link.label}</span>
                 {link.href === "/notifications" && !!unreadCount && (
                   <Badge className="h-5 min-w-5 justify-center px-1">

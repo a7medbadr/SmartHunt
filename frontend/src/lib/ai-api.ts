@@ -14,9 +14,15 @@ export interface AIGenerateResponse {
 export async function generateAIResponse(
   prompt: string,
 ): Promise<AIGenerateResponse> {
-  const { data } = await apiClient.post<AIGenerateResponse>("/ai/generate", {
-    prompt,
-  });
+  // The local Ollama model this runs on is CPU-bound and slow — give it
+  // real room (matches the backend's own AIRequest.timeout default)
+  // instead of the axios default, which would abort long before a real
+  // answer comes back.
+  const { data } = await apiClient.post<AIGenerateResponse>(
+    "/ai/generate",
+    { prompt },
+    { timeout: 100000 },
+  );
   return data;
 }
 

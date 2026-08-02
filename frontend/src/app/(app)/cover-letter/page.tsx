@@ -36,7 +36,7 @@ export default function CoverLetterPage() {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <Mail className="size-6 text-primary" />
+        <Mail className="size-6 text-cyan-400" />
         خطاب التقديم
       </h1>
 

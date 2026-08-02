@@ -52,7 +52,7 @@ export default function ProvidersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <Building2 className="size-6 text-primary" />
+          <Building2 className="size-6 text-indigo-400" />
           مواقع التوظيف
         </h1>
 

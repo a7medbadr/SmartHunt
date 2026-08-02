@@ -2,6 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  Briefcase,
+  Building2,
   FileText,
   Heart,
   Home,
@@ -9,6 +11,7 @@ import {
   Send,
   BookmarkPlus,
   Clock,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -17,25 +20,46 @@ import { getDashboardStatistics } from "@/lib/dashboard-api";
 import { getRecentActivities, type ActivityType } from "@/lib/activity-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const STAT_CARDS: Array<{
   key: keyof Awaited<ReturnType<typeof getDashboardStatistics>>;
   label: string;
   href?: string;
+  icon: LucideIcon;
+  color: string;
 }> = [
-  { key: "jobs", label: "الوظائف المكتشفة", href: "/jobs" },
-  { key: "applications", label: "التقديمات", href: "/applications" },
-  { key: "favorites", label: "المفضلة", href: "/favorites" },
-  { key: "saved_searches", label: "عمليات البحث المحفوظة", href: "/saved-searches" },
-  { key: "providers", label: "مواقع التوظيف المفعّلة", href: "/providers" },
+  { key: "jobs", label: "الوظائف المكتشفة", href: "/jobs", icon: Search, color: "text-emerald-400" },
+  {
+    key: "applications",
+    label: "التقديمات",
+    href: "/applications",
+    icon: Briefcase,
+    color: "text-orange-400",
+  },
+  { key: "favorites", label: "المفضلة", href: "/favorites", icon: Heart, color: "text-rose-400" },
+  {
+    key: "saved_searches",
+    label: "عمليات البحث المحفوظة",
+    href: "/saved-searches",
+    icon: BookmarkPlus,
+    color: "text-amber-400",
+  },
+  {
+    key: "providers",
+    label: "مواقع التوظيف المفعّلة",
+    href: "/providers",
+    icon: Building2,
+    color: "text-indigo-400",
+  },
 ];
 
-const ACTIVITY_ICONS: Record<ActivityType, LucideIcon> = {
-  resume_uploaded: FileText,
-  application_created: Send,
-  favorite_added: Heart,
-  saved_search_created: BookmarkPlus,
-  cover_letter_generated: Mail,
+const ACTIVITY_ICONS: Record<ActivityType, { icon: LucideIcon; color: string }> = {
+  resume_uploaded: { icon: FileText, color: "text-violet-400" },
+  application_created: { icon: Send, color: "text-orange-400" },
+  favorite_added: { icon: Heart, color: "text-rose-400" },
+  saved_search_created: { icon: BookmarkPlus, color: "text-amber-400" },
+  cover_letter_generated: { icon: Mail, color: "text-cyan-400" },
 };
 
 function timeAgo(isoDate: string): string {
@@ -63,7 +87,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <Home className="size-6 text-primary" />
+        <Home className="size-6 text-blue-400" />
         الداشبورد
       </h1>
 
@@ -75,6 +99,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {STAT_CARDS.map((stat) => {
+          const Icon = stat.icon;
           const card = (
             <Card
               className={
@@ -83,10 +108,11 @@ export default function DashboardPage() {
                   : "h-full"
               }
             >
-              <CardHeader className="pb-2">
+              <CardHeader className="flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-normal text-muted-foreground">
                   {stat.label}
                 </CardTitle>
+                <Icon className={cn("size-4", stat.color)} />
               </CardHeader>
               <CardContent>
                 {isPending ? (
@@ -127,13 +153,20 @@ export default function DashboardPage() {
           ) : activities && activities.length > 0 ? (
             <ul className="flex flex-col gap-1">
               {activities.map((activity) => {
-                const Icon = ACTIVITY_ICONS[activity.type] ?? Clock;
+                const entry = ACTIVITY_ICONS[activity.type];
+                const Icon = entry?.icon ?? Clock;
+                const color = entry?.color ?? "text-muted-foreground";
                 return (
                   <li
                     key={activity.id}
                     className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/50"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <span
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-full bg-current/10",
+                        color,
+                      )}
+                    >
                       <Icon className="size-4" />
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col">

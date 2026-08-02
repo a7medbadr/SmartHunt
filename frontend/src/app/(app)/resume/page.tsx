@@ -60,7 +60,7 @@ export default function ResumePage() {
   return (
     <div className="flex max-w-xl flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <FileText className="size-6 text-primary" />
+        <FileText className="size-6 text-violet-400" />
         السيرة الذاتية
       </h1>
 

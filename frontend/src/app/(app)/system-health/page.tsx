@@ -44,7 +44,7 @@ export default function SystemHealthPage() {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <ActivityIcon className="size-6 text-primary" />
+        <ActivityIcon className="size-6 text-red-400" />
         حالة النظام
       </h1>
 

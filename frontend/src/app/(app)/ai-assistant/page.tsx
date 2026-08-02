@@ -62,7 +62,7 @@ export default function AIAssistantPage() {
   return (
     <div className="flex h-full max-w-2xl flex-col gap-4">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <Bot className="size-6 text-primary" />
+        <Bot className="size-6 text-fuchsia-400" />
         المساعد الذكي
       </h1>
 

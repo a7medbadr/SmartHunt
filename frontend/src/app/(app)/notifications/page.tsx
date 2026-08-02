@@ -45,7 +45,7 @@ export default function NotificationsPage() {
     <div className="flex max-w-2xl flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <Bell className="size-6 text-primary" />
+          <Bell className="size-6 text-yellow-400" />
           الإشعارات
         </h1>
         {unreadCount > 0 && (

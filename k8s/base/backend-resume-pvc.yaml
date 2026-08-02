@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smarthunt-resume-storage
+  labels:
+    app: smarthunt
+    component: backend
+spec:
+  # ReadWriteMany via EFS, not the default gp3 (EBS, ReadWriteOnce): the
+  # Deployment's RollingUpdate (maxUnavailable: 0, maxSurge: 1) briefly
+  # runs old and new pods together, which an EBS-backed RWO volume can't
+  # attach to at once — that would hang every future rollout the moment
+  # this PVC got wired in.
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 1Gi

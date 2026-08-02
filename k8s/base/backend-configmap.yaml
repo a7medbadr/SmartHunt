@@ -28,3 +28,5 @@ data:
   ACCESS_TOKEN_EXPIRE_MINUTES: "60"
 
   TZ: "UTC"
+
+  RESUME_STORAGE_DIR: "/data/resumes"

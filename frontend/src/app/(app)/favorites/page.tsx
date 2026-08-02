@@ -33,7 +33,7 @@ export default function FavoritesPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
-        <Heart className="size-6 text-primary" />
+        <Heart className="size-6 text-rose-400" />
         المفضلة
       </h1>
 
