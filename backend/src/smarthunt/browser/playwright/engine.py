@@ -254,6 +254,7 @@ class PlaywrightEngine:
         login_result = await self.login(provider)
 
         if login_result.get("status") != "SUCCESS":
+            logger.warning(f"apply() login failed job_url={job_url} result={login_result}")
             return {
                 "status": login_result.get("status", "FAILED"),
                 "job_url": job_url,
@@ -269,14 +270,20 @@ class PlaywrightEngine:
         open_result = await self.open_job(job_url, provider=provider)
 
         if open_result.get("status") != "SUCCESS":
+            logger.warning(f"apply() open_job failed job_url={job_url} result={open_result}")
             return {"status": "FAILED", "job_url": job_url, "reason": "job_page_unavailable"}
 
         form_result = await self.detect_form(job_url, provider=provider)
 
         if not form_result.get("available"):
+            logger.warning(f"apply() no form detected job_url={job_url} result={form_result}")
             return {"status": "FAILED", "job_url": job_url, "reason": "no_application_form"}
 
         if not form_result.get("easy_apply"):
+            logger.warning(
+                f"apply() form found but not Easy Apply (external ATS) "
+                f"job_url={job_url} result={form_result}"
+            )
             return {"status": "FAILED", "job_url": job_url, "reason": "external_ats_not_supported"}
 
         result = await self.easy_apply(
