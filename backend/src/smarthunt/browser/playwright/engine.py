@@ -66,7 +66,15 @@ class PlaywrightEngine:
 
         try:
             title = await navigation_service.open_job(page=page, url=job_url)
-        except JobPageNotFound:
+        except JobPageNotFound as exc:
+            # This and detect_form()'s equivalent used to fail silently
+            # (a plain FAILED/available=False with no reason logged) —
+            # found live 2026-08-03 debugging a real apply() attempt
+            # with no way to tell why it failed short of adding this.
+            logger.warning(
+                f"open_job could not verify job page job_url={job_url} "
+                f"landed_on={page.url!r} reason={exc}"
+            )
             return {"status": "FAILED", "title": None}
 
         return {"status": "SUCCESS", "title": title}
@@ -79,7 +87,11 @@ class PlaywrightEngine:
 
         try:
             await navigation_service.open_job(page=page, url=job_url)
-        except JobPageNotFound:
+        except JobPageNotFound as exc:
+            logger.warning(
+                f"detect_form could not verify job page job_url={job_url} "
+                f"landed_on={page.url!r} reason={exc}"
+            )
             return {
                 "available": False,
                 "easy_apply": False,
@@ -87,6 +99,12 @@ class PlaywrightEngine:
             }
 
         form = await form_detector.detect(page)
+
+        if not form.available:
+            logger.warning(
+                f"detect_form found no application form job_url={job_url} "
+                f"landed_on={page.url!r}"
+            )
 
         return {
             "available": form.available,
