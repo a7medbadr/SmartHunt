@@ -53,6 +53,26 @@ async def test_login_success():
 
 
 @pytest.mark.asyncio
+async def test_login_reuses_already_authenticated_session_without_reauthenticating():
+    """Regression test: this page's context is a persistent, named
+    session the owner explicitly wants kept alive across calls, not
+    re-authenticated every time. login() used to unconditionally
+    navigate to /login regardless of current state — confirmed live
+    2026-08-03 that this breaks an already-authenticated session:
+    LinkedIn doesn't show the login form to a logged-in visitor, it
+    redirects elsewhere, so the old code just timed out waiting for
+    fields that were never going to appear. Must detect the session is
+    already live and skip re-authenticating entirely."""
+
+    page = make_mock_page("https://www.linkedin.com/feed/")
+
+    result = await linkedin_login(page)
+
+    assert result == {"status": "SUCCESS"}
+    page.goto.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_login_clicks_sign_in_button_as_enter_fallback():
     """Regression test: Enter-in-password-field (this module's original
     fix for LinkedIn's JS-driven, non-submit button) stopped reliably
@@ -62,12 +82,21 @@ async def test_login_clicks_sign_in_button_as_enter_fallback():
     visible <button> — Apple SSO renders first) so submission still
     happens even when Enter alone is a no-op."""
 
-    page = make_mock_page("https://www.linkedin.com/feed/")
+    # Starts on the login page, not feed — login() now short-circuits an
+    # already-authenticated session (page.url already on feed/) without
+    # touching the form at all, which would make this test never reach
+    # the code path it's meant to cover. The button click's side effect
+    # below simulates real navigation landing on feed/ afterward.
+    page = make_mock_page("https://www.linkedin.com/login")
 
     button_locator = MagicMock()
     button_locator.count = AsyncMock(return_value=2)
     sign_in_button = MagicMock()
-    sign_in_button.click = AsyncMock()
+
+    async def fake_click(timeout=None):
+        page.url = "https://www.linkedin.com/feed/"
+
+    sign_in_button.click = AsyncMock(side_effect=fake_click)
     button_locator.nth = MagicMock(return_value=sign_in_button)
 
     field_locator = page.locator.return_value
@@ -129,7 +158,10 @@ async def test_login_failed_without_credentials(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_login_failed_on_exception():
-    page = make_mock_page("https://www.linkedin.com/feed/")
+    # Not already on feed/ — otherwise the already-authenticated
+    # shortcut returns SUCCESS before ever reaching the goto() this
+    # test means to fail.
+    page = make_mock_page("https://www.linkedin.com/login")
     page.goto = AsyncMock(side_effect=Exception("network error"))
 
     result = await linkedin_login(page)

@@ -45,6 +45,22 @@ async def linkedin_login(page: Page) -> dict:
         logger.error("LinkedIn credentials are not configured.")
         return {"status": "FAILED"}
 
+    # This page's context is a persistent, named session the owner
+    # explicitly wants kept alive across calls (not re-authenticated
+    # every time) — confirmed live 2026-08-03: navigating an already
+    # -authenticated session to /login doesn't show the login form at
+    # all (LinkedIn redirects it elsewhere), so the old unconditional
+    # goto-then-fill-the-form flow just timed out waiting for fields
+    # that were never going to appear. Check the session is actually
+    # live first.
+    try:
+        current_url = (page.url or "").lower()
+        if "linkedin.com" in current_url and ("feed" in current_url or "/in/" in current_url):
+            logger.info("Reusing already-authenticated LinkedIn session.")
+            return {"status": "SUCCESS"}
+    except Exception:
+        pass
+
     try:
         logger.info("Opening LinkedIn login page...")
 
