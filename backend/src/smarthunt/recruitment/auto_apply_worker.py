@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -113,23 +114,33 @@ class AutoApplyWorker:
     async def _notify_success(self, db: AsyncSession, job: Job) -> None:
         """Fulfils the product's core promise: applications happen
         unattended, then the owner is told afterward, not asked to click
-        "apply" themselves. Uses the TELEGRAM channel so this starts
-        delivering for real the moment TELEGRAM_BOT_TOKEN/
-        TELEGRAM_CHAT_ID are configured — NotificationService already
-        no-ops the send (while still recording the in-app notification)
-        when they're unset, so this is safe to fire unconditionally."""
+        "apply" themselves. Fires both TELEGRAM and EMAIL — each
+        channel's own sender already no-ops (while still recording the
+        in-app notification) when its own credentials are unset, so
+        this is safe to fire unconditionally regardless of which
+        channels are actually configured."""
 
-        await notification_service.create(
-            db,
-            NotificationCreate(
-                type="SUCCESS",
-                title=f"تم التقديم تلقائيًا: {job.title}",
-                message=f"قدّمنا تلقائيًا على وظيفة {job.title} في {job.company}"
-                f"{f' ({job.location})' if job.location else ''}.\n{job.url or ''}",
-                channel="TELEGRAM",
-                priority="HIGH",
-            ),
+        title = f"تم التقديم تلقائيًا: {job.title}"
+        message = (
+            f"قدّمنا تلقائيًا على وظيفة: {job.title}\n"
+            f"الشركة: {job.company}\n"
+            f"الموقع: {job.location or 'غير محدد'}\n"
+            f"المصدر: {job.source or 'غير محدد'}\n"
+            f"رابط الوظيفة: {job.url or 'غير متاح'}\n"
+            f"تاريخ التقديم: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
         )
+
+        for channel in ("TELEGRAM", "EMAIL"):
+            await notification_service.create(
+                db,
+                NotificationCreate(
+                    type="SUCCESS",
+                    title=title,
+                    message=message,
+                    channel=channel,
+                    priority="HIGH",
+                ),
+            )
 
     async def process_all(
         self,

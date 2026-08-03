@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.activity.schemas import ActivityCreate, ActivityResponse
@@ -26,6 +26,9 @@ async def create_activity(data: ActivityCreate, db: AsyncSession = Depends(get_d
     status_code=status.HTTP_200_OK,
     summary="Get Recent Activities",
 )
-async def get_recent_activities(db: AsyncSession = Depends(get_db)):
+async def get_recent_activities(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=500),
+):
     service = ActivityService(db)
-    return await service.get_recent_activities(limit=20)
+    return await service.get_recent_activities(limit=limit)

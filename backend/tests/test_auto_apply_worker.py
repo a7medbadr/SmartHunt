@@ -139,9 +139,10 @@ async def test_process_next_notifies_owner_on_success(
     result = await db_session.execute(select(Notification))
     notifications = list(result.scalars().all())
 
-    assert len(notifications) == 1
-    assert "Senior Linux Administrator" in notifications[0].title
-    assert notifications[0].channel == "TELEGRAM"
+    assert len(notifications) == 2
+    channels = {n.channel for n in notifications}
+    assert channels == {"TELEGRAM", "EMAIL"}
+    assert all("Senior Linux Administrator" in n.title for n in notifications)
 
 
 @pytest.mark.asyncio

@@ -15,18 +15,22 @@ export interface AIGenerateResponse {
 // slow enough that a single attempt can miss the backend's own 90s
 // per-attempt timeout — confirmed live: one real request took a 90s
 // timeout on attempt 1, then succeeded in 87s on attempt 2 (backend
-// retries automatically). 240s gives the frontend enough room to
-// actually see that retry succeed instead of aborting first and
-// showing a false "error, try again" while the backend was still
-// working.
-const AI_REQUEST_TIMEOUT_MS = 240000;
+// retries automatically, up to 3 times = 270s worst case). 280s gives
+// the frontend enough room to actually see even that worst case
+// resolve instead of aborting first and showing a false "error, try
+// again" while the backend was still working. Ollama calls are also
+// now serialized backend-side (see ai/providers/ollama.py) so
+// concurrent requests stop fighting each other for the same CPU-bound
+// model, which was the main cause of attempts exceeding 90s at all.
+const AI_REQUEST_TIMEOUT_MS = 280000;
 
 export async function generateAIResponse(
   prompt: string,
+  maxTokens?: number,
 ): Promise<AIGenerateResponse> {
   const { data } = await apiClient.post<AIGenerateResponse>(
     "/ai/generate",
-    { prompt },
+    maxTokens ? { prompt, max_tokens: maxTokens } : { prompt },
     { timeout: AI_REQUEST_TIMEOUT_MS },
   );
   return data;

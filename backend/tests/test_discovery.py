@@ -15,7 +15,7 @@ async def test_discovery_run_does_not_crash(client):
     assert response.status_code == 200
 
     data = response.json()
-    assert data["providers"] == 11
+    assert data["providers"] == 12
     assert data["discovered"] >= 0
     assert data["inserted"] >= 0
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.providers.registry import provider_registry
 from smarthunt.providers.settings.service import provider_settings_service
 from smarthunt.database.repositories.job_repository import JobRepository
+from smarthunt.matching.services.job_relevance import is_relevant_job_title
 from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
 from smarthunt.scheduler.history.service import scheduler_history_service
 
@@ -42,6 +43,17 @@ class DiscoveryService:
             # not a guarantee — don't trust a provider to actually honor it.
             needle = location.lower()
             jobs = [j for j in jobs if needle in (j.location or "").lower()]
+
+        # Providers' own search (LinkedIn's especially) semantically
+        # broadens a query like "Linux Administrator" far past the
+        # owner's actual, narrow skill set — Systems Engineer, Network
+        # Security Engineer, SAP consultant, fire-alarm systems, DB
+        # administrator, anything Manager/Architect-level, and postings
+        # restricted to Saudi nationals (the owner is an iqama holder,
+        # not a Saudi national, and can't apply to those at all) have
+        # all shown up from a query match alone. A query match is not a
+        # relevance signal; the title itself must be.
+        jobs = [j for j in jobs if is_relevant_job_title(j.title)]
 
         inserted = await self.repository.save_discovered_jobs(jobs)
 

@@ -9,6 +9,7 @@ from smarthunt.metrics import (
     notifications_sent_total,
     notifications_unread_total,
 )
+from smarthunt.notifications.channels.email import send_email_message
 from smarthunt.notifications.channels.telegram import send_telegram_message
 from smarthunt.notifications.models import (
     Notification,
@@ -57,6 +58,14 @@ class NotificationService:
             if not sent:
                 logger.warning(
                     "telegram_notification_not_delivered",
+                    notification_id=notification.id,
+                )
+
+        if data.channel.upper() == "EMAIL":
+            sent = await send_email_message(data.title, data.message)
+            if not sent:
+                logger.warning(
+                    "email_notification_not_delivered",
                     notification_id=notification.id,
                 )
 

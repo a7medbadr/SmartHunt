@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    notification_email: str | None = None
+
     linkedin_email: str | None = None
     linkedin_password: str | None = None
 

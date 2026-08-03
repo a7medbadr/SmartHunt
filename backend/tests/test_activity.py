@@ -47,3 +47,21 @@ async def test_create_and_list_activity(
     assert len(activities) == 1
     assert activities[0]["id"] == created["id"]
     assert activities[0]["title"] == payload["title"]
+
+
+@pytest.mark.asyncio
+async def test_activity_limit_param(client: AsyncClient, clean_activities):
+    """A dedicated Activity log page needs more than the Dashboard
+    widget's default 20 rows — GET /activity?limit=N controls that."""
+    for i in range(5):
+        await client.post(
+            "/api/v1/activity",
+            json={"type": "application_created", "title": f"Applied {i}"},
+        )
+
+    response = await client.get("/api/v1/activity", params={"limit": 3})
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.json()) == 3
+
+    response = await client.get("/api/v1/activity", params={"limit": 20})
+    assert len(response.json()) == 5

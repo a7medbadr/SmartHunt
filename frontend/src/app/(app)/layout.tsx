@@ -10,6 +10,7 @@ import {
   CalendarClock,
   FileText,
   Heart,
+  History,
   Home,
   LogOut,
   Mail,
@@ -51,6 +52,7 @@ const NAV_LINKS = [
   { href: "/scheduler", label: "الجدولة", icon: CalendarClock, color: "text-teal-400" },
   { href: "/providers", label: "مواقع التوظيف", icon: Building2, color: "text-indigo-400" },
   { href: "/notifications", label: "الإشعارات", icon: Bell, color: "text-yellow-400" },
+  { href: "/activity", label: "سجل النشاطات", icon: History, color: "text-teal-400" },
   { href: "/settings", label: "الإعدادات", icon: Settings, color: "text-slate-400" },
   { href: "/system-health", label: "حالة النظام", icon: Activity, color: "text-red-400" },
 ];

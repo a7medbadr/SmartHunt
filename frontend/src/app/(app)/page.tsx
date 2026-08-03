@@ -4,11 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Briefcase,
   Building2,
-  FileText,
   Heart,
   Home,
-  Mail,
-  Send,
   BookmarkPlus,
   Clock,
   Search,
@@ -17,10 +14,11 @@ import {
 import Link from "next/link";
 
 import { getDashboardStatistics } from "@/lib/dashboard-api";
-import { getRecentActivities, type ActivityType } from "@/lib/activity-api";
+import { getRecentActivities } from "@/lib/activity-api";
+import { ACTIVITY_ICONS } from "@/lib/activity-icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 
 const STAT_CARDS: Array<{
   key: keyof Awaited<ReturnType<typeof getDashboardStatistics>>;
@@ -54,25 +52,6 @@ const STAT_CARDS: Array<{
   },
 ];
 
-const ACTIVITY_ICONS: Record<ActivityType, { icon: LucideIcon; color: string }> = {
-  resume_uploaded: { icon: FileText, color: "text-violet-400" },
-  application_created: { icon: Send, color: "text-orange-400" },
-  favorite_added: { icon: Heart, color: "text-rose-400" },
-  saved_search_created: { icon: BookmarkPlus, color: "text-amber-400" },
-  cover_letter_generated: { icon: Mail, color: "text-cyan-400" },
-};
-
-function timeAgo(isoDate: string): string {
-  const diffMs = Date.now() - new Date(isoDate).getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "الآن";
-  if (minutes < 60) return `من ${minutes} دقيقة`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `من ${hours} ساعة`;
-  const days = Math.floor(hours / 24);
-  return `من ${days} يوم`;
-}
-
 export default function DashboardPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ["dashboard-statistics"],
@@ -81,7 +60,7 @@ export default function DashboardPage() {
 
   const { data: activities, isPending: activitiesPending } = useQuery({
     queryKey: ["recent-activity"],
-    queryFn: getRecentActivities,
+    queryFn: () => getRecentActivities(),
   });
 
   return (
@@ -137,11 +116,14 @@ export default function DashboardPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base font-medium">
             <Clock className="size-4 text-muted-foreground" />
             آخر النشاطات
           </CardTitle>
+          <Link href="/activity" className="text-xs text-primary hover:underline">
+            شوف كل النشاطات
+          </Link>
         </CardHeader>
         <CardContent>
           {activitiesPending ? (

@@ -31,9 +31,17 @@ class TimeoutProvider(BaseAIProvider):
 
 
 @pytest.mark.asyncio
-async def test_ai_timeout():
+async def test_ai_timeout(monkeypatch):
+    """AIProviderFactory.register() mutates a module-level cache with no
+    built-in undo — calling it directly (as this test used to) leaked a
+    broken LOCAL provider (always returns content="timeout") into every
+    test running afterward that hits the real LOCAL fallback, e.g. any
+    AI-backed feature in a test env with no OpenAI key configured.
+    monkeypatch.setitem restores the original registration automatically
+    after this test."""
 
-    AIProviderFactory.register(
+    monkeypatch.setitem(
+        AIProviderFactory._providers,
         AIProvider.LOCAL,
         TimeoutProvider(),
     )

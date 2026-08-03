@@ -16,11 +16,39 @@ interface Message {
   content: string;
 }
 
+const EVALUATE_RESUME_PROMPT = "قيّم السيرة الذاتية بتاعتي";
+
 const QUICK_PROMPTS = [
-  "قيّم السيرة الذاتية بتاعتي",
+  EVALUATE_RESUME_PROMPT,
   "اديني نصايح لتطوير مسيرتي المهنية",
   "جهزني لأسئلة المقابلة الشخصية",
 ];
+
+// A bare "قيّم السيرة الذاتية بتاعتي" + raw resume text gave the small
+// local model too little structure — it would go off-topic instead of
+// evaluating. Mirrors the structured-template approach that already
+// works for deep job analysis (matching/services/deep_analysis.py).
+const RESUME_EVALUATION_TEMPLATE = `أنت خبير توظيف متخصص في أنظمة تتبع المتقدمين (ATS - Applicant Tracking Systems). قيّم السيرة الذاتية دي بالتحديد، بالتنسيق ده بالظبط، بالعربي:
+
+## نقاط القوة
+- (اذكر مهارات وخبرات حقيقية موجودة فعلاً في السيرة الذاتية اللي تحت، بالاسم)
+
+## نقاط تحتاج تحسين
+- (نقص أو ضعف حقيقي في السيرة الذاتية)
+
+## التوافق مع أنظمة ATS
+(هل الصيغة والكلمات المفتاحية مناسبة لأنظمة الفرز الآلي؟ اذكر كلمات مفتاحية مفقودة لو فيه)
+
+## التقييم العام
+(رقم من 100 وسبب مختصر)
+
+السيرة الذاتية:
+
+`;
+
+function buildResumeEvaluationPrompt(resumeText: string): string {
+  return `${RESUME_EVALUATION_TEMPLATE}${resumeText}`;
+}
 
 export default function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,7 +61,8 @@ export default function AIAssistantPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: generateAIResponse,
+    mutationFn: ({ prompt, maxTokens }: { prompt: string; maxTokens?: number }) =>
+      generateAIResponse(prompt, maxTokens),
     onSuccess: (data) => {
       setMessages((prev) => [...prev, { role: "assistant", content: data.content }]);
     },
@@ -53,10 +82,19 @@ export default function AIAssistantPage() {
     if (!prompt.trim() || mutation.isPending) return;
     setMessages((prev) => [...prev, { role: "user", content: prompt }]);
     setInput("");
-    const fullPrompt = resumeText
-      ? `سيرتي الذاتية:\n\n${resumeText}\n\n---\n\n${prompt}`
-      : prompt;
-    mutation.mutate(fullPrompt);
+
+    let fullPrompt: string;
+    let maxTokens: number | undefined;
+    if (prompt === EVALUATE_RESUME_PROMPT && resumeText) {
+      fullPrompt = buildResumeEvaluationPrompt(resumeText);
+      maxTokens = 800;
+    } else if (resumeText) {
+      fullPrompt = `سيرتي الذاتية:\n\n${resumeText}\n\n---\n\n${prompt}`;
+    } else {
+      fullPrompt = prompt;
+    }
+
+    mutation.mutate({ prompt: fullPrompt, maxTokens });
   }
 
   return (

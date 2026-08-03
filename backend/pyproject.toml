@@ -33,6 +33,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.44.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
+    "aiosmtplib>=3.0.0",
 ]
 
 [tool.pytest.ini_options]

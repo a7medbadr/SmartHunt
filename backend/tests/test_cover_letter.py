@@ -23,6 +23,33 @@ async def test_cover_letter_generation(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_cover_letter_is_not_the_old_static_template(client: AsyncClient) -> None:
+    """Regression test: generate_cover_letter() used to be a hardcoded
+    boilerplate string ("Dear Hiring Manager,\\n\\nI am excited to apply
+    for the position...") with matched skill names slotted in — not AI
+    generated at all, which is why every letter scored low on the
+    reviewer's "too short"/"too generic" checks regardless of the real
+    resume content. It now calls the real AI service (with a fallback
+    template only if that call fails) and should read like it says
+    something specific, not the fixed boilerplate sentence."""
+    payload = {
+        "resume": (
+            "Senior Linux System Administrator with 8 years managing RHEL and AIX "
+            "environments, led migration of 200+ servers to Red Hat OpenShift, "
+            "reduced incident response time by 40% through Ansible automation."
+        ),
+        "job": "Senior System Administrator for Linux, RHEL, OpenShift required.",
+    }
+    response = await client.post("/api/v1/cover-letter/generate", json=payload)
+
+    assert response.status_code == 200
+    letter = response.json()["generated_cover_letter"]
+
+    assert len(letter.split()) >= 40
+    assert "i am excited to apply for the position." not in letter.lower()
+
+
+@pytest.mark.asyncio
 async def test_cover_letter_reflects_actual_overlap(client: AsyncClient) -> None:
     """The matched skills must come from the real resume/job overlap, not a
     fixed hardcoded list — resume and job here share nothing in the skills

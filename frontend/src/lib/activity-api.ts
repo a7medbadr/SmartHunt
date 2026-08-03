@@ -15,7 +15,9 @@ export interface Activity {
   created_at: string;
 }
 
-export async function getRecentActivities(): Promise<Activity[]> {
-  const { data } = await apiClient.get<Activity[]>("/activity");
+export async function getRecentActivities(limit?: number): Promise<Activity[]> {
+  const { data } = await apiClient.get<Activity[]>("/activity", {
+    params: limit ? { limit } : undefined,
+  });
   return data;
 }

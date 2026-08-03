@@ -13,6 +13,7 @@ from smarthunt.providers.indeed.provider import IndeedProvider
 from smarthunt.providers.linkedin.provider import LinkedInProvider
 from smarthunt.providers.monstergulf.provider import MonstergulfProvider
 from smarthunt.providers.naukrigulf.provider import NaukrigulfProvider
+from smarthunt.providers.sabbar.provider import SabbarProvider
 from smarthunt.providers.tanqeeb.provider import TanqeebProvider
 from smarthunt.providers.wuzzuf.provider import WuzzufProvider
 from smarthunt.providers.wzayef.provider import WzayefProvider
@@ -33,6 +34,7 @@ class ProviderRegistry:
             TanqeebProvider(),
             DrjobsProvider(),
             ForasnagulfProvider(),
+            SabbarProvider(),
         ]
 
     def _normalize(self, item) -> DiscoveredJob:
