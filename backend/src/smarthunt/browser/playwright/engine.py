@@ -58,11 +58,11 @@ class PlaywrightEngine:
             "provider": provider,
         }
 
-    async def open_job(self, job_url: str):
+    async def open_job(self, job_url: str, provider: str = "default"):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page("default")
+        page = await self.manager.get_page(provider)
 
         try:
             title = await navigation_service.open_job(page=page, url=job_url)
@@ -71,11 +71,11 @@ class PlaywrightEngine:
 
         return {"status": "SUCCESS", "title": title}
 
-    async def detect_form(self, job_url: str):
+    async def detect_form(self, job_url: str, provider: str = "default"):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page("default")
+        page = await self.manager.get_page(provider)
 
         try:
             await navigation_service.open_job(page=page, url=job_url)
@@ -99,11 +99,12 @@ class PlaywrightEngine:
         job_url: str,
         application_id: str | None = None,
         db: AsyncSession | None = None,
+        provider: str = "default",
     ):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page("default")
+        page = await self.manager.get_page(provider)
 
         try:
             await navigation_service.open_job(page=page, url=job_url)
@@ -225,12 +226,18 @@ class PlaywrightEngine:
                 "reason": "login_" + login_result.get("status", "failed").lower(),
             }
 
-        open_result = await self.open_job(job_url)
+        # Regression fix: open_job/detect_form/easy_apply used to always
+        # read the "default" (anonymous) browser context, a different
+        # one than login() just authenticated ("linkedin") — so even a
+        # successful login's session was never actually used by the
+        # rest of the flow. Passing provider through keeps every step
+        # on the same authenticated context.
+        open_result = await self.open_job(job_url, provider=provider)
 
         if open_result.get("status") != "SUCCESS":
             return {"status": "FAILED", "job_url": job_url, "reason": "job_page_unavailable"}
 
-        form_result = await self.detect_form(job_url)
+        form_result = await self.detect_form(job_url, provider=provider)
 
         if not form_result.get("available"):
             return {"status": "FAILED", "job_url": job_url, "reason": "no_application_form"}
@@ -238,7 +245,9 @@ class PlaywrightEngine:
         if not form_result.get("easy_apply"):
             return {"status": "FAILED", "job_url": job_url, "reason": "external_ats_not_supported"}
 
-        result = await self.easy_apply(job_url, application_id=application_id, db=db)
+        result = await self.easy_apply(
+            job_url, application_id=application_id, db=db, provider=provider
+        )
 
         return {**result, "job_url": job_url}
 

@@ -97,8 +97,26 @@ async def linkedin_login(page: Page) -> dict:
         logger.info("Current URL after login: %s", current_url)
 
         if any(marker in current_url for marker in MANUAL_REQUIRED_URL_MARKERS):
-            logger.warning("Manual verification required.")
-            return {"status": "MANUAL_REQUIRED"}
+            # This is exactly the case where a human needs to approve a
+            # push notification on their phone — found live 2026-08-03
+            # that reporting MANUAL_REQUIRED after a token ~2s check was
+            # too eager: the owner hadn't had time to even see the
+            # notification yet, and a second call to re-check status
+            # would re-submit credentials and disrupt the pending
+            # approval instead of just checking it. Poll the same page
+            # for up to ~100s before giving up, so one call can actually
+            # see a real, timely approval land.
+            logger.warning("Manual verification required, polling for approval...")
+            for _ in range(20):
+                await page.wait_for_timeout(5000)
+                current_url = page.url.lower()
+                if "feed" in current_url or "/in/" in current_url:
+                    logger.info("LinkedIn login successful after manual approval.")
+                    return {"status": "SUCCESS"}
+                if not any(marker in current_url for marker in MANUAL_REQUIRED_URL_MARKERS):
+                    break
+            else:
+                return {"status": "MANUAL_REQUIRED"}
 
         content = (await page.content()).lower()
 
