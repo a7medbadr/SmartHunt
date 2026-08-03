@@ -292,11 +292,11 @@ class PlaywrightEngine:
 
         return {**result, "job_url": job_url}
 
-    async def take_screenshot(self, path: str | None = None):
+    async def take_screenshot(self, path: str | None = None, provider: str = "default"):
         if not self.manager.is_running:
             await self.manager.launch()
 
-        page = await self.manager.get_page("default")
+        page = await self.manager.get_page(provider)
 
         if path is None:
             screenshot_dir = Path("/tmp") / "screenshots"
@@ -310,6 +310,40 @@ class PlaywrightEngine:
         await page.screenshot(path=path)
 
         return {"path": path}
+
+    async def debug_page_buttons(self, job_url: str, provider: str = "default"):
+        """One-off diagnostic: list every visible button's text/
+        aria-label on a job page after navigating to it, on the same
+        named context real apply() calls use — added to debug
+        Easy Apply detection matching the wrong button (found live
+        2026-08-03: matched a generic "Continue" instead)."""
+        if not self.manager.is_running:
+            await self.manager.launch()
+
+        page = await self.manager.get_page(provider)
+
+        try:
+            await navigation_service.open_job(page=page, url=job_url)
+        except JobPageNotFound:
+            return {"status": "FAILED", "buttons": [], "url": page.url}
+
+        buttons = page.locator("button:visible")
+        count = await buttons.count()
+
+        results = []
+        for i in range(count):
+            btn = buttons.nth(i)
+            try:
+                text = (await btn.inner_text()).strip()
+            except Exception:
+                text = ""
+            try:
+                aria_label = await btn.get_attribute("aria-label")
+            except Exception:
+                aria_label = None
+            results.append({"text": text, "aria_label": aria_label})
+
+        return {"status": "SUCCESS", "url": page.url, "buttons": results}
 
 
 playwright_engine = PlaywrightEngine()

@@ -137,3 +137,13 @@ async def fill_profile(
 )
 async def screenshot():
     return await playwright_engine.take_screenshot()
+
+
+@router.get(
+    "/debug-buttons",
+)
+async def debug_buttons(job_url: str, provider: str = "default"):
+    """Diagnostic-only: lists every visible button's text/aria-label on
+    a job page via the same named browser context real apply() calls
+    use, to see why Easy Apply detection matched the wrong selector."""
+    return await playwright_engine.debug_page_buttons(job_url, provider=provider)
