@@ -126,20 +126,36 @@ class PlaywrightEngine:
 
         try:
             await navigation_service.open_job(page=page, url=job_url)
-        except JobPageNotFound:
+        except JobPageNotFound as exc:
+            logger.warning(
+                f"easy_apply could not verify job page job_url={job_url} "
+                f"landed_on={page.url!r} reason={exc}"
+            )
             return {"status": "FAILED"}
 
         clicked = await easy_apply_engine.click_easy_apply(page)
 
         if not clicked:
             scheduler_lock_conflicts_total.inc()
+            logger.warning(
+                f"easy_apply could not click an Easy Apply button "
+                f"job_url={job_url} landed_on={page.url!r}"
+            )
             return {"status": "FAILED"}
 
         scheduler_lock_acquired_total.inc()
 
-        await easy_apply_engine.wait_modal(page)
+        modal_found = await easy_apply_engine.wait_modal(page)
+
+        if not modal_found:
+            logger.warning(
+                f"easy_apply clicked Easy Apply but no modal appeared "
+                f"job_url={job_url} landed_on={page.url!r}"
+            )
 
         result = await easy_apply_engine.run(page)
+
+        logger.info(f"easy_apply finished job_url={job_url} result={result}")
 
         if result.get("status") == "PAUSED_UNKNOWN_QUESTION" and application_id and db is not None:
             await self._pause_application(application_id, db)
