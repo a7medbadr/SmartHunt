@@ -134,7 +134,19 @@ async def linkedin_login(page: Page) -> dict:
             else:
                 return {"status": "MANUAL_REQUIRED"}
 
-        content = (await page.content()).lower()
+        # Found live 2026-08-03: page.content() can race an in-flight
+        # navigation right after submit/approval ("Unable to retrieve
+        # content because the page is navigating"), which isn't a real
+        # login failure — just a transient timing issue. One short
+        # retry resolves it.
+        try:
+            content = (await page.content()).lower()
+        except Exception:
+            await page.wait_for_timeout(1500)
+            try:
+                content = (await page.content()).lower()
+            except Exception:
+                content = ""
 
         if any(marker in content for marker in MANUAL_REQUIRED_CONTENT_MARKERS):
             logger.warning("CAPTCHA / MFA detected.")
