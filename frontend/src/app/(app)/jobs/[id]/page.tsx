@@ -269,7 +269,13 @@ export default function JobDetailsPage() {
                   </Badge>
                 ))}
               </div>
-              <AnalysisMarkdown text={analyzeMutation.data.ai_summary} />
+              {analyzeMutation.data.provider === "local" ? (
+                <p className="text-sm text-muted-foreground">
+                  الذكاء الاصطناعي كان مشغول وقت التحليل ده، جرب تاني بعد شوية.
+                </p>
+              ) : (
+                <AnalysisMarkdown text={analyzeMutation.data.ai_summary} />
+              )}
             </div>
           )}
         </CardContent>

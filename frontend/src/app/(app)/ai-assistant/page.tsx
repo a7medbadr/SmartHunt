@@ -64,7 +64,16 @@ export default function AIAssistantPage() {
     mutationFn: ({ prompt, maxTokens }: { prompt: string; maxTokens?: number }) =>
       generateAIResponse(prompt, maxTokens),
     onSuccess: (data) => {
-      setMessages((prev) => [...prev, { role: "assistant", content: data.content }]);
+      // The real AI provider can fail/time out and silently fall back
+      // to a "local" stub that just echoes the prompt back — a 200
+      // response, but not a real answer. Treat that the same as an
+      // error instead of showing the raw echoed prompt as if it were
+      // a reply.
+      const content =
+        data.provider === "local"
+          ? "الذكاء الاصطناعي مشغول دلوقتي، جرب تاني بعد شوية."
+          : data.content;
+      setMessages((prev) => [...prev, { role: "assistant", content }]);
     },
     onError: () => {
       setMessages((prev) => [

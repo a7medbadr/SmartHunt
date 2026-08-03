@@ -45,10 +45,22 @@ class CoverLetterService:
                 AIRequest(
                     prompt=COVER_LETTER_PROMPT.format(resume=request.resume, job=request.job),
                     max_tokens=500,
-                    timeout=90.0,
+                    # A full resume + job description is a much bigger
+                    # prompt than most other AI calls in this app — 90s
+                    # (fine for the shorter AI Assistant chat) measured
+                    # live as not enough for this one, burning through
+                    # all 3 retries (270s) before falling back to the
+                    # fake LOCAL echo stub instead of a real letter.
+                    timeout=150.0,
                 )
             )
             letter_content = ai_response.content.strip()
+            if ai_response.provider.value == "local":
+                # The real providers all failed/timed out — the LOCAL
+                # fallback isn't a real model, it's a stub that just
+                # echoes the prompt back. That's worse than our own
+                # simple template, not a usable letter.
+                letter_content = ""
         except Exception:
             letter_content = ""
 
