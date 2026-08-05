@@ -168,6 +168,70 @@ async def test_refresh_rejects_invalid_token(client):
 
 
 @pytest.mark.asyncio
+async def test_change_password_then_login_with_new_password(client):
+    payload = random_user()
+    await client.post("/api/v1/auth/register", json=payload)
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    token = login.json()["access_token"]
+
+    response = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": payload["password"], "new_password": "NewSecret456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 204
+
+    old_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": "NewSecret456"},
+    )
+    assert new_login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_change_password_rejects_wrong_current_password(client):
+    payload = random_user()
+    await client.post("/api/v1/auth/register", json=payload)
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    token = login.json()["access_token"]
+
+    response = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "NewSecret456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+
+    # The password must not have changed — the old one still works.
+    still_works = await client.post(
+        "/api/v1/auth/login",
+        json={"username": payload["username"], "password": payload["password"]},
+    )
+    assert still_works.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_change_password_requires_login(client):
+    response = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "whatever", "new_password": "NewSecret456"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_protected_endpoint_requires_login(client):
     response = await client.post(
         "/api/v1/jobs",

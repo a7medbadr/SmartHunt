@@ -41,3 +41,12 @@ export async function refreshToken(): Promise<TokenResponse> {
   const { data } = await apiClient.post<TokenResponse>("/auth/refresh");
   return data;
 }
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+}
+
+export async function changePassword(payload: ChangePasswordPayload): Promise<void> {
+  await apiClient.post("/auth/change-password", payload);
+}

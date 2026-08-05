@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.api.dependencies.database import get_db
 from smarthunt.auth.schemas.auth import (
+    ChangePasswordRequest,
     TokenResponse,
     UserLogin,
     UserOut,
@@ -79,6 +80,22 @@ async def me(
         "username": current_user.username,
         "email": current_user.email,
     }
+
+
+@router.post(
+    "/change-password",
+    status_code=204,
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+):
+    await AuthService(db).change_password(
+        current_user,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+    )
 
 
 @router.post(
