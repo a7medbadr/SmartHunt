@@ -179,9 +179,7 @@ async def test_scan_home_feed_scrolls_and_extracts(monkeypatch):
     # the real scroll call (document.querySelector('main').scrollBy) fired
     # scroll_rounds times, not an exact total evaluate() call count.
     scroll_calls = [
-        call
-        for call in fake_page.evaluate.await_args_list
-        if "scrollBy" in call.args[0]
+        call for call in fake_page.evaluate.await_args_list if "scrollBy" in call.args[0]
     ]
     assert len(scroll_calls) == 2
     fake_page.locator.assert_called_with(post_scanner.FEED_POST_SELECTOR)
