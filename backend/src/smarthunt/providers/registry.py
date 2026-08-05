@@ -5,6 +5,7 @@ from dataclasses import asdict, is_dataclass
 
 from smarthunt.domain.job import DiscoveredJob
 from smarthunt.providers.base.provider import BaseProvider
+from smarthunt.providers.baaeed.provider import BaaeedProvider
 from smarthunt.providers.bayt.provider import BaytProvider
 from smarthunt.providers.drjobs.provider import DrjobsProvider
 from smarthunt.providers.forasnagulf.provider import ForasnagulfProvider
@@ -35,6 +36,7 @@ class ProviderRegistry:
             DrjobsProvider(),
             ForasnagulfProvider(),
             SabbarProvider(),
+            BaaeedProvider(),
         ]
 
     def _normalize(self, item) -> DiscoveredJob:
