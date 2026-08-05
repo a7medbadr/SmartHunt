@@ -14,8 +14,17 @@ MANUAL_REQUIRED_URL_MARKERS = (
 )
 
 MANUAL_REQUIRED_CONTENT_MARKERS = (
+    # Bare "verify" was a false positive, confirmed live 2026-08-03: the
+    # owner logged in manually with the exact same credentials in a
+    # private browser tab, no CAPTCHA/challenge at all — "verify" alone
+    # matches too much ordinary page content (analytics scripts, footer
+    # text, etc.) to be a reliable signal. These are specific enough to
+    # only match an actual challenge.
     "captcha",
-    "verify",
+    "verify it's you",
+    "verify your identity",
+    "i'm not a robot",
+    "prove you're human",
     "two-step verification",
     "security check",
 )
@@ -69,6 +78,23 @@ async def linkedin_login(page: Page) -> dict:
             wait_until="domcontentloaded",
             timeout=60000,
         )
+
+        # The pre-navigation shortcut above only catches an already-
+        # authenticated session within the SAME page's lifetime — a
+        # freshly created page (e.g. right after a container restart,
+        # once BrowserManager restores saved cookies into the new
+        # context) starts on about:blank, so that check can never fire
+        # for it. Confirmed live 2026-08-03: with valid restored cookies,
+        # navigating to the login URL makes LinkedIn immediately redirect
+        # to /feed/ instead of showing the form at all — the old code
+        # then waited 30s for username/password fields that were never
+        # going to appear and reported a false FAILED despite the
+        # session actually being valid. Check again right after this
+        # navigation, before waiting for any form field.
+        current_url = (page.url or "").lower()
+        if "linkedin.com" in current_url and ("feed" in current_url or "/in/" in current_url):
+            logger.info("LinkedIn redirected an already-authenticated session away from /login.")
+            return {"status": "SUCCESS"}
 
         email_field = page.locator('input[autocomplete*="username"]:visible').first
         password_field = page.locator('input[autocomplete*="current-password"]:visible').first

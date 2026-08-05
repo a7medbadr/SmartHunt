@@ -122,6 +122,53 @@ async def test_login(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_login_saves_session_on_success(client: AsyncClient, monkeypatch):
+    """Regression test: a successful login used to only live in this
+    process's memory — confirmed live 2026-08-03 that every container
+    restart (routine, many times a session during deploys) silently
+    logged the owner out, forcing a fresh LinkedIn login (and real
+    credentials) every time, which was also what was triggering
+    LinkedIn's own repeated-login abuse detection. A successful login
+    must persist its session to disk immediately."""
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    save_state_mock = AsyncMock()
+    monkeypatch.setattr(browser_manager, "save_state", save_state_mock)
+
+    response = await client.post(
+        "/api/v1/browser/playwright/login",
+        json={"provider": "linkedin"},
+    )
+
+    assert response.status_code == 200
+    save_state_mock.assert_awaited_once_with("linkedin")
+
+
+@pytest.mark.asyncio
+async def test_login_does_not_save_session_on_manual_required(client: AsyncClient, monkeypatch):
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    async def fake_login(page):
+        return {"status": "MANUAL_REQUIRED"}
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.linkedin_login",
+        fake_login,
+    )
+
+    save_state_mock = AsyncMock()
+    monkeypatch.setattr(browser_manager, "save_state", save_state_mock)
+
+    response = await client.post(
+        "/api/v1/browser/playwright/login",
+        json={"provider": "linkedin"},
+    )
+
+    assert response.status_code == 200
+    save_state_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_open_job(client: AsyncClient):
     response = await client.post(
         "/api/v1/browser/playwright/open-job",
@@ -134,6 +181,70 @@ async def test_open_job(client: AsyncClient):
 
     assert data["status"] == "SUCCESS"
     assert data["title"] == "Linux Engineer"
+
+
+@pytest.mark.asyncio
+async def test_open_job_returns_failed_with_null_title_when_page_unverifiable(
+    client: AsyncClient, mock_browser_manager
+):
+    """Regression test: OpenJobResponse.title used to be a required str,
+    but engine.open_job() returns title=None on a JobPageNotFound — this
+    was a real 500 (ResponseValidationError) confirmed live 2026-08-03
+    against a real LinkedIn job page that failed verify_job_page()."""
+    mock_browser_manager.query_selector = AsyncMock(return_value=None)
+
+    response = await client.post(
+        "/api/v1/browser/playwright/open-job",
+        json={"job_url": "https://example.com/job"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "FAILED"
+    assert data["title"] is None
+
+
+@pytest.mark.asyncio
+async def test_easy_apply_notifies_owner_when_paused_on_unknown_question(
+    client: AsyncClient, monkeypatch, mock_easy_apply_flow
+):
+    """An unanswerable question is the other case (besides login
+    MANUAL_REQUIRED) that should ever pause and wait for the owner — they
+    must be told immediately, not left to discover it by checking the
+    Applications page later (missing live 2026-08-03)."""
+
+    async def fake_run(page, job_id=None):
+        return {
+            "status": "PAUSED_UNKNOWN_QUESTION",
+            "question": "years of kubernetes experience",
+        }
+
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.easy_apply_engine.run",
+        fake_run,
+    )
+
+    notify = AsyncMock()
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.notification_service.create",
+        notify,
+    )
+
+    response = await client.post(
+        "/api/v1/browser/playwright/easy-apply",
+        json={"job_url": "https://example.com/job/1"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["status"] == "PAUSED_UNKNOWN_QUESTION"
+
+    channels = [call.args[1].channel for call in notify.await_args_list]
+    assert sorted(channels) == ["EMAIL", "TELEGRAM", "WHATSAPP"]
+    assert "years of kubernetes experience" in notify.await_args_list[0].args[1].message
 
 
 @pytest.mark.asyncio
@@ -165,7 +276,7 @@ def mock_easy_apply_flow(monkeypatch):
     async def fake_wait_modal(page):
         return True
 
-    async def fake_run(page):
+    async def fake_run(page, job_id=None):
         return {"status": "SUCCESS"}
 
     monkeypatch.setattr(
@@ -234,12 +345,25 @@ async def test_apply_stops_for_manual_required_login(client: AsyncClient, monkey
         fake_login,
     )
 
+    notify = AsyncMock()
+    monkeypatch.setattr(
+        "smarthunt.browser.playwright.engine.notification_service.create",
+        notify,
+    )
+
     response = await client.post(
         "/api/v1/browser/playwright/apply",
         json={"job_url": "https://example.com/job/1"},
     )
 
     assert response.status_code == 200
+
+    # The owner must be told immediately when a login needs manual
+    # help (CAPTCHA/MFA) instead of only discovering it by checking
+    # later — confirmed missing live 2026-08-03. Fires every configured
+    # channel (mirrors auto_apply_worker.py's success notification).
+    channels = [call.args[1].channel for call in notify.await_args_list]
+    assert sorted(channels) == ["EMAIL", "TELEGRAM", "WHATSAPP"]
 
     data = response.json()
 

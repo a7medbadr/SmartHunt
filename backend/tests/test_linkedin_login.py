@@ -73,6 +73,35 @@ async def test_login_reuses_already_authenticated_session_without_reauthenticati
 
 
 @pytest.mark.asyncio
+async def test_login_reuses_restored_session_after_redirect_from_login_page():
+    """Regression test: the shortcut above only catches an already-
+    authenticated session within the SAME page's lifetime — a freshly
+    created page (e.g. right after a container restart, once
+    BrowserManager restores saved cookies into the new context) starts
+    on about:blank, so that pre-navigation check can never fire for it.
+    Confirmed live 2026-08-03: with valid restored cookies, navigating
+    to the login URL made LinkedIn immediately redirect to /feed/
+    instead of showing the form — the old code then waited 30s for
+    username/password fields that were never going to appear and
+    reported a false FAILED despite the session actually being valid."""
+
+    page = make_mock_page("about:blank")
+
+    async def fake_goto(url, wait_until=None, timeout=None):
+        page.url = "https://www.linkedin.com/feed/"
+
+    page.goto = AsyncMock(side_effect=fake_goto)
+
+    field_locator = page.locator.return_value
+
+    result = await linkedin_login(page)
+
+    assert result == {"status": "SUCCESS"}
+    page.goto.assert_awaited_once()
+    field_locator.wait_for.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_login_clicks_sign_in_button_as_enter_fallback():
     """Regression test: Enter-in-password-field (this module's original
     fix for LinkedIn's JS-driven, non-submit button) stopped reliably
@@ -134,6 +163,22 @@ async def test_login_manual_required_on_captcha_content():
     result = await linkedin_login(page)
 
     assert result == {"status": "MANUAL_REQUIRED"}
+
+
+def test_bare_verify_word_is_not_a_manual_required_marker():
+    """Regression test: bare "verify" used to be a MANUAL_REQUIRED
+    content trigger — a false positive confirmed live 2026-08-03 (the
+    owner logged in manually with the exact same credentials, no
+    CAPTCHA at all). Ordinary page content ("we'll verify your email",
+    analytics scripts, footer text) contains that word constantly;
+    only specific challenge phrasing should count."""
+    from smarthunt.browser.providers.linkedin.login import (
+        MANUAL_REQUIRED_CONTENT_MARKERS,
+    )
+
+    content = "we'll verify your email address shortly. welcome to your feed."
+
+    assert not any(marker in content for marker in MANUAL_REQUIRED_CONTENT_MARKERS)
 
 
 @pytest.mark.asyncio

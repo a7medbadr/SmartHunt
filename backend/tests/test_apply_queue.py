@@ -121,7 +121,7 @@ def mock_playwright_apply(monkeypatch):
     running the specific item just created), not the browser mechanics,
     which already have their own coverage in test_playwright_engine.py."""
 
-    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None):
+    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None, job_id=None):
         return {"status": "SUCCESS", "job_url": job_url}
 
     monkeypatch.setattr(

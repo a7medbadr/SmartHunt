@@ -11,11 +11,13 @@ class ApplyRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
     provider: str = Field(default="linkedin")
     application_id: Optional[str] = None
+    job_id: Optional[int] = None
 
 
 class EasyApplyRequest(BaseModel):
     job_url: str = Field(..., min_length=1)
     application_id: Optional[str] = None
+    job_id: Optional[int] = None
 
 
 class FormFillRequest(BaseModel):
@@ -65,13 +67,18 @@ class FillProfileResponse(BaseModel):
     unknown_questions: list[str]
 
 
+class ScreenshotRequest(BaseModel):
+    provider: str = "default"
+    path: str | None = None
+
+
 class ScreenshotResponse(BaseModel):
     path: str
 
 
 class OpenJobResponse(BaseModel):
     status: str
-    title: str
+    title: str | None = None
 
 
 class DetectFormResponse(BaseModel):

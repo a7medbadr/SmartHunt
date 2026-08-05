@@ -58,6 +58,41 @@ async def test_goto_job_retry():
 
 
 @pytest.mark.asyncio
+async def test_wait_until_loaded_waits_for_domcontentloaded_and_networkidle():
+    """Regression test: LinkedIn's job page is a heavy client-rendered
+    SPA — the real Easy Apply button only appears after JS hydration,
+    which domcontentloaded alone doesn't wait for. Confirmed live
+    2026-08-03: a button scan right after domcontentloaded caught the
+    page mid-hydration (generic "Apply" text, a stray logged-out
+    widget) even on an authenticated session. Must also wait for
+    networkidle (best-effort, non-fatal on timeout) before callers
+    scan the DOM for interactive elements."""
+    page = make_page()
+
+    service = NavigationService()
+
+    await service.wait_until_loaded(page)
+
+    assert page.wait_for_load_state.call_count == 2
+    waited_for = [call.args[0] for call in page.wait_for_load_state.call_args_list]
+    assert waited_for == ["domcontentloaded", "networkidle"]
+
+
+@pytest.mark.asyncio
+async def test_wait_until_loaded_tolerates_networkidle_timeout():
+    """A page that never goes fully idle (e.g. LinkedIn keeping a
+    background connection open) must not fail the whole navigation —
+    networkidle is a best-effort hydration window, not a hard
+    requirement."""
+    page = make_page()
+    page.wait_for_load_state = AsyncMock(side_effect=[None, PlaywrightTimeoutError("timeout")])
+
+    service = NavigationService()
+
+    await service.wait_until_loaded(page)
+
+
+@pytest.mark.asyncio
 async def test_verify_job_page_success():
     page = make_page()
 

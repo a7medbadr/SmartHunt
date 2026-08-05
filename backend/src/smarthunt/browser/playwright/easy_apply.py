@@ -126,7 +126,7 @@ class EasyApplyEngine:
 
         return {"status": "REVIEW_REQUIRED"}
 
-    async def run(self, page: Page) -> dict:
+    async def run(self, page: Page, job_id: int | None = None) -> dict:
         """
         Steps through the Easy Apply modal.
 
@@ -140,7 +140,7 @@ class EasyApplyEngine:
 
         while steps < max_steps:
 
-            fill_result = await form_filler_engine.fill_form(page)
+            fill_result = await form_filler_engine.fill_form(page, job_id=job_id)
 
             if fill_result.get("status") == "QUESTION_REQUIRED":
                 return {

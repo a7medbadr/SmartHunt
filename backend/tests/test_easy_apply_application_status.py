@@ -50,7 +50,7 @@ def mock_easy_apply_flow(monkeypatch):
     async def fake_wait_modal(page):
         return True
 
-    async def fake_run(page):
+    async def fake_run(page, job_id=None):
         return {
             "status": "PAUSED_UNKNOWN_QUESTION",
             "question": "years of kubernetes experience",

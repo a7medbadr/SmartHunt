@@ -21,6 +21,7 @@ from smarthunt.browser.playwright.schemas import (
     OpenJobRequest,
     OpenJobResponse,
     PlaywrightStatusResponse,
+    ScreenshotRequest,
     ScreenshotResponse,
     StatusResponse,
 )
@@ -92,6 +93,7 @@ async def apply(
         provider=payload.provider,
         application_id=payload.application_id,
         db=db,
+        job_id=payload.job_id,
     )
 
 
@@ -107,6 +109,7 @@ async def easy_apply(
         payload.job_url,
         application_id=payload.application_id,
         db=db,
+        job_id=payload.job_id,
     )
 
 
@@ -135,8 +138,8 @@ async def fill_profile(
     "/screenshot",
     response_model=ScreenshotResponse,
 )
-async def screenshot():
-    return await playwright_engine.take_screenshot()
+async def screenshot(payload: ScreenshotRequest = ScreenshotRequest()):
+    return await playwright_engine.take_screenshot(payload.path, provider=payload.provider)
 
 
 @router.get(

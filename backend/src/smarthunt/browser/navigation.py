@@ -96,6 +96,27 @@ class NavigationService:
 
             logger.warning("Timed out waiting for page load.")
 
+        # LinkedIn's job page is a heavy client-rendered SPA — the real
+        # "Easy Apply" button and authenticated header only appear after
+        # JS hydration finishes, well after domcontentloaded. Confirmed
+        # live 2026-08-03: scanning buttons right after the above wait
+        # caught the page mid-hydration (generic "Apply" text, a stray
+        # logged-out "Sign in with Email" widget still visible) even on
+        # a genuinely authenticated session — almost certainly why a real
+        # apply() attempt matched the wrong selector before. networkidle
+        # gives hydration a real window without blocking indefinitely if
+        # LinkedIn keeps a background connection open (non-fatal here).
+        try:
+
+            await page.wait_for_load_state(
+                "networkidle",
+                timeout=8000,
+            )
+
+        except PlaywrightTimeoutError:
+
+            logger.warning("Timed out waiting for network idle (non-fatal).")
+
     async def verify_job_page(
         self,
         page: Page,

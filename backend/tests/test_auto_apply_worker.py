@@ -23,7 +23,7 @@ def mock_playwright_apply(monkeypatch):
 
     calls = []
 
-    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None):
+    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None, job_id=None):
         calls.append({"job_url": job_url, "provider": provider})
         return {"status": "SUCCESS", "job_url": job_url}
 
@@ -102,7 +102,7 @@ async def test_process_next_passes_the_real_job_url_and_provider(
 
 @pytest.mark.asyncio
 async def test_process_next_fails_when_apply_fails(client: AsyncClient, test_job: int, monkeypatch):
-    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None):
+    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None, job_id=None):
         return {"status": "FAILED", "job_url": job_url, "reason": "no_application_form"}
 
     monkeypatch.setattr(
@@ -139,9 +139,9 @@ async def test_process_next_notifies_owner_on_success(
     result = await db_session.execute(select(Notification))
     notifications = list(result.scalars().all())
 
-    assert len(notifications) == 2
+    assert len(notifications) == 3
     channels = {n.channel for n in notifications}
-    assert channels == {"TELEGRAM", "EMAIL"}
+    assert channels == {"TELEGRAM", "EMAIL", "WHATSAPP"}
     assert all("Senior Linux Administrator" in n.title for n in notifications)
 
 
@@ -149,7 +149,7 @@ async def test_process_next_notifies_owner_on_success(
 async def test_process_next_does_not_notify_on_failure(
     client: AsyncClient, test_job: int, db_session: AsyncSession, monkeypatch
 ):
-    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None):
+    async def fake_apply(job_url, provider="linkedin", application_id=None, db=None, job_id=None):
         return {"status": "FAILED", "job_url": job_url}
 
     monkeypatch.setattr(

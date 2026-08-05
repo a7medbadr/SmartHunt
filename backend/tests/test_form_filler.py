@@ -9,6 +9,7 @@ from smarthunt.domain import ResumeProfile
 def build_page(locator_groups):
 
     page = MagicMock()
+    page.url = "https://example.com/job/test"
 
     page.locator.side_effect = [
         MagicMock(all=AsyncMock(return_value=group)) for group in locator_groups

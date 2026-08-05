@@ -80,6 +80,7 @@ class AutoApplyWorker:
                     job_url=job.url,
                     provider=item.provider,
                     db=db,
+                    job_id=job.id,
                 )
 
                 item.status = "SUCCESS" if result.get("status") == "SUCCESS" else "FAILED"
@@ -130,7 +131,7 @@ class AutoApplyWorker:
             f"تاريخ التقديم: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
         )
 
-        for channel in ("TELEGRAM", "EMAIL"):
+        for channel in ("TELEGRAM", "EMAIL", "WHATSAPP"):
             await notification_service.create(
                 db,
                 NotificationCreate(

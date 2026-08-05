@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 from typing import Dict, Optional
 
 from playwright.async_api import (
@@ -9,7 +11,21 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from smarthunt.logging.logger import logger
+
 LAUNCH_TIMEOUT_SECONDS = 30
+
+# Named contexts (get_page("linkedin"), etc.) persist their cookies/
+# localStorage here so a real login survives a container restart —
+# found live 2026-08-03: browser.new_context() with no storage_state is
+# purely in-memory, so every docker-compose rebuild/redeploy (routine,
+# happens many times a session) silently logged the owner out and forced
+# a fresh LinkedIn login next time, which is also what was triggering
+# LinkedIn's own repeated-login abuse detection. This makes a named
+# context behave like a real saved browser profile: log in once, stay
+# logged in indefinitely, exactly like the owner's own Chrome profile
+# does for LinkedIn/Facebook.
+BROWSER_PROFILES_DIR = Path(os.getenv("BROWSER_PROFILES_DIR", "/tmp/smarthunt/browser-profiles"))
 
 
 class BrowserManager:
@@ -94,6 +110,9 @@ class BrowserManager:
             ),
         }
 
+    def _profile_path(self, provider: str) -> Path:
+        return BROWSER_PROFILES_DIR / f"{provider}.json"
+
     async def get_page(
         self,
         provider: str,
@@ -104,7 +123,14 @@ class BrowserManager:
 
         if provider not in self.contexts:
 
-            context = await self.browser.new_context(**self._context_options())
+            options = self._context_options()
+
+            profile_path = self._profile_path(provider)
+            if profile_path.exists():
+                options["storage_state"] = str(profile_path)
+                logger.info(f"Restored saved browser session for provider={provider}")
+
+            context = await self.browser.new_context(**options)
 
             context.set_default_timeout(10000)
 
@@ -117,6 +143,23 @@ class BrowserManager:
             self.pages[provider] = await self.contexts[provider].new_page()
 
         return self.pages[provider]
+
+    async def save_state(self, provider: str) -> None:
+        """Persists the named context's current cookies/localStorage to
+        disk so the next get_page(provider) call — even in a brand new
+        container — restores this exact session instead of starting
+        logged out. Call this after any action that plausibly changed
+        auth state (a successful login is the main one)."""
+        context = self.contexts.get(provider)
+        if context is None:
+            return
+
+        try:
+            BROWSER_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+            await context.storage_state(path=str(self._profile_path(provider)))
+            logger.info(f"Saved browser session for provider={provider}")
+        except Exception:
+            logger.exception(f"Failed to save browser session for provider={provider}")
 
     async def new_isolated_page(self, timeout_ms: int = 20000) -> tuple[BrowserContext, Page]:
         """A dedicated context+page for a single one-off task (e.g. an
@@ -138,6 +181,14 @@ class BrowserManager:
         return context, page
 
     async def close(self) -> None:
+
+        # Best-effort safety net: capture whatever session state exists
+        # right now for every named (non-isolated) context, so an
+        # unplanned shutdown doesn't lose a session that was never
+        # explicitly saved via save_state() — e.g. a login that
+        # succeeded but the caller didn't reach the save_state() call.
+        for provider in list(self.contexts.keys()):
+            await self.save_state(provider)
 
         for page in self.pages.values():
 

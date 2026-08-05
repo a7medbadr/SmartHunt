@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from playwright.async_api import Page
+from sqlalchemy import select
 
 from smarthunt.browser.playwright.retry import retry_executor
 from smarthunt.browser.question_classifier import (
@@ -11,7 +12,9 @@ from smarthunt.browser.unknown_questions import (
     UnknownQuestionRecord,
     unknown_question_repository,
 )
+from smarthunt.database.session import AsyncSessionLocal
 from smarthunt.logging.logger import logger
+from smarthunt.resume.models import TailoredResume
 from smarthunt.resume.storage.storage import (
     resume_storage,
 )
@@ -22,15 +25,34 @@ class FormFillerEngine:
     Dynamic application form filling engine.
     """
 
-    def get_profile(self) -> dict:
-        info = resume_storage.get_resume_info()
+    async def get_profile(self, job_id: int | None = None) -> dict:
+        resume_path = None
+
+        if job_id is not None:
+            # Prefer a job-specific tailored resume (real resume kept
+            # verbatim + an AI-written summary for this exact posting)
+            # over the generic uploaded file, when one has been
+            # generated — same self-managed-session pattern as
+            # unknown_questions.py's DB repository, since this is called
+            # deep inside the fill loop with no request-scoped session.
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(TailoredResume).where(TailoredResume.job_id == job_id)
+                )
+                tailored = result.scalar_one_or_none()
+                if tailored is not None and Path(tailored.file_path).exists():
+                    resume_path = tailored.file_path
+
+        if resume_path is None:
+            info = resume_storage.get_resume_info()
+            resume_path = info["stored_path"] if info.get("uploaded") else None
 
         return {
             "first_name": "",
             "last_name": "",
             "email": "",
             "phone": "",
-            "resume_path": (info["stored_path"] if info.get("uploaded") else None),
+            "resume_path": resume_path,
         }
 
     async def fill_textbox(
@@ -127,9 +149,10 @@ class FormFillerEngine:
         self,
         page: Page,
         provider: str = "linkedin",
+        job_id: int | None = None,
     ) -> dict:
 
-        profile = self.get_profile()
+        profile = await self.get_profile(job_id)
 
         inputs = await page.locator("input, textarea, select").all()
 

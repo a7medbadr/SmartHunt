@@ -16,8 +16,45 @@ from smarthunt.metrics.scheduler_lock import (
     scheduler_lock_acquired_total,
     scheduler_lock_conflicts_total,
 )
+from smarthunt.notifications.schemas import NotificationCreate
+from smarthunt.notifications.service import NotificationService
 from smarthunt.recruitment.service import RecruitmentService
 from smarthunt.resume.profile_builder import resume_profile_builder
+
+notification_service = NotificationService()
+
+# Mirrors recruitment/auto_apply_worker.py's _notify_success channel list —
+# fires every configured channel; each channel's own sender already no-ops
+# safely when its own credentials are unset, so this is safe to call
+# unconditionally.
+PAUSE_NOTIFICATION_CHANNELS = ("TELEGRAM", "EMAIL", "WHATSAPP")
+
+
+async def _notify_paused(
+    db: AsyncSession | None,
+    title: str,
+    message: str,
+) -> None:
+    """Best-effort — a notification failure must never take down the
+    apply flow that triggered it (see the same rationale in
+    auto_apply_worker.py's _notify_success)."""
+    if db is None:
+        return
+
+    for channel in PAUSE_NOTIFICATION_CHANNELS:
+        try:
+            await notification_service.create(
+                db,
+                NotificationCreate(
+                    type="WARNING",
+                    title=title,
+                    message=message,
+                    channel=channel,
+                    priority="HIGH",
+                ),
+            )
+        except Exception:
+            logger.exception(f"Failed to send pause notification channel={channel}")
 
 
 class PlaywrightEngine:
@@ -47,6 +84,16 @@ class PlaywrightEngine:
 
             page = await self.manager.get_page(provider)
             result = await linkedin_login(page)
+
+            if result.get("status") == "SUCCESS":
+                # Persist cookies/localStorage to disk now — see
+                # BrowserManager.save_state()'s docstring. Without this,
+                # a real login only ever lived in this process's memory
+                # and was silently lost on every container restart,
+                # forcing a fresh login (and real credentials) next time
+                # regardless of whether the previous session was still
+                # perfectly valid.
+                await self.manager.save_state(provider)
 
             return {
                 **result,
@@ -118,6 +165,7 @@ class PlaywrightEngine:
         application_id: str | None = None,
         db: AsyncSession | None = None,
         provider: str = "default",
+        job_id: int | None = None,
     ):
         if not self.manager.is_running:
             await self.manager.launch()
@@ -153,12 +201,24 @@ class PlaywrightEngine:
                 f"job_url={job_url} landed_on={page.url!r}"
             )
 
-        result = await easy_apply_engine.run(page)
+        result = await easy_apply_engine.run(page, job_id=job_id)
 
         logger.info(f"easy_apply finished job_url={job_url} result={result}")
 
-        if result.get("status") == "PAUSED_UNKNOWN_QUESTION" and application_id and db is not None:
-            await self._pause_application(application_id, db)
+        if result.get("status") == "PAUSED_UNKNOWN_QUESTION":
+            if application_id and db is not None:
+                await self._pause_application(application_id, db)
+
+            await _notify_paused(
+                db,
+                title="التقديم واقف على سؤال محتاج ردك",
+                message=(
+                    "التقديم اتوقف مؤقتًا لأنه قابل سؤال في الفورم مش متأكد من إجابته:\n\n"
+                    f"السؤال: {result.get('question', 'غير معروف')}\n"
+                    f"رابط الوظيفة: {job_url}\n\n"
+                    "ادخل على صفحة الوظيفة وكمّل التقديم يدويًا لما تكون جاهز."
+                ),
+            )
 
         return result
 
@@ -241,6 +301,7 @@ class PlaywrightEngine:
         provider: str = "linkedin",
         application_id: str | None = None,
         db: AsyncSession | None = None,
+        job_id: int | None = None,
     ):
         """Composes the already-real login/open_job/detect_form/easy_apply
         steps into a full unattended application. Only CAPTCHA/MFA
@@ -255,6 +316,19 @@ class PlaywrightEngine:
 
         if login_result.get("status") != "SUCCESS":
             logger.warning(f"apply() login failed job_url={job_url} result={login_result}")
+
+            if login_result.get("status") == "MANUAL_REQUIRED":
+                await _notify_paused(
+                    db,
+                    title=f"لينكدان محتاج تدخل يدوي ({provider})",
+                    message=(
+                        "محاولة تسجيل الدخول اتوقفت لأن لينكدان طلب تحقق يدوي "
+                        "(CAPTCHA أو موافقة من الموبايل).\n\n"
+                        f"الوظيفة اللي كنا هنقدم عليها: {job_url}\n\n"
+                        "افتح لينكدان وشوف لو فيه طلب تحقق محتاج موافقتك."
+                    ),
+                )
+
             return {
                 "status": login_result.get("status", "FAILED"),
                 "job_url": job_url,
@@ -287,7 +361,7 @@ class PlaywrightEngine:
             return {"status": "FAILED", "job_url": job_url, "reason": "external_ats_not_supported"}
 
         result = await self.easy_apply(
-            job_url, application_id=application_id, db=db, provider=provider
+            job_url, application_id=application_id, db=db, provider=provider, job_id=job_id
         )
 
         return {**result, "job_url": job_url}
