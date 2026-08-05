@@ -10,6 +10,7 @@ from smarthunt.browser.question_classifier import (
     classify,
 )
 from smarthunt.browser.unknown_questions import (
+    DBUnknownQuestionRepository,
     InMemoryUnknownQuestionRepository,
     UnknownQuestionRecord,
 )
@@ -77,6 +78,31 @@ async def test_repository_filters_by_provider():
     assert linkedin_only[0].label == "q1"
 
 
+@pytest.mark.asyncio
+async def test_db_repository_save_and_list_persists_across_instances():
+    """Regression test: the singleton used to be in-memory only, losing
+    every paused application's blocking question on restart — confirmed
+    live 2026-08-03 this was still the case despite the vision doc's
+    "pause and notify" goal. A fresh repository instance (simulating a
+    new process) must still see records saved by a previous one."""
+    repo = DBUnknownQuestionRepository()
+
+    await repo.save(
+        UnknownQuestionRecord(
+            provider="linkedin",
+            url="https://example.com/job/db-1",
+            label="years of kubernetes experience",
+            html="<div>...</div>",
+            confidence=0.6,
+        )
+    )
+
+    fresh_repo = DBUnknownQuestionRepository()
+    records = await fresh_repo.list(provider="linkedin")
+
+    assert any(r.url == "https://example.com/job/db-1" for r in records)
+
+
 def test_question_decision_answer():
     answerer = QuestionAnswerer()
 
@@ -123,7 +149,7 @@ async def test_easy_apply_pauses_on_unknown_question(monkeypatch):
 
     page = MagicMock()
 
-    async def fake_fill_form(p, provider="linkedin"):
+    async def fake_fill_form(p, provider="linkedin", job_id=None):
         return {
             "status": "QUESTION_REQUIRED",
             "question": "years of kubernetes experience",
