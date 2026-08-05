@@ -468,13 +468,21 @@ priority order is:
    cover letter → apply via Playwright → track status → notify), including a real LinkedIn account.
 6. UX polish.
 
-**Current state (as of 2026-08-01, superseding the "0%" line above):** all of the above is built.
-`frontend/src/app/(app)/` has: Dashboard (stats + a real Recent Activity feed), Jobs search
-(with real resume-match scoring via `sort=score`, and a no-sponsorship-language badge),
-Favorites (full job data via a joined query, not just bare IDs), Resume, Cover Letter,
-Applications (with a needs-follow-up flag for stale ones), AI Assistant, Scheduler,
-Notifications, Settings, System Health — each with a sidebar icon and matching page-header icon.
-The AI layer is wired to a real local Ollama provider (not a mock), used for deep job analysis.
+**Current state (as of 2026-08-01, superseding the "0%" line above; page list updated 2026-08-04):**
+all of the above is built. `frontend/src/app/(app)/` has: Dashboard (stats + a real Recent Activity
+feed, capped to the 5 most recent — see `/activity` for the full log), Jobs search (real resume-
+match scoring via `sort=score`, a no-sponsorship-language badge, a per-site "search this site
+directly" dropdown — see the discovery notes below — and starring jobs as favorites inline, no
+separate Favorites page anymore), Resume (upload/analyze, plus Cover Letter generation merged into
+the same page as of 2026-08-04 — the standalone `/cover-letter` route is gone), Applications, AI
+Assistant, Job Search (`/job-search` — as of 2026-08-04 this replaces the old `/scheduler` +
+`/saved-searches` pages: manual discovery trigger, saved searches with delete/re-run, LinkedIn
+post/feed monitoring moved here from the Providers page, run history, failed-jobs; the old "active
+locks" card was removed as not user-actionable — see the discovery notes below for why), Providers
+(now just the provider grid + "request a new site" dialog), Notifications, Activity, `/docs` (an
+in-app usage guide, added 2026-08-04), Settings, System Health — each with a sidebar icon and
+matching page-header icon. The AI layer is wired to a real local Ollama provider (not a mock), used
+for deep job analysis.
 Dark mode is the permanent default (`className="dark"` on `<html>`, not user-toggleable). Sidebar
 nav icons and each page's header icon carry a fixed, distinct Tailwind color per section (e.g. jobs
 = emerald, favorites = rose, resume = violet, applications = orange — see `NAV_LINKS` in
@@ -597,6 +605,130 @@ Other known, doc-recorded gaps (not exhaustive — treat as a starting list, re-
 - Resume/cover letter: multiple templates, real PDF/DOCX export, in-app preview.
 - Playwright: more job sites, more robust cookie/session persistence across restarts.
 - Scheduler/automation: no UI yet to trigger, pause, or monitor runs (API-only today).
+
+**LinkedIn's home feed switched to fully obfuscated CSS classes (no `data-urn` anywhere on that
+page) at some point after 2026-08-03 — found 2026-08-04 chasing "حصل خطأ أثناء الفحص" reports on
+the LinkedIn-post-scan feature.** `linkedin_monitor/post_scanner.py`'s `scan_home_feed()` used the
+same `[data-urn*='urn:li:activity']` selector as `scan_profile_posts()`, which silently found 0
+posts every time (caught by a broad try/except, so it never errored — it just always returned
+scanned=0). Confirmed live via `page.content()`: the string `urn:li:activity` appears *zero* times
+anywhere in the feed's real HTML now, which uses hash-like classes (`_713ca099`, etc.) instead.
+Profile "recent activity" pages (`scan_profile_posts`) still use the old, stable `data-urn`
+markup — this is feed-specific, not a site-wide change. The one surviving stable-looking marker on
+the feed is each post's own `<p componentkey="feed-commentary_<uuid>">` wrapper (LinkedIn's own
+frontend-framework bookkeeping attribute, not a CSS class) — `FEED_POST_SELECTOR =
+'p[componentkey^="feed-commentary_"]'` now drives feed extraction. There's no real per-post
+permalink left in that markup either, so `post_url` there is synthesized as
+`https://www.linkedin.com/feed/#{componentkey}` (real, unique, just not a link to that exact post
+the way the profile-page case still is). Also found in the same investigation: a blind
+`wait_for_timeout(3000)` after `goto()` was flaky under load (the exact same profile+selector found
+0 posts through the live endpoint right after a heavy `scan_home_feed()` scroll, but reliably found
+5 in an isolated manual check) — replaced with `wait_for_selector(..., timeout=15000)` wrapped in
+its own try/except in both scan functions, which is more robust to real page-load timing variance
+than a fixed sleep. If feed scanning breaks again, dump `page.content()` live first and grep for
+`urn:li:activity` before assuming the selector logic is at fault — this has now moved twice.
+
+**Separately, `posted_at` had never once been populated for any real discovered job (even ones
+discovered well after the original selector was added and unit-tested) — found and fixed
+2026-08-04 the same way as the feed issue above.** `providers/linkedin/provider.py`'s search-result
+cards changed the posting-date element's class from `.job-search-card__listdate` to `.job-search-
+card__listdate--new` at some point after 2026-07-20 (a live `card.inner_html()` dump showed the
+real current markup: `<time class="job-search-card__listdate--new" datetime="2026-08-03">12 hours
+ago</time>`) — the old selector silently matched nothing, caught by the same kind of broad
+try/except, so every job's `posted_at` stayed `None` with no visible error. `POSTED_DATE_SELECTOR`
+now matches both class names. Verified live: a fresh real search populated real ISO dates on every
+job. Existing rows discovered before this fix keep `posted_at=None` permanently (nothing
+re-scrapes old rows) — the Jobs page frontend falls back to showing `created_at` (discovery date)
+for those instead of a blank cell.
+
+**The local Ollama model is far slower on realistic-size prompts than the timeouts assumed —
+measured live 2026-08-04, root cause of persistent "17% then error" reports on AI Assistant/cover
+letter/deep-analysis/resume-tailoring despite each having been "fixed" before.** A resume+job
+prompt truncated to 3000 chars each (1690 tokens combined, matching what cover_letter/service.py
+and matching/services/deep_analysis.py were both sending) took **237.6s** end to end against
+`qwen2.5:0.5b` on an otherwise-idle host — already past every one of those call sites' own
+per-attempt `AIRequest.timeout` (115–150s), so `asyncio.wait_for` was cancelling a genuinely
+in-progress, would-have-succeeded generation and retrying from scratch each time, burning up to
+3× that before ever reaching the LOCAL fallback — and the *frontend* axios timeouts (280–350s) were
+in several cases shorter than even that backend worst case, so the client gave up before the
+backend could ever respond either way. A raw, unbounded direct-to-Ollama test with a 7674-char
+prompt took **6m34s+** and still hadn't finished when killed — prompt-eval time (not token
+generation) is the dominant cost and scales with input size, so cutting prompt size is the lever
+that actually helps, not just raising timeouts. Fixed by halving every truncation cap from 3000 to
+1500 chars (cover_letter/service.py, matching/services/deep_analysis.py,
+resume/services/tailoring.py, frontend `ai-api.ts`'s `MAX_RESUME_CHARS_FOR_AI`), raising each
+backend per-attempt timeout to actually exceed the new real measured time with margin (200–260s,
+up from 115–150s), and raising every corresponding frontend axios timeout to real margin over
+`retries × per-attempt-timeout` (650–850s, up from 280–500s) instead of under a single attempt.
+Verified live end-to-end afterward, not just by re-reading the code: a real cover-letter generation
+call returned a genuine, specific, 100%-matched letter in 141s (HTTP 200); a real AI Assistant
+resume-eval call needed a retry (attempt 1 still timed out on an Arabic-heavy prompt) but completed
+for real in 436s — confirming the new frontend timeout margin, not just the backend fix, actually
+matters. If "17%" (or any fixed early progress-bar percentage) comes back, first check what the
+*current* real Ollama latency is for that exact call shape (`curl` Ollama's `/api/generate`
+directly with a same-size prompt and read `prompt_eval_duration`/`eval_duration` from the response)
+before assuming the timeout math above is still right — CPU contention from other processes on
+this shared host (stale Playwright browser processes especially) measurably changes it run to run.
+
+**`matching/services/matcher.py`'s `SKILLS` list was scoped to a generic DevOps skill set
+(python/kubernetes/terraform/jenkins/git) with zero overlap for this owner's actual Linux/AIX/
+storage/virtualization/backup background — found 2026-08-04 via a real job ("Storage Backup
+Engineer": Veeam, Dell EMC/HPE/NetApp storage administration) that scored a flat 0% despite having
+a real, substantial, clearly-relevant description.** `extract_skills()` found zero recognized
+skills in that job's text at all, and `match()` treats "no recognized skills in the job" as an
+automatic 0 regardless of resume content — not a scoring bug, a *vocabulary* gap. Expanded `SKILLS`
+to the owner's real domain (rhel/centos/ubuntu/suse, san/nas/storage/backup/veeam/netbackup,
+vsphere/esxi/vcf, nutanix/kvm/hyper-v, pacemaker/satellite/selinux, high availability/disaster
+recovery), aligned with `matching/services/job_relevance.py`'s already-vetted keyword scope. If
+match scores still look wrong for a job with a real, substantial description, check whether the
+job's actual required tech just isn't in this list yet before assuming it's a deeper bug.
+
+**Test-suite gotcha, found 2026-08-04 chasing a test that failed only ~700s into a full sequential
+run, never in isolation or within its own file:** `monkeypatch.setattr(some_singleton_instance,
+"method_name", fake)` — patching an *instance* (e.g. `provider_registry`, `provider_settings_
+service`, both process-wide singletons that live for the whole test run) rather than its *class* —
+has a real footgun. If the instance doesn't already have that attribute set directly on it (i.e. it
+currently resolves through the class), monkeypatch's `getattr()` during setup still returns the
+bound method, and its teardown does `setattr(instance, name, <that bound method>)` — which
+*stamps* the original method onto the instance as a permanent instance-level attribute, silently
+shadowing the class from then on. A *later*, unrelated test's own `monkeypatch.setattr(TheClass,
+"method_name", fake)` (patching the class, the normally-correct pattern, e.g.
+`test_provider_settings.py` already did this correctly) then has no visible effect, because
+instance-attribute lookup wins over the class — the singleton keeps calling the *real* stamped-on
+method for the rest of the process. Symptom looked exactly like flakiness (passes standalone,
+fails only deep in a full run) but was fully deterministic given this suite's fixed collection
+order. Fix: always monkeypatch the *class* (`ProviderRegistry`/`ProviderSettingsService`, imported
+alongside the singleton) when patching a method on one of these singletons, never the instance.
+
+**Investigated 2026-08-04 why Sabbar/Baaeed (both `real_discovery=True`, both confirmed doing real,
+unfiltered live scraping — no fake stub data) had produced zero jobs in the DB despite being
+enabled:** two separate causes, one now fixed, one structural/inherent. (1) Baaeed's jobs are all
+`location="Remote"`, which the Saudi-Arabia-only `DiscoveryService` location filter used to exclude
+from every single scheduled run unconditionally — fixed by letting any job whose location contains
+"remote" always pass the location filter regardless of what location was searched for
+(`discovery/service.py`). (2) Neither provider supports real query-based search on its own site
+(confirmed: Sabbar's search box is a JS combobox the URL can't drive; Baaeed's doesn't reliably
+filter either) — both just return their site's current unfiltered recent-listings page and rely on
+`matching/services/job_relevance.py`'s strict title allowlist to do the actual filtering, same as
+every other provider's results pass through. Since both are general job boards (sales/marketing/
+content/HR postings dominate their recent listings), the odds of any single ~25-job sample
+containing something that actually matches this owner's narrow Linux/OpenShift/VMware/storage
+allowlist are low — confirmed live: 0/25 relevant from each in one snapshot. This is expected
+low-and-occasional yield given how these two providers work, not a bug to chase further with more
+code changes; it should improve gradually over many scheduled runs sampling fresh "recent" batches,
+not from any single run.
+
+**Added a "search this specific site directly" feature (`POST
+/api/v1/discovery/search-provider`, `DiscoveryService.search_single_provider()`) 2026-08-04** — the
+Jobs page's provider dropdown now actually live-searches that one site's own real
+`search()` (respecting the enabled/disabled setting) and saves whatever it finds, instead of only
+ever filtering the local jobs table. Deliberately does *not* apply `discover()`'s Saudi-only
+location filter or strict title-relevance filter — the owner explicitly picked this one site and
+query and should see what's really there, not our own curated/filtered view of it. Verified live
+with LinkedIn: a real search for "Linux Administrator" in "Saudi Arabia" found 10 real jobs,
+inserted 6 new ones, in 43s. LinkedIn's own two-pass search (list page, then each job's own detail
+page for its description — see the provider's own file) costs roughly ~4.3s/job, which is why this
+endpoint's default `limit` is 15 (not `discover()`'s 25) and its frontend axios timeout is 150s.
 
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2

@@ -1,0 +1,38 @@
+# Pings the public health route every 10 minutes so the Red Hat Developer
+# Sandbox's inactivity-based idling never scales smarthunt-backend/postgresql
+# to 0 replicas. Found 2026-08-05: the free-tier sandbox idles workloads
+# after a period with no traffic through the Route, and the first request
+# after that triggers a slow cold-start (and can transiently fail) — this
+# keeps the app permanently warm instead.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: smarthunt-keepalive
+  labels:
+    app: smarthunt
+    component: keepalive
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ping
+              image: docker.io/curlimages/curl:latest
+              command: ["/bin/sh", "-c"]
+              args:
+                - "curl -sk -o /dev/null -w 'keepalive ping: HTTP %{http_code}\n' https://smarthunt-backend-a-badr-dev.apps.rm3.7wse.p1.openshiftapps.com/api/v1/health/live"
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  cpu: 50m
+                  memory: 64Mi
