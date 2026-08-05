@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smarthunt-browser-profiles
+  labels:
+    app: smarthunt
+    component: backend
+spec:
+  # Same ReadWriteMany/EFS reasoning as backend-resume-pvc.yaml: the
+  # RollingUpdate briefly runs old and new pods together, which an
+  # EBS-backed RWO volume can't attach to at once.
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 1Gi

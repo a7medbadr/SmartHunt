@@ -30,11 +30,17 @@ backend/.env
 # Logs
 *.log
 
-# Frontend — the backend Docker build (backend/Dockerfile) never needs any
-# of this, and frontend/.next churns constantly under a running dev server,
-# which raced an `oc start-build --from-dir=.` tar snapshot and broke the
-# upload (2026-08-01: "no such file or directory" on a turbopack cache file).
-frontend/
+# Frontend build artifacts — frontend/.next churns constantly under a
+# running dev/prod server, which raced an `oc start-build --from-dir=.`
+# tar snapshot and broke the backend's upload (2026-08-01: "no such file
+# or directory" on a turbopack cache file). Originally excluded all of
+# frontend/ to dodge this, but frontend/ now has its own OpenShift build
+# (frontend/Dockerfile) that genuinely needs the source — only the
+# actual churning/generated directories are excluded now, not the
+# whole tree.
+frontend/.next
+frontend/node_modules
+frontend/.turbo
 
 # OS
 .DS_Store

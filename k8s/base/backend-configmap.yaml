@@ -30,3 +30,4 @@ data:
   TZ: "UTC"
 
   RESUME_STORAGE_DIR: "/data/resumes"
+  BROWSER_PROFILES_DIR: "/data/browser-profiles"

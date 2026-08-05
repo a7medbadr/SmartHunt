@@ -36,15 +36,25 @@ spec:
         - secretRef:
             name: smarthunt-secret
         resources:
+          # 512Mi was nowhere near enough — found 2026-08-04 live: a real
+          # LinkedIn feed scan (which launches an actual headless
+          # Chromium, same as login()/apply()) OOMKilled the pod
+          # (exitCode 137) every time, which is what every "حصل خطأ أثناء
+          # الفحص" report on OpenShift actually was — the backend crashed
+          # mid-request, not a code bug in the scan logic itself. Ample
+          # quota headroom available (compute-deploy: 30Gi limit, ~1.5Gi
+          # used before this change).
           requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            cpu: 500m
+            cpu: 200m
             memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: resume-storage
           mountPath: /data/resumes
+        - name: browser-profiles
+          mountPath: /data/browser-profiles
         livenessProbe:
           httpGet:
             path: /api/v1/health/live
@@ -69,3 +79,6 @@ spec:
       - name: resume-storage
         persistentVolumeClaim:
           claimName: smarthunt-resume-storage
+      - name: browser-profiles
+        persistentVolumeClaim:
+          claimName: smarthunt-browser-profiles

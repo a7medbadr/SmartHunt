@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smarthunt-frontend-config
+  labels:
+    app: smarthunt
+    component: frontend
+data:
+  # The frontend server proxies /api/* to this origin server-side (see
+  # frontend/next.config.ts's rewrites()) — the browser only ever talks
+  # to the frontend's own Route, never directly to the backend, so this
+  # is the in-cluster Service DNS name, not a public URL.
+  BACKEND_ORIGIN: http://smarthunt-backend
+  PORT: "3000"
+  HOSTNAME: 0.0.0.0

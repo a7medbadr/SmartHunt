@@ -1,0 +1,28 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: smarthunt-frontend
+  labels:
+    app: smarthunt
+    component: frontend
+  annotations:
+    # OpenShift's default Route/HAProxy timeout is 30s — far shorter than
+    # several real calls proxied through here (LinkedIn feed/account
+    # scans routinely take 30-90s; AI generation calls can legitimately
+    # run to the 650-850s frontend timeouts already tuned for real
+    # measured Ollama latency, see CLAUDE.md). Found 2026-08-04: every
+    # such call was getting killed with a 504 at exactly 30s regardless
+    # of backend health, which was silently undoing all the backend/
+    # frontend timeout tuning done earlier for AI calls — those fixes
+    # were correct but never actually took effect on OpenShift because
+    # the Route itself was cutting the connection first.
+    haproxy.router.openshift.io/timeout: 900s
+spec:
+  to:
+    kind: Service
+    name: smarthunt-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

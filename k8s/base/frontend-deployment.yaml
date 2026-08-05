@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smarthunt-frontend
+  labels:
+    app: smarthunt
+    component: frontend
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: smarthunt
+      component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: smarthunt
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: image-registry.openshift-image-registry.svc:5000/a-badr-dev/smarthunt-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: smarthunt-frontend-config
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 3000
+          initialDelaySeconds: 10
+          timeoutSeconds: 3
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /login
+            port: 3000
+          failureThreshold: 30
+          periodSeconds: 5

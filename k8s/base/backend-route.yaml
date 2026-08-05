@@ -5,6 +5,10 @@ metadata:
   labels:
     app: smarthunt
     component: backend
+  annotations:
+    # See frontend-route.yaml's comment — same 30s-default-vs-long-real-
+    # calls issue applies to direct backend Route access too.
+    haproxy.router.openshift.io/timeout: 900s
 spec:
   to:
     kind: Service

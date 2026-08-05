@@ -37,9 +37,12 @@ services:
       - /home/badr/secrets/secret.env
     environment:
       - RESUME_STORAGE_DIR=/data/resumes
+      - BROWSER_PROFILES_DIR=/data/browser-profiles
     volumes:
       - resume_storage:/data/resumes
+      - browser_profiles:/data/browser-profiles
 
 volumes:
   postgres_data:
   resume_storage:
+  browser_profiles:
