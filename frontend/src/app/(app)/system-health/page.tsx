@@ -9,9 +9,11 @@ import {
   getSystemVersion,
   listProviderHealth,
 } from "@/lib/system-api";
+import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { cn } from "@/lib/utils";
 
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
@@ -23,6 +25,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default function SystemHealthPage() {
+  const { t } = useTranslation();
   const detailsQuery = useQuery({
     queryKey: ["health-details"],
     queryFn: getHealthDetails,
@@ -42,10 +45,11 @@ export default function SystemHealthPage() {
   });
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="relative flex max-w-3xl flex-col gap-6 overflow-hidden">
+      <PageGlow />
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <ActivityIcon className="size-6 text-red-400" />
-        حالة النظام
+        {t("pageTitles", "systemHealth")}
       </h1>
 
       <Card>

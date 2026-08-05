@@ -10,6 +10,8 @@ export interface Job {
   description: string | null;
   requirements: string | null;
   created_at: string;
+  posted_at?: string | null;
+  post_url?: string | null;
   score?: number | null;
   no_sponsorship_signal?: boolean;
 }

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Briefcase, Zap } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -13,8 +14,10 @@ import {
   updateApplicationStatus,
 } from "@/lib/applications-api";
 import { quickApply } from "@/lib/apply-queue-api";
+import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -39,9 +42,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/language-context";
+
+const STATUS_STYLES: Record<string, string> = {
+  Applied: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  Interviewing: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  "Technical Interview": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  Offered: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  Rejected: "bg-red-500/15 text-red-400 border-red-500/30",
+  Pending: "bg-slate-500/15 text-slate-400 border-slate-500/30",
+};
 
 export default function ApplicationsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
@@ -88,11 +103,12 @@ export default function ApplicationsPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6 overflow-hidden">
+      <PageGlow />
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
           <Briefcase className="size-6 text-orange-400" />
-          التقديمات
+          {t("pageTitles", "applications")}
         </h1>
 
         <Dialog
@@ -160,6 +176,29 @@ export default function ApplicationsPage() {
         </Dialog>
       </div>
 
+      {!isPending && data && data.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {APPLICATION_STATUSES.map((status) => {
+            const count = data.filter((a) => a.status === status).length;
+            if (count === 0) return null;
+            return (
+              <Card key={status} className="min-w-28">
+                <CardContent className="flex flex-col gap-1 p-3">
+                  <span className="text-xs text-muted-foreground">{status}</span>
+                  <span className="text-xl font-semibold">{count}</span>
+                </CardContent>
+              </Card>
+            );
+          })}
+          <Card className="min-w-28">
+            <CardContent className="flex flex-col gap-1 p-3">
+              <span className="text-xs text-muted-foreground">الإجمالي</span>
+              <span className="text-xl font-semibold">{data.length}</span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {isPending ? (
         <Skeleton className="h-40 w-full" />
       ) : data && data.length > 0 ? (
@@ -205,7 +244,9 @@ export default function ApplicationsPage() {
                       statusMutation.mutate({ id: app.id, status: status as ApplicationStatus })
                     }
                   >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger
+                      className={cn("w-40", STATUS_STYLES[app.status])}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -221,13 +262,21 @@ export default function ApplicationsPage() {
                   {new Date(app.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteMutation.mutate(app.id)}
-                  >
-                    حذف
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Link
+                      href={`/applications/${app.id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      المحادثة
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(app.id)}
+                    >
+                      حذف
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

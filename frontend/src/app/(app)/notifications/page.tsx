@@ -9,13 +9,16 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/notifications-api";
+import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { cn } from "@/lib/utils";
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data, isPending } = useQuery({
     queryKey: ["notifications"],
@@ -42,11 +45,12 @@ export default function NotificationsPage() {
   const unreadCount = data?.filter((n) => !n.read_at).length ?? 0;
 
   return (
-    <div className="flex max-w-2xl flex-col gap-4">
+    <div className="relative flex max-w-2xl flex-col gap-4 overflow-hidden">
+      <PageGlow />
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
           <Bell className="size-6 text-yellow-400" />
-          الإشعارات
+          {t("pageTitles", "notifications")}
         </h1>
         {unreadCount > 0 && (
           <Button

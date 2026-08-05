@@ -15,19 +15,6 @@ export async function listSchedulerHistory(): Promise<SchedulerHistoryEntry[]> {
   return data;
 }
 
-export interface SchedulerLock {
-  id: number;
-  job_id: string;
-  owner_id: string;
-  acquired_at: string;
-  expires_at: string;
-}
-
-export async function listSchedulerLocks(): Promise<SchedulerLock[]> {
-  const { data } = await apiClient.get<SchedulerLock[]>("/scheduler/locks");
-  return data;
-}
-
 export interface FailedSchedulerJob {
   id: number;
   provider: string;
@@ -59,6 +46,32 @@ export async function runDiscovery(
     "/discovery/run",
     null,
     { params: { query, location } },
+  );
+  return data;
+}
+
+export interface SearchProviderResult {
+  provider: string;
+  found: number;
+  inserted: number;
+  duplicates: number;
+}
+
+// Real site navigation (LinkedIn et al.) — measured live 2026-08-04 at
+// ~43s for the backend's default limit=15 (LinkedIn visits each job's
+// own detail page for its description, ~4.3s/job); generous margin over
+// that, same reasoning as linkedin-monitor-api.ts's SCAN_TIMEOUT_MS.
+const SEARCH_PROVIDER_TIMEOUT_MS = 150000;
+
+export async function searchProvider(
+  provider: string,
+  query: string,
+  location?: string,
+): Promise<SearchProviderResult> {
+  const { data } = await apiClient.post<SearchProviderResult>(
+    "/discovery/search-provider",
+    null,
+    { params: { provider, query, location }, timeout: SEARCH_PROVIDER_TIMEOUT_MS },
   );
   return data;
 }

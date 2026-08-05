@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Cairo, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { QueryProvider } from "@/lib/query-provider";
+import { LanguageProvider } from "@/lib/i18n/language-context";
+import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/translations";
 
 const cairo = Cairo({
   variable: "--font-sans",
@@ -19,19 +22,25 @@ export const metadata: Metadata = {
   description: "منصة البحث الذكي عن الوظائف والتقديم التلقائي بالذكاء الاصطناعي",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const locale: Locale = cookieStore.get(LOCALE_COOKIE)?.value === "en" ? "en" : "ar";
+  const dir = locale === "ar" ? "rtl" : "ltr";
+
   return (
     <html
-      lang="ar"
-      dir="rtl"
+      lang={locale}
+      dir={dir}
       className={`dark ${cairo.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <LanguageProvider initialLocale={locale}>{children}</LanguageProvider>
+        </QueryProvider>
       </body>
     </html>
   );

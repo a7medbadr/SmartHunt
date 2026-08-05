@@ -4,7 +4,7 @@ export interface DashboardStatistics {
   jobs: number;
   applications: number;
   favorites: number;
-  saved_searches: number;
+  linkedin_posts: number;
   providers: number;
 }
 

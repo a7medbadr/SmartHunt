@@ -3,18 +3,16 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
-  BookmarkPlus,
+  BookOpen,
   Bot,
   Briefcase,
   Building2,
-  CalendarClock,
   FileText,
-  Heart,
   History,
   Home,
   LogOut,
-  Mail,
   Search,
+  SearchCheck,
   Settings,
   Activity,
 } from "lucide-react";
@@ -25,6 +23,7 @@ import { useEffect } from "react";
 import { getCurrentUser, refreshToken } from "@/lib/auth-api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/notifications-api";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,30 +35,30 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "/", label: "الرئيسية", icon: Home, color: "text-blue-400" },
-  { href: "/jobs", label: "الوظائف", icon: Search, color: "text-emerald-400" },
-  { href: "/favorites", label: "المفضلة", icon: Heart, color: "text-rose-400" },
+  { href: "/", key: "dashboard" as const, icon: Home, color: "text-blue-400" },
+  { href: "/jobs", key: "jobs" as const, icon: Search, color: "text-emerald-400" },
   {
-    href: "/saved-searches",
-    label: "عمليات البحث المحفوظة",
-    icon: BookmarkPlus,
-    color: "text-amber-400",
+    href: "/job-search",
+    key: "jobSearch" as const,
+    icon: SearchCheck,
+    color: "text-teal-400",
   },
-  { href: "/resume", label: "السيرة الذاتية", icon: FileText, color: "text-violet-400" },
-  { href: "/cover-letter", label: "خطاب التقديم", icon: Mail, color: "text-cyan-400" },
-  { href: "/applications", label: "التقديمات", icon: Briefcase, color: "text-orange-400" },
-  { href: "/ai-assistant", label: "المساعد الذكي", icon: Bot, color: "text-fuchsia-400" },
-  { href: "/scheduler", label: "الجدولة", icon: CalendarClock, color: "text-teal-400" },
-  { href: "/providers", label: "مواقع التوظيف", icon: Building2, color: "text-indigo-400" },
-  { href: "/notifications", label: "الإشعارات", icon: Bell, color: "text-yellow-400" },
-  { href: "/activity", label: "سجل النشاطات", icon: History, color: "text-teal-400" },
-  { href: "/settings", label: "الإعدادات", icon: Settings, color: "text-slate-400" },
-  { href: "/system-health", label: "حالة النظام", icon: Activity, color: "text-red-400" },
+  { href: "/applications", key: "applications" as const, icon: Briefcase, color: "text-orange-400" },
+  { href: "/resume", key: "resume" as const, icon: FileText, color: "text-violet-400" },
+  { href: "/ai-assistant", key: "aiAssistant" as const, icon: Bot, color: "text-fuchsia-400" },
+  { href: "/providers", key: "providers" as const, icon: Building2, color: "text-indigo-400" },
+  { href: "/notifications", key: "notifications" as const, icon: Bell, color: "text-yellow-400" },
+  { href: "/activity", key: "activity" as const, icon: History, color: "text-teal-400" },
+  { href: "/docs", key: "docs" as const, icon: BookOpen, color: "text-amber-400" },
+  { href: "/settings", key: "settings" as const, icon: Settings, color: "text-slate-400" },
+  { href: "/system-health", key: "systemHealth" as const, icon: Activity, color: "text-red-400" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t, locale } = useTranslation();
+  const isRtl = locale === "ar";
 
   useEffect(() => {
     if (!getToken()) {
@@ -138,19 +137,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (isPending || !user) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <p className="text-muted-foreground">جاري التحميل...</p>
+        <p className="text-muted-foreground">{t("common", "loading")}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-full flex-1">
-      <aside className="flex w-64 shrink-0 flex-col border-l bg-card/40">
-        <div className="flex items-center gap-2 px-5 py-4">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+    // `position: fixed` on <aside>, not a flexbox height-containment
+    // trick — found 2026-08-04 that an h-screen/overflow-hidden flex
+    // wrapper (the previous approach) still let the sidebar scroll away
+    // on a long page for at least one real browser/session, despite
+    // being correct on paper. `fixed` is anchored to the viewport by
+    // definition, completely independent of any ancestor's height/
+    // overflow/flex setup, so there's no chain of "does every ancestor
+    // actually constrain height correctly" left to get wrong. <main>
+    // just gets a matching margin so its content doesn't render under
+    // the fixed sidebar, and the whole page scrolls normally.
+    <div className="flex flex-1">
+      <aside
+        className={cn(
+          "fixed inset-y-0 z-10 flex w-64 flex-col overflow-y-auto bg-card/40",
+          isRtl ? "right-0 border-l" : "left-0 border-r",
+        )}
+      >
+        <div className="px-5 py-4">
+          <div className="flex w-fit items-center gap-2 rounded-lg bg-primary px-3 py-1.5">
             <Search className="size-4 text-primary-foreground" />
+            <span className="text-lg font-bold text-primary-foreground">SmartHunt</span>
           </div>
-          <span className="text-lg font-bold">SmartHunt</span>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3">
@@ -169,7 +183,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <Icon className={cn("size-4 shrink-0", link.color)} />
-                <span className="flex-1">{link.label}</span>
+                <span className="flex-1">{t("nav", link.key)}</span>
                 {link.href === "/notifications" && !!unreadCount && (
                   <Badge className="h-5 min-w-5 justify-center px-1">
                     {unreadCount}
@@ -195,14 +209,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="size-4" />
-                تسجيل الخروج
+                {t("nav", "logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </aside>
 
-      <main className="flex flex-1 flex-col overflow-y-auto p-6">{children}</main>
+      {/* mr- (physical), not me- (logical): the app is dir="rtl", where
+          margin-inline-end resolves to margin-LEFT — the opposite side
+          from the <aside>'s physical right-0, so the previous me-64 gave
+          the content zero clearance on the side the sidebar actually
+          occupies and let every page render underneath it. Found
+          2026-08-04 from a live screenshot showing the dashboard fully
+          overlapping the nav. */}
+      <main className={cn("flex flex-1 flex-col p-6", isRtl ? "mr-64" : "ml-64")}>
+        {children}
+      </main>
     </div>
   );
 }

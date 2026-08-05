@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { createNotification } from "@/lib/notifications-api";
 import { listProviders, setProviderEnabled } from "@/lib/providers-api";
+import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function ProvidersPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestSiteName, setRequestSiteName] = useState("");
   const [requestNote, setRequestNote] = useState("");
@@ -49,11 +52,12 @@ export default function ProvidersPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6 overflow-hidden">
+      <PageGlow />
       <div className="flex items-center justify-between">
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
           <Building2 className="size-6 text-indigo-400" />
-          مواقع التوظيف
+          {t("pageTitles", "providers")}
         </h1>
 
         <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>

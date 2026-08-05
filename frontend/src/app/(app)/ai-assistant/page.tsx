@@ -1,15 +1,20 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { generateAIResponse } from "@/lib/ai-api";
+import { generateAIResponse, truncateResumeForAI } from "@/lib/ai-api";
+import { AI_MUTATION_KEY } from "@/lib/ai-mutation-key";
 import { getResumeText } from "@/lib/resume-api";
+import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EstimatedProgressBar } from "@/components/ui/estimated-progress-bar";
 import { Textarea } from "@/components/ui/textarea";
+import { useEstimatedProgress } from "@/hooks/use-estimated-progress";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/language-context";
 
 interface Message {
   role: "user" | "assistant";
@@ -51,6 +56,7 @@ function buildResumeEvaluationPrompt(resumeText: string): string {
 }
 
 export default function AIAssistantPage() {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -60,7 +66,12 @@ export default function AIAssistantPage() {
     queryFn: getResumeText,
   });
 
+  // The backend can only run one AI generation at a time — see
+  // ai-mutation-key.ts.
+  const aiBusyElsewhere = useIsMutating({ mutationKey: AI_MUTATION_KEY }) > 0;
+
   const mutation = useMutation({
+    mutationKey: AI_MUTATION_KEY,
     mutationFn: ({ prompt, maxTokens }: { prompt: string; maxTokens?: number }) =>
       generateAIResponse(prompt, maxTokens),
     onSuccess: (data) => {
@@ -82,23 +93,24 @@ export default function AIAssistantPage() {
       ]);
     },
   });
+  const chatProgress = useEstimatedProgress(mutation.isPending, 200000);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function send(prompt: string) {
-    if (!prompt.trim() || mutation.isPending) return;
+    if (!prompt.trim() || mutation.isPending || aiBusyElsewhere) return;
     setMessages((prev) => [...prev, { role: "user", content: prompt }]);
     setInput("");
 
     let fullPrompt: string;
     let maxTokens: number | undefined;
     if (prompt === EVALUATE_RESUME_PROMPT && resumeText) {
-      fullPrompt = buildResumeEvaluationPrompt(resumeText);
-      maxTokens = 800;
+      fullPrompt = buildResumeEvaluationPrompt(truncateResumeForAI(resumeText));
+      maxTokens = 400;
     } else if (resumeText) {
-      fullPrompt = `سيرتي الذاتية:\n\n${resumeText}\n\n---\n\n${prompt}`;
+      fullPrompt = `سيرتي الذاتية:\n\n${truncateResumeForAI(resumeText)}\n\n---\n\n${prompt}`;
     } else {
       fullPrompt = prompt;
     }
@@ -107,10 +119,11 @@ export default function AIAssistantPage() {
   }
 
   return (
-    <div className="flex h-full max-w-2xl flex-col gap-4">
+    <div className="relative flex h-full max-w-2xl flex-col gap-4 overflow-hidden">
+      <PageGlow />
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Bot className="size-6 text-fuchsia-400" />
-        المساعد الذكي
+        {t("pageTitles", "aiAssistant")}
       </h1>
 
       {resumeText ? (
@@ -126,11 +139,23 @@ export default function AIAssistantPage() {
       {messages.length === 0 && (
         <div className="flex flex-wrap gap-2">
           {QUICK_PROMPTS.map((prompt) => (
-            <Button key={prompt} variant="outline" size="sm" onClick={() => send(prompt)}>
+            <Button
+              key={prompt}
+              variant="outline"
+              size="sm"
+              disabled={aiBusyElsewhere}
+              onClick={() => send(prompt)}
+            >
               {prompt}
             </Button>
           ))}
         </div>
+      )}
+
+      {aiBusyElsewhere && !mutation.isPending && (
+        <p className="text-xs text-muted-foreground">
+          في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+        </p>
       )}
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-md border p-4">
@@ -148,20 +173,15 @@ export default function AIAssistantPage() {
           </div>
         ))}
         {mutation.isPending && (
-          <div className="self-start rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 self-start rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
             جاري الكتابة...
+            <EstimatedProgressBar percent={chatProgress} />
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send(input);
-        }}
-        className="flex gap-2"
-      >
+      <div className="flex gap-2">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -175,10 +195,14 @@ export default function AIAssistantPage() {
           rows={2}
           className="flex-1"
         />
-        <Button type="submit" disabled={mutation.isPending}>
+        <Button
+          type="button"
+          onClick={() => send(input)}
+          disabled={mutation.isPending || aiBusyElsewhere}
+        >
           إرسال
         </Button>
-      </form>
+      </div>
     </div>
   );
 }

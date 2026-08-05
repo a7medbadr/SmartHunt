@@ -6,7 +6,7 @@ import {
   Building2,
   Heart,
   Home,
-  BookmarkPlus,
+  Rss,
   Clock,
   Search,
   type LucideIcon,
@@ -16,9 +16,11 @@ import Link from "next/link";
 import { getDashboardStatistics } from "@/lib/dashboard-api";
 import { getRecentActivities } from "@/lib/activity-api";
 import { ACTIVITY_ICONS } from "@/lib/activity-icons";
+import { PageGlow } from "@/components/page-glow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, timeAgo } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/language-context";
 
 const STAT_CARDS: Array<{
   key: keyof Awaited<ReturnType<typeof getDashboardStatistics>>;
@@ -29,20 +31,20 @@ const STAT_CARDS: Array<{
 }> = [
   { key: "jobs", label: "الوظائف المكتشفة", href: "/jobs", icon: Search, color: "text-emerald-400" },
   {
+    key: "linkedin_posts",
+    label: "وظائف من بوستات لينكدان",
+    href: "/job-search",
+    icon: Rss,
+    color: "text-sky-400",
+  },
+  {
     key: "applications",
     label: "التقديمات",
     href: "/applications",
     icon: Briefcase,
     color: "text-orange-400",
   },
-  { key: "favorites", label: "المفضلة", href: "/favorites", icon: Heart, color: "text-rose-400" },
-  {
-    key: "saved_searches",
-    label: "عمليات البحث المحفوظة",
-    href: "/saved-searches",
-    icon: BookmarkPlus,
-    color: "text-amber-400",
-  },
+  { key: "favorites", label: "المفضلة", href: "/jobs", icon: Heart, color: "text-rose-400" },
   {
     key: "providers",
     label: "مواقع التوظيف المفعّلة",
@@ -53,6 +55,7 @@ const STAT_CARDS: Array<{
 ];
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useQuery({
     queryKey: ["dashboard-statistics"],
     queryFn: getDashboardStatistics,
@@ -60,14 +63,16 @@ export default function DashboardPage() {
 
   const { data: activities, isPending: activitiesPending } = useQuery({
     queryKey: ["recent-activity"],
-    queryFn: () => getRecentActivities(),
+    queryFn: () => getRecentActivities(5),
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6 overflow-hidden">
+      <PageGlow />
+
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Home className="size-6 text-blue-400" />
-        الداشبورد
+        {t("pageTitles", "dashboard")}
       </h1>
 
       {isError && (

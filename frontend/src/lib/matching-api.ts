@@ -13,16 +13,16 @@ export async function deepAnalyzeJob(
   resume: string,
   job: string,
 ): Promise<DeepAnalysisResult> {
-  // The backend's own AI timeout for this call is 115s per attempt, with
-  // up to 3 retries on the real (CPU-bound, sometimes slow) local Ollama
-  // model — give the frontend enough room to see a retry succeed instead
-  // of aborting first and reporting a false failure. Ollama calls are
-  // also now serialized backend-side (ai/providers/ollama.py) so
-  // concurrent requests stop competing for the same CPU-bound model.
+  // The backend's own AI timeout for this call is 200s per attempt (see
+  // matching/services/deep_analysis.py), with up to ai_max_retries
+  // attempts on the real (CPU-bound, sometimes slow) local Ollama model —
+  // 350s here used to be shorter than even 2 backend attempts, so the
+  // frontend would abort before the backend could ever finish or fall
+  // back. Needs real margin over retries * per-attempt timeout.
   const { data } = await apiClient.post<DeepAnalysisResult>(
     "/matching/deep-analysis",
     { resume, job },
-    { timeout: 350000 },
+    { timeout: 650000 },
   );
   return data;
 }

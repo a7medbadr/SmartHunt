@@ -11,18 +11,43 @@ export interface AIGenerateResponse {
   error: string | null;
 }
 
-// The local Ollama model this runs on is CPU-bound and, under real load,
-// slow enough that a single attempt can miss the backend's own 90s
-// per-attempt timeout — confirmed live: one real request took a 90s
-// timeout on attempt 1, then succeeded in 87s on attempt 2 (backend
-// retries automatically, up to 3 times = 270s worst case). 280s gives
-// the frontend enough room to actually see even that worst case
-// resolve instead of aborting first and showing a false "error, try
-// again" while the backend was still working. Ollama calls are also
-// now serialized backend-side (see ai/providers/ollama.py) so
-// concurrent requests stop fighting each other for the same CPU-bound
-// model, which was the main cause of attempts exceeding 90s at all.
-const AI_REQUEST_TIMEOUT_MS = 280000;
+// Measured live 2026-08-04 on an otherwise-idle host: a resume+job prompt
+// truncated to 3000 chars each (1690 tokens combined) took 237.6s end to
+// end against the configured local model — already past a 150s
+// per-attempt timeout, so asyncio.wait_for on the backend was cancelling
+// a genuinely-in-progress, would-have-succeeded generation and retrying
+// from scratch every time (up to 3x) before ever falling back. 260s per
+// attempt (with the halved MAX_RESUME_CHARS_FOR_AI below) gives a single
+// real attempt real margin to finish. The client-side timeout has to
+// cover the full retries * per-attempt-timeout worst case with margin —
+// a long wait, but the progress indicator on these actions makes that
+// bearable instead of looking frozen.
+const AI_REQUEST_TIMEOUT_MS = 850000;
+const AI_SERVER_TIMEOUT_SECONDS = 260;
+
+// Halved 2026-08-04 (from 3000) after the measurement above — cuts
+// prompt-eval time roughly in half, which is what actually let a single
+// attempt finish inside its timeout budget instead of always being
+// cancelled and retried. A well-structured resume front-loads what
+// matters (summary, skills, most recent role) in its first portion, so
+// truncating there keeps answers useful while cutting inference time
+// substantially.
+const MAX_RESUME_CHARS_FOR_AI = 1500;
+
+export function truncateResumeForAI(resume: string): string {
+  return resume.length > MAX_RESUME_CHARS_FOR_AI
+    ? resume.slice(0, MAX_RESUME_CHARS_FOR_AI) + "\n...(تم اختصار باقي السيرة الذاتية)"
+    : resume;
+}
+
+// A job description can be just as long as a resume — unbounded here
+// before, so an interview-prep call against a long real posting could
+// blow past the timeout budget the same way an untruncated resume did.
+function truncateJobForAI(job: string): string {
+  return job.length > MAX_RESUME_CHARS_FOR_AI
+    ? job.slice(0, MAX_RESUME_CHARS_FOR_AI) + "\n...(تم اختصار باقي وصف الوظيفة)"
+    : job;
+}
 
 export async function generateAIResponse(
   prompt: string,
@@ -30,7 +55,11 @@ export async function generateAIResponse(
 ): Promise<AIGenerateResponse> {
   const { data } = await apiClient.post<AIGenerateResponse>(
     "/ai/generate",
-    maxTokens ? { prompt, max_tokens: maxTokens } : { prompt },
+    {
+      prompt,
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      timeout: AI_SERVER_TIMEOUT_SECONDS,
+    },
     { timeout: AI_REQUEST_TIMEOUT_MS },
   );
   return data;
@@ -41,13 +70,13 @@ export async function generateInterviewPrep(
   job: string,
 ): Promise<AIGenerateResponse> {
   const prompt =
-    `سيرتي الذاتية:\n\n${resume}\n\n---\n\nوصف الوظيفة:\n\n${job}\n\n---\n\n` +
+    `سيرتي الذاتية:\n\n${truncateResumeForAI(resume)}\n\n---\n\nوصف الوظيفة:\n\n${truncateJobForAI(job)}\n\n---\n\n` +
     "جهزني لمقابلة شخصية لهذه الوظيفة بالتحديد: اكتب 3 أسئلة تقنية متوقعة بناءً على متطلبات الوظيفة، " +
     "و3 أسئلة سلوكية (behavioral) متوقعة، ولكل سؤال نصيحة مختصرة للإجابة عليه بناءً على خبرتي في السيرة الذاتية.";
 
   const { data } = await apiClient.post<AIGenerateResponse>(
     "/ai/generate",
-    { prompt, max_tokens: 700 },
+    { prompt, max_tokens: 400, timeout: AI_SERVER_TIMEOUT_SECONDS },
     { timeout: AI_REQUEST_TIMEOUT_MS },
   );
   return data;
