@@ -13,7 +13,7 @@ router = APIRouter(prefix="/providers", tags=["providers"])
 # see CLAUDE.md's provider capability notes. Never advertise a fake
 # provider as real; that's exactly the "looks real but isn't" pattern
 # this whole codebase has had to keep fixing.
-REAL_DISCOVERY_PROVIDERS = {"linkedin", "sabbar"}
+REAL_DISCOVERY_PROVIDERS = {"linkedin", "sabbar", "baaeed"}
 
 
 @router.get("", response_model=list[ProviderInfo])

@@ -47,7 +47,12 @@ async def test_scheduler_service_start_and_shutdown():
             "discover_openshift",
             "discover_vmware",
             "discover_storage",
+            "discover_devops",
             "process_failed_scheduler_jobs",
+            "scan_linkedin_home_feed_hourly",
+            "daily_morning_discovery",
+            "scan_all_linkedin_accounts_daily",
+            "scan_hashtags_daily",
         } <= job_ids
 
         settings.scheduler_enabled = False

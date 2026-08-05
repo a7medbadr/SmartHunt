@@ -20,11 +20,20 @@ from smarthunt.scheduler.failed_job_service import (
 # interest in) — a Linux/AIX/OpenShift systems & infrastructure
 # administrator, not a software developer. Verify against the owner's
 # uploaded resume before changing these, don't guess.
+#
+# "devops" re-added 2026-08-05 — a deliberate, explicit request from the
+# owner (not a reversion of the note above): they now want to actively
+# target and apply to DevOps roles too, on top of the existing sysadmin
+# scope, not instead of it. is_relevant_job_title's own keyword filter
+# (matching/services/job_relevance.py) still gates results afterward, so
+# this doesn't reopen the original "generic devops query pulls in
+# full-stack roles" problem on its own.
 TOPIC_QUERIES = {
     "linux": "Linux Administrator",
     "openshift": "OpenShift Administrator",
     "vmware": "VMware Administrator",
     "storage": "Storage Administrator",
+    "devops": "DevOps Engineer",
 }
 
 # Kept in sync with scheduler/jobs.py's DISCOVERY_LOCATION — Saudi Arabia

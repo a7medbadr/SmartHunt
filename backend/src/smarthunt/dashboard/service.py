@@ -6,7 +6,6 @@ from smarthunt.database.models.application import Application
 from smarthunt.database.models.job import Job
 from smarthunt.favorites.models import FavoriteJob
 from smarthunt.providers.registry import provider_registry
-from smarthunt.saved_searches.models import SavedSearch
 
 
 class DashboardService:
@@ -18,10 +17,13 @@ class DashboardService:
         return result.scalar_one()
 
     async def get_statistics(self) -> DashboardStatisticsResponse:
+        linkedin_posts_result = await self.db.execute(
+            select(func.count()).select_from(Job).where(Job.source == "linkedin_post")
+        )
         return DashboardStatisticsResponse(
             jobs=await self._count(Job),
             applications=await self._count(Application),
             favorites=await self._count(FavoriteJob),
-            saved_searches=await self._count(SavedSearch),
+            linkedin_posts=linkedin_posts_result.scalar_one(),
             providers=len(provider_registry.providers()),
         )

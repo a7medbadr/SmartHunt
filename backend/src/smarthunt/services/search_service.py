@@ -46,11 +46,13 @@ class SearchService:
                 "requirements": job.requirements,
                 "description": job.description,
                 "created_at": job.created_at.isoformat() if job.created_at else None,
+                "posted_at": job.posted_at.isoformat() if job.posted_at else None,
+                "post_url": job.post_url,
                 "no_sponsorship_signal": job.no_sponsorship_signal,
                 "score": (
                     match_resume(
                         resume_text or "",
-                        f"{job.description or ''} {job.requirements or ''}",
+                        f"{job.title or ''} {job.description or ''} {job.requirements or ''}",
                     )["score"]
                     if resume_text is not None
                     else None

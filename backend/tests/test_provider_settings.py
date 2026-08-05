@@ -22,7 +22,7 @@ async def test_list_providers_defaults_to_enabled(client):
     response = await client.get("/api/v1/providers")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 12
+    assert len(data) == 13
     assert all(p["enabled"] for p in data)
     linkedin = next(p for p in data if p["name"] == "linkedin")
     assert linkedin["real_discovery"] is True

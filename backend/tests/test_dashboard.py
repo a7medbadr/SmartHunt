@@ -13,7 +13,7 @@ async def test_get_dashboard_statistics_empty_db(client: AsyncClient):
     assert "jobs" in data
     assert "applications" in data
     assert "favorites" in data
-    assert "saved_searches" in data
+    assert "linkedin_posts" in data
     assert "providers" in data
     assert isinstance(data["jobs"], int)
 
@@ -31,9 +31,20 @@ async def test_dashboard_statistics_reflects_real_data(client: AsyncClient, db_s
             url="https://example.com/jobs/dashboard-stats-test",
         )
     )
+    db_session.add(
+        Job(
+            title="Dashboard Stats LinkedIn Post Job",
+            company="LinkedIn Post",
+            location="Saudi Arabia",
+            source="linkedin_post",
+            url="https://example.com/jobs/dashboard-stats-post-test",
+            post_url="https://www.linkedin.com/feed/#dashboard-stats-test",
+        )
+    )
     await db_session.commit()
 
     after = (await client.get("/api/v1/dashboard/statistics")).json()
 
-    assert after["jobs"] == before["jobs"] + 1
+    assert after["jobs"] == before["jobs"] + 2
+    assert after["linkedin_posts"] == before["linkedin_posts"] + 1
     assert after["providers"] > 0

@@ -46,8 +46,10 @@ async def search_jobs(
         eff_keyword = keyword if keyword is not None else title
         eff_source = source if source is not None else provider
 
-        needs_score = sort == "score" or score_min is not None or score_max is not None
-        resume_text = await _get_resume_text(session) if needs_score else None
+        # Always compute score (a cheap, rule-based keyword match — no AI
+        # call) so the Jobs tab can show a match-% column on every job by
+        # default, not only when explicitly sorting/filtering by it.
+        resume_text = await _get_resume_text(session)
 
         res = await search_service.search(
             query=eff_keyword or "",

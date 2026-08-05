@@ -79,3 +79,27 @@ async def test_latest_scheduler_history_empty(client: AsyncClient):
     response = await client.get("/api/v1/scheduler/history/latest")
     assert response.status_code == 200
     assert response.json() is None
+
+
+@pytest.mark.asyncio
+async def test_history_auto_archives_once_over_threshold(client: AsyncClient):
+    # 100 rows is the archive threshold — the 101st insert should trim
+    # the table down to the most recent 10, not just drop under 100.
+    for i in range(101):
+        response = await client.post(
+            "/api/v1/scheduler/history",
+            json={
+                "provider": "linkedin",
+                "status": "SUCCESS",
+                "jobs_found": i,
+                "message": f"run-{i}",
+            },
+        )
+        assert response.status_code == 201
+
+    response = await client.get("/api/v1/scheduler/history")
+    data = response.json()
+    assert len(data) == 10
+    # Newest-first ordering: the most recent run ("run-100") must survive.
+    assert data[0]["message"] == "run-100"
+    assert data[-1]["message"] == "run-91"

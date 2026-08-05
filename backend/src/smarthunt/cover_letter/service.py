@@ -30,6 +30,23 @@ FALLBACK_LETTER = (
     "Best regards"
 )
 
+# Measured live 2026-08-04 on an otherwise-idle host: a real resume+job
+# prompt truncated to 3000 chars each (6262 chars / 1690 tokens total)
+# took 237.6s end to end (88.5s prompt-eval + 146.5s generating 290
+# tokens) against the configured local model — already past the 150s
+# per-attempt timeout below, so asyncio.wait_for was cancelling a
+# genuinely-in-progress, would-have-succeeded generation and retrying
+# from scratch every time, up to 3x (450s+) before ever reaching the
+# LOCAL fallback. Halving the truncation cuts prompt-eval roughly in
+# half; the timeout below is raised to match with real margin.
+_MAX_CHARS_FOR_AI = 1500
+
+
+def _truncate_for_ai(text: str) -> str:
+    if len(text) <= _MAX_CHARS_FOR_AI:
+        return text
+    return text[:_MAX_CHARS_FOR_AI] + "\n...(تم اختصار الباقي)"
+
 
 class CoverLetterService:
     async def generate_cover_letter(
@@ -43,15 +60,18 @@ class CoverLetterService:
         try:
             ai_response = await ai_service.generate(
                 AIRequest(
-                    prompt=COVER_LETTER_PROMPT.format(resume=request.resume, job=request.job),
-                    max_tokens=500,
-                    # A full resume + job description is a much bigger
-                    # prompt than most other AI calls in this app — 90s
-                    # (fine for the shorter AI Assistant chat) measured
-                    # live as not enough for this one, burning through
-                    # all 3 retries (270s) before falling back to the
-                    # fake LOCAL echo stub instead of a real letter.
-                    timeout=150.0,
+                    prompt=COVER_LETTER_PROMPT.format(
+                        resume=_truncate_for_ai(request.resume),
+                        job=_truncate_for_ai(request.job),
+                    ),
+                    max_tokens=350,
+                    # See _MAX_CHARS_FOR_AI comment above — 260s gives a
+                    # single real attempt (measured ~150-200s for a
+                    # halved, 1500-char-each prompt) enough room to
+                    # actually finish instead of being cancelled by
+                    # asyncio.wait_for mid-generation and retried from
+                    # scratch.
+                    timeout=260.0,
                 )
             )
             letter_content = ai_response.content.strip()

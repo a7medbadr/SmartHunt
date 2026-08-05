@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from smarthunt.cover_letter.service import _truncate_for_ai
+
 
 @pytest.mark.asyncio
 async def test_cover_letter_generation(client: AsyncClient) -> None:
@@ -66,3 +68,16 @@ async def test_cover_letter_reflects_actual_overlap(client: AsyncClient) -> None
     assert data["matched_skills"] == []
     assert "linux" not in data["generated_cover_letter"].lower()
     assert "docker" not in data["generated_cover_letter"].lower()
+
+
+def test_truncate_for_ai_shortens_long_text():
+    """Regression test: a full untruncated resume+job prompt was
+    confirmed live 2026-08-03 to take 242s for a single AI call — far
+    beyond what the frontend/proxy will wait for, the likely cause of
+    reports that generation "hangs then returns nothing" with no error
+    shown at all. Only the AI prompt is capped; match() still scores
+    against the full text."""
+    text = "a" * 5000
+    truncated = _truncate_for_ai(text)
+    assert len(truncated) < len(text)
+    assert truncated.startswith("a" * 1500)
