@@ -8,6 +8,7 @@ from smarthunt.database.session import Base
 
 class ActivityType(str, enum.Enum):
     RESUME_UPLOADED = "resume_uploaded"
+    RESUME_TAILORED = "resume_tailored"
     APPLICATION_CREATED = "application_created"
     FAVORITE_ADDED = "favorite_added"
     SAVED_SEARCH_CREATED = "saved_search_created"

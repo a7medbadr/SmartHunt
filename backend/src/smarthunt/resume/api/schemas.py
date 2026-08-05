@@ -1,8 +1,22 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class ResumeProfileRequest(BaseModel):
     resume: str
+
+
+class TailoredResumeResponse(BaseModel):
+    job_id: int
+    summary: str
+    generated_text: str
+    score: int
+    matched_skills: list[str]
+    missing_skills: list[str]
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ResumeProfileResponse(BaseModel):
