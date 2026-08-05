@@ -18,6 +18,8 @@ from smarthunt.cover_letter.reviewer.router import (
 )
 from smarthunt.dashboard.api import router as dashboard_router
 from smarthunt.discovery.router import router as discovery_router
+from smarthunt.email_apply.router import router as email_apply_router
+from smarthunt.linkedin_monitor.router import router as linkedin_monitor_router
 from smarthunt.events.router import router as events_router
 from smarthunt.favorites.router import router as favorites_router
 from smarthunt.idempotency.router import router as idempotency_router
@@ -86,6 +88,16 @@ api_router.include_router(
 api_router.include_router(
     applications_router,
     tags=["applications"],
+)
+
+api_router.include_router(
+    email_apply_router,
+    tags=["email-apply"],
+)
+
+api_router.include_router(
+    linkedin_monitor_router,
+    tags=["linkedin-monitor"],
 )
 
 api_router.include_router(

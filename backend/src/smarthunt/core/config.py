@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     notification_email: str | None = None
 
+    # IMAP — for polling replies to sent application emails. Reuses the
+    # SMTP username/password above (same Gmail account, same App
+    # Password works for both protocols) — no separate credentials needed.
+    imap_host: str | None = "imap.gmail.com"
+    imap_port: int = 993
+
+    # 360dialog WhatsApp Sandbox API — see notifications/channels/whatsapp.py.
+    whatsapp_api_key: str | None = None
+    whatsapp_api_url: str | None = "https://waba-sandbox.360dialog.io/v1/messages"
+    whatsapp_recipient_number: str | None = None
+
     linkedin_email: str | None = None
     linkedin_password: str | None = None
 

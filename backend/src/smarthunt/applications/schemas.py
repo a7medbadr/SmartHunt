@@ -33,6 +33,7 @@ class ApplicationResponse(BaseModel):
     company: str
     url: str | None = None
     status: str
+    job_id: int | None = None
     created_at: datetime
     days_since_applied: int
     needs_follow_up: bool

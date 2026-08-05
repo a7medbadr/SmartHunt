@@ -11,6 +11,7 @@ from smarthunt.metrics import (
 )
 from smarthunt.notifications.channels.email import send_email_message
 from smarthunt.notifications.channels.telegram import send_telegram_message
+from smarthunt.notifications.channels.whatsapp import send_whatsapp_message
 from smarthunt.notifications.models import (
     Notification,
     NotificationStatus,
@@ -66,6 +67,14 @@ class NotificationService:
             if not sent:
                 logger.warning(
                     "email_notification_not_delivered",
+                    notification_id=notification.id,
+                )
+
+        if data.channel.upper() == "WHATSAPP":
+            sent = await send_whatsapp_message(f"{data.title}\n\n{data.message}")
+            if not sent:
+                logger.warning(
+                    "whatsapp_notification_not_delivered",
                     notification_id=notification.id,
                 )
 

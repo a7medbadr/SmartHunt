@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Text, DateTime
+from sqlalchemy import ForeignKey, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +18,12 @@ class Application(Base):
     company: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="APPLIED", nullable=False)
+    # Links this application back to the job it was created from — nullable
+    # since manually-logged applications (the "حفظ فقط" dialog flow) don't
+    # necessarily reference a real jobs row.
+    job_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
