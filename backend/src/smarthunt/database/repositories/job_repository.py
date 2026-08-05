@@ -85,6 +85,7 @@ class JobRepository:
                     requirements=item.requirements,
                     source=item.source,
                     url=item.url,
+                    posted_at=item.posted_at,
                 )
             )
 

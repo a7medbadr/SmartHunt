@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 
 from smarthunt.domain.job import DiscoveredJob
 
@@ -23,6 +24,7 @@ class Job:
     remote: bool = False
     country: str | None = None
     city: str | None = None
+    posted_at: date | None = None
 
     def to_domain(self) -> DiscoveredJob:
         return DiscoveredJob(
@@ -32,6 +34,7 @@ class Job:
             source=self.provider,
             url=self.url or None,
             description=self.description,
+            posted_at=self.posted_at,
         )
 
 

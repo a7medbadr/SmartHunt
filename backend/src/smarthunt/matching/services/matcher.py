@@ -1,9 +1,21 @@
 import re
 from typing import Any, Dict, Set
 
+# Found 2026-08-04: real jobs with a genuinely relevant, real description
+# (e.g. "Storage Backup Engineer" — Veeam, storage administration, Dell
+# EMC/HPE/NetApp) still scored a flat 0% because this list only covered a
+# generic DevOps skill set (python/kubernetes/terraform/jenkins/git) that
+# doesn't overlap at all with this owner's actual Linux/storage/
+# virtualization/backup infrastructure background — extract_skills()
+# found zero job_skills for such postings, and match() treats "no
+# recognized skills in the job" as an automatic 0 regardless of resume
+# content. Expanded to the owner's real technology domain, matching
+# job_relevance.py's already-vetted scope (see CLAUDE.md's discovery
+# notes) plus the specific tools named in the owner's own resume.
 SKILLS = [
     "python",
     "linux",
+    "aix",
     "openshift",
     "docker",
     "kubernetes",
@@ -14,8 +26,28 @@ SKILLS = [
     "aws",
     "azure",
     "vmware",
+    "vsphere",
+    "esxi",
+    "vcf",
     "red hat",
-    "aix",
+    "rhel",
+    "centos",
+    "ubuntu",
+    "suse",
+    "san",
+    "nas",
+    "storage",
+    "backup",
+    "veeam",
+    "netbackup",
+    "nutanix",
+    "kvm",
+    "hyper-v",
+    "pacemaker",
+    "satellite",
+    "selinux",
+    "high availability",
+    "disaster recovery",
 ]
 
 

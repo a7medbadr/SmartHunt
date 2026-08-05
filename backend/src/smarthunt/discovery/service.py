@@ -41,8 +41,18 @@ class DiscoveryService:
         if location:
             # Providers are asked for `location`, but that's a search hint,
             # not a guarantee — don't trust a provider to actually honor it.
+            # A job explicitly marked "Remote" (e.g. baaeed's listings) is
+            # still a real option for the owner regardless of the physical
+            # location searched for, so it always passes this filter rather
+            # than being silently excluded from every Saudi-only scheduled
+            # run — found 2026-08-03 while investigating why baaeed had
+            # produced zero jobs despite real_discovery=True.
             needle = location.lower()
-            jobs = [j for j in jobs if needle in (j.location or "").lower()]
+            jobs = [
+                j
+                for j in jobs
+                if needle in (j.location or "").lower() or "remote" in (j.location or "").lower()
+            ]
 
         # Providers' own search (LinkedIn's especially) semantically
         # broadens a query like "Linux Administrator" far past the
@@ -68,6 +78,76 @@ class DiscoveryService:
             self.session,
             SchedulerHistoryCreate(
                 provider=provider,
+                status="completed",
+                jobs_found=len(jobs),
+                message=f"query={query!r} location={location!r} inserted={inserted}",
+            ),
+        )
+
+        return result
+
+    async def search_single_provider(
+        self,
+        provider_name: str,
+        query: str,
+        location: str | None = None,
+        limit: int = 25,
+    ) -> dict:
+        """Live-searches exactly one named provider's own site and saves
+        whatever it returns — the "search this specific site" feature
+        (2026-08-04). Still respects the enabled/disabled provider
+        setting — a disabled provider stays genuinely unsearchable
+        everywhere, not just hidden from the automated pipeline.
+
+        Applies the same strict title-relevance filter as discover()
+        (see its own comment above for why a query match alone isn't a
+        relevance signal) — found live 2026-08-04: an early version of
+        this method skipped it on the theory that "the owner picked this
+        site/query deliberately, they should see the raw results," but
+        LinkedIn's own broadened search results (QA testers, product
+        managers, etc. for a "Linux Administrator" query) landed in the
+        *same* shared jobs list the owner browses generally, with
+        misleadingly high scores from the ratio-based matcher on a small
+        skill set — exactly the "jobs with no relation to my work"
+        clutter the owner explicitly asked to have removed. Deliberately
+        does NOT force the Saudi-only location filter, though — the
+        owner typed a specific location (or none) for this specific
+        search and that should be respected as-is, unlike the scheduled
+        pipeline's fixed scope."""
+
+        target = next(
+            (p for p in provider_registry.providers() if p.name == provider_name),
+            None,
+        )
+        if target is None:
+            raise ValueError(f"Unknown provider: {provider_name!r}")
+
+        enabled_map = await provider_settings_service.get_enabled_map(self.session)
+        if not enabled_map.get(provider_name, True):
+            raise ValueError(f"Provider {provider_name!r} is disabled")
+
+        jobs = await provider_registry.fetch_all_jobs(
+            query=query,
+            location=location,
+            limit=limit,
+            providers=[target],
+        )
+
+        jobs = [j for j in jobs if is_relevant_job_title(j.title)]
+
+        inserted = await self.repository.save_discovered_jobs(jobs)
+
+        result = {
+            "provider": provider_name,
+            "found": len(jobs),
+            "inserted": inserted,
+            "duplicates": len(jobs) - inserted,
+        }
+
+        await scheduler_history_service.create(
+            self.session,
+            SchedulerHistoryCreate(
+                provider=f"site-search:{provider_name}",
                 status="completed",
                 jobs_found=len(jobs),
                 message=f"query={query!r} location={location!r} inserted={inserted}",

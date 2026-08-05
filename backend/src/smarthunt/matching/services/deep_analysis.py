@@ -25,6 +25,23 @@ Resume: {resume}
 Job: {job}
 """
 
+# The local Ollama model is CPU-bound — prompt-eval time scales with input
+# length. Confirmed live 2026-08-03/04: a resume+job prompt truncated to
+# 3000 chars each (1690 tokens combined) took 237.6s end to end on an
+# otherwise-idle host — already past the 115s timeout below, so every real
+# attempt was being cancelled by asyncio.wait_for mid-generation and
+# retried from scratch rather than allowed to finish. Halved so a single
+# attempt has a real chance to complete within its budget. Only the prompt
+# fed to the AI is truncated — match() below still scores against the full
+# resume, so rule-based skill matching accuracy is unaffected.
+_MAX_RESUME_CHARS_FOR_AI = 1500
+
+
+def _truncate_for_ai(text: str) -> str:
+    if len(text) <= _MAX_RESUME_CHARS_FOR_AI:
+        return text
+    return text[:_MAX_RESUME_CHARS_FOR_AI] + "\n...(تم اختصار باقي السيرة الذاتية)"
+
 
 class DeepAnalysisResult:
     def __init__(
@@ -49,9 +66,11 @@ async def generate_deep_analysis(resume: str, job: str) -> DeepAnalysisResult:
 
     ai_response = await ai_service.generate(
         AIRequest(
-            prompt=DEEP_ANALYSIS_PROMPT.format(resume=resume, job=job),
+            prompt=DEEP_ANALYSIS_PROMPT.format(
+                resume=_truncate_for_ai(resume), job=_truncate_for_ai(job)
+            ),
             max_tokens=280,
-            timeout=115.0,
+            timeout=200.0,
         )
     )
 

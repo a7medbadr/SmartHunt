@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, HttpUrl
@@ -22,6 +22,8 @@ class JobResponse(BaseModel):
     description: Optional[str] = None
     requirements: Optional[str] = None
     created_at: datetime
+    posted_at: Optional[date] = None
+    post_url: Optional[str] = None
     no_sponsorship_signal: bool = False
 
     model_config = ConfigDict(from_attributes=True)
