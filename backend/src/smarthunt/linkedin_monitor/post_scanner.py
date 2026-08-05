@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 
@@ -5,6 +6,16 @@ from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.linkedin_monitor.relevance import is_job_related_post
 
 logger = logging.getLogger("smarthunt.linkedin_monitor")
+
+# scan_profile_posts / scan_home_feed / scan_hashtag_posts all navigate the
+# same shared, session-persisting get_page("linkedin") — fine one at a
+# time (the normal case), but if two of these ever land in the same
+# scheduler tick they'd both goto()/scroll/extract on the *same* Page
+# object concurrently and corrupt each other's results. Serializes access
+# rather than giving each caller its own page, since the whole point of
+# the shared named context is to reuse one real, already-logged-in
+# session instead of opening a second one.
+_linkedin_page_lock = asyncio.Lock()
 
 # Profile "recent activity" cards' inner_text() includes LinkedIn's own
 # surrounding chrome ahead of the real post body — found live 2026-08-05
@@ -228,23 +239,24 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
         if not browser_manager.is_running:
             await browser_manager.launch()
 
-        page = await browser_manager.get_page("linkedin")
+        async with _linkedin_page_lock:
+            page = await browser_manager.get_page("linkedin")
 
-        await page.goto(activity_url, wait_until="domcontentloaded", timeout=30000)
-        # Found live 2026-08-04: a blind 3s sleep was flaky — the exact
-        # same profile/selector reliably found posts in an isolated
-        # manual check, but returned 0 through this endpoint right after
-        # a heavy scan_home_feed() call (10 scroll rounds) on the same
-        # shared "linkedin" page/context, i.e. genuine page-load timing
-        # variance under load, not a wrong selector. Wait for the actual
-        # post markup to appear (bounded, so a genuinely-empty activity
-        # page still resolves quickly) instead of guessing a fixed delay.
-        try:
-            await page.wait_for_selector(POST_CONTAINER_SELECTOR, timeout=15000)
-        except Exception:
-            pass
+            await page.goto(activity_url, wait_until="domcontentloaded", timeout=30000)
+            # Found live 2026-08-04: a blind 3s sleep was flaky — the exact
+            # same profile/selector reliably found posts in an isolated
+            # manual check, but returned 0 through this endpoint right after
+            # a heavy scan_home_feed() call (10 scroll rounds) on the same
+            # shared "linkedin" page/context, i.e. genuine page-load timing
+            # variance under load, not a wrong selector. Wait for the actual
+            # post markup to appear (bounded, so a genuinely-empty activity
+            # page still resolves quickly) instead of guessing a fixed delay.
+            try:
+                await page.wait_for_selector(POST_CONTAINER_SELECTOR, timeout=15000)
+            except Exception:
+                pass
 
-        posts = await _extract_posts_from_page(page, limit)
+            posts = await _extract_posts_from_page(page, limit)
 
         logger.info(
             "linkedin_profile_scan_completed",
@@ -269,30 +281,31 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
     if not browser_manager.is_running:
         await browser_manager.launch()
 
-    page = await browser_manager.get_page("linkedin")
+    async with _linkedin_page_lock:
+        page = await browser_manager.get_page("linkedin")
 
-    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-    try:
-        await page.wait_for_selector(FEED_POST_SELECTOR, timeout=15000)
-    except Exception:
-        pass
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        try:
+            await page.wait_for_selector(FEED_POST_SELECTOR, timeout=15000)
+        except Exception:
+            pass
 
-    # page.mouse.wheel() fires at the mouse's current position, which
-    # defaults to (0, 0) with no prior mouse.move() — found live
-    # 2026-08-05 chasing a report that the hourly feed scan basically
-    # never returned new jobs despite running every hour for real: a
-    # direct check showed window.scrollY staying at 0 through 10 full
-    # wheel rounds, i.e. the "scroll" was a complete no-op the whole
-    # time. LinkedIn's feed/search-results pages scroll an inner <main>
-    # container, not the window/body (both exactly viewport-height with
-    # no overflow) — scrolling that element directly is what actually
-    # loads more posts (verified live: post count grew from 2 to 25 over
-    # 10 rounds on the home feed, and from 9 to 14 on a hashtag search).
-    for _ in range(scroll_rounds):
-        await page.evaluate("() => document.querySelector('main')?.scrollBy(0, 2000)")
-        await page.wait_for_timeout(2000)
+        # page.mouse.wheel() fires at the mouse's current position, which
+        # defaults to (0, 0) with no prior mouse.move() — found live
+        # 2026-08-05 chasing a report that the hourly feed scan basically
+        # never returned new jobs despite running every hour for real: a
+        # direct check showed window.scrollY staying at 0 through 10 full
+        # wheel rounds, i.e. the "scroll" was a complete no-op the whole
+        # time. LinkedIn's feed/search-results pages scroll an inner <main>
+        # container, not the window/body (both exactly viewport-height with
+        # no overflow) — scrolling that element directly is what actually
+        # loads more posts (verified live: post count grew from 2 to 25 over
+        # 10 rounds on the home feed, and from 9 to 14 on a hashtag search).
+        for _ in range(scroll_rounds):
+            await page.evaluate("() => document.querySelector('main')?.scrollBy(0, 2000)")
+            await page.wait_for_timeout(2000)
 
-    return await _extract_feed_posts_from_page(page, limit)
+        return await _extract_feed_posts_from_page(page, limit)
 
 
 async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int = 10) -> list[dict]:

@@ -53,6 +53,21 @@ class BrowserManager:
         self.contexts: Dict[str, BrowserContext] = {}
         self.pages: Dict[str, Page] = {}
 
+        # Serializes launch() across concurrent callers — found live
+        # 2026-08-05 chasing "the hourly LinkedIn feed scan basically
+        # never returns anything": when a discovery job and the feed/
+        # hashtag scan land in the same APScheduler tick (routine on
+        # this host, since every interval job's phase resets on every
+        # restart), each one saw self.browser is None and raced its own
+        # concurrent chromium.launch() — N simultaneous launches fighting
+        # for this 3-core host's CPU reliably pushed every one of them
+        # past the 30s timeout together, even though a single launch
+        # alone takes ~15s idle. Without the lock, the loser(s) would
+        # also leak a started `playwright` driver process each time
+        # (launch() only tears down its own local references on
+        # timeout, not a launch already in flight elsewhere).
+        self._launch_lock = asyncio.Lock()
+
     @property
     def is_running(self) -> bool:
         return self.browser is not None
@@ -65,6 +80,16 @@ class BrowserManager:
         if self.browser is not None:
             return
 
+        async with self._launch_lock:
+            # Re-check inside the lock: a caller that waited for another
+            # in-flight launch() to finish should just reuse its result
+            # instead of launching a second browser.
+            if self.browser is not None:
+                return
+
+            await self._do_launch(headless)
+
+    async def _do_launch(self, headless: bool) -> None:
         try:
             self.playwright = await asyncio.wait_for(
                 async_playwright().start(),

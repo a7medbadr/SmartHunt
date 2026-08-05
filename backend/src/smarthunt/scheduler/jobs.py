@@ -11,6 +11,18 @@ logger = logging.getLogger("smarthunt.scheduler")
 # CLAUDE.md's "Discovery scope" note before broadening this.
 DISCOVERY_LOCATION = "Saudi Arabia"
 
+# scheduler_history provider labels for the three LinkedIn-monitor jobs
+# below — added 2026-08-05 alongside SchedulerService's startup catch-up
+# check (services/scheduler_service.py), which reads these same labels
+# back out of scheduler_history to decide whether today's/this hour's run
+# already happened. Before this, these three jobs only ever logged via
+# structlog (no scheduler_history row at all), so the job-search page's
+# run history couldn't show them, and there was no way to tell "did this
+# actually run today" without grepping container logs.
+LINKEDIN_FEED_PROVIDER = "scheduler:linkedin-feed"
+LINKEDIN_ACCOUNTS_PROVIDER = "scheduler:linkedin-accounts"
+LINKEDIN_HASHTAGS_PROVIDER = "scheduler:linkedin-hashtags"
+
 # The owner's own hashtag list (2026-08-05), deduplicated — a mix of
 # general hiring/location tags and their specific tech stack. Scanned
 # daily (see scan_hashtags_daily below), not hourly: at ~60-65s/hashtag
@@ -142,6 +154,8 @@ async def scan_linkedin_home_feed_hourly():
     request so this doesn't require remembering to click it."""
     from smarthunt.linkedin_monitor import service as linkedin_monitor_service
     from smarthunt.linkedin_monitor.post_scanner import scan_home_feed
+    from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
+    from smarthunt.scheduler.history.service import scheduler_history_service
 
     async with AsyncSessionLocal() as db:
         try:
@@ -151,6 +165,16 @@ async def scan_linkedin_home_feed_hourly():
                 "scheduled_linkedin_feed_scan_completed",
                 extra={"scanned": len(posts), "saved": len(saved)},
             )
+            await scheduler_history_service.create(
+                db,
+                SchedulerHistoryCreate(
+                    provider=LINKEDIN_FEED_PROVIDER,
+                    status="completed",
+                    jobs_found=len(saved),
+                    message=f"scanned={len(posts)} saved={len(saved)}",
+                ),
+            )
+            await db.commit()
         except Exception:
             logger.exception("scheduled_linkedin_feed_scan_failed")
 
@@ -183,9 +207,14 @@ async def scan_all_linkedin_accounts_daily():
     yesterday" outcome."""
     from smarthunt.linkedin_monitor import service as linkedin_monitor_service
     from smarthunt.linkedin_monitor.post_scanner import scan_profile_posts
+    from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
+    from smarthunt.scheduler.history.service import scheduler_history_service
 
     async with AsyncSessionLocal() as db:
         accounts = await linkedin_monitor_service.list_accounts(db)
+
+    total_scanned = 0
+    total_saved = 0
 
     for account in accounts:
         if not account.enabled:
@@ -196,6 +225,8 @@ async def scan_all_linkedin_accounts_daily():
                 posts = await scan_profile_posts(account.profile_url)
                 saved = await linkedin_monitor_service.scan_and_save(db, posts)
                 await linkedin_monitor_service.mark_account_checked(db, account.id)
+                total_scanned += len(posts)
+                total_saved += len(saved)
                 logger.info(
                     "scheduled_linkedin_account_scan_completed",
                     extra={
@@ -211,6 +242,18 @@ async def scan_all_linkedin_accounts_daily():
                 )
                 continue
 
+    async with AsyncSessionLocal() as db:
+        await scheduler_history_service.create(
+            db,
+            SchedulerHistoryCreate(
+                provider=LINKEDIN_ACCOUNTS_PROVIDER,
+                status="completed",
+                jobs_found=total_saved,
+                message=f"accounts={len(accounts)} scanned={total_scanned} saved={total_saved}",
+            ),
+        )
+        await db.commit()
+
 
 async def scan_hashtags_daily():
     """Once a day, scans the first ~50 posts under every hashtag in
@@ -220,12 +263,19 @@ async def scan_hashtags_daily():
     error, etc.) doesn't skip the rest of the list."""
     from smarthunt.linkedin_monitor import service as linkedin_monitor_service
     from smarthunt.linkedin_monitor.post_scanner import scan_hashtag_posts
+    from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
+    from smarthunt.scheduler.history.service import scheduler_history_service
+
+    total_scanned = 0
+    total_saved = 0
 
     for hashtag in HASHTAG_LIST:
         async with AsyncSessionLocal() as db:
             try:
                 posts = await scan_hashtag_posts(hashtag)
                 saved = await linkedin_monitor_service.scan_and_save(db, posts)
+                total_scanned += len(posts)
+                total_saved += len(saved)
                 logger.info(
                     "scheduled_hashtag_scan_completed",
                     extra={"hashtag": hashtag, "scanned": len(posts), "saved": len(saved)},
@@ -233,4 +283,17 @@ async def scan_hashtags_daily():
             except Exception:
                 logger.exception("scheduled_hashtag_scan_failed", extra={"hashtag": hashtag})
                 continue
-                continue
+
+    async with AsyncSessionLocal() as db:
+        await scheduler_history_service.create(
+            db,
+            SchedulerHistoryCreate(
+                provider=LINKEDIN_HASHTAGS_PROVIDER,
+                status="completed",
+                jobs_found=total_saved,
+                message=(
+                    f"hashtags={len(HASHTAG_LIST)} scanned={total_scanned} saved={total_saved}"
+                ),
+            ),
+        )
+        await db.commit()

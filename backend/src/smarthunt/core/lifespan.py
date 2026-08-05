@@ -64,6 +64,17 @@ async def lifespan(app: FastAPI):
             service="smarthunt-backend",
         )
 
+    try:
+        await SchedulerService().catch_up_scheduled_jobs()
+
+    except Exception:
+        # A missed catch-up just means the regular trigger runs at its
+        # next scheduled time as usual — not worth failing startup over.
+        logger.exception(
+            "scheduled_job_catchup_failed_at_startup",
+            service="smarthunt-backend",
+        )
+
     yield
 
     logger.info(

@@ -1,3 +1,6 @@
+import asyncio
+from datetime import datetime, timedelta, timezone
+
 import structlog
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -5,6 +8,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from smarthunt.core.config import settings
 from smarthunt.scheduler import scheduler
 from smarthunt.scheduler.jobs import (
+    LINKEDIN_ACCOUNTS_PROVIDER,
+    LINKEDIN_FEED_PROVIDER,
+    LINKEDIN_HASHTAGS_PROVIDER,
     check_email_replies,
     daily_morning_discovery,
     discover_devops,
@@ -143,3 +149,66 @@ class SchedulerService:
         except Exception:
             logger.exception("scheduler_start_failed")
             raise
+
+    async def catch_up_scheduled_jobs(self) -> None:
+        """Startup catch-up for every interval/cron scheduled job that
+        writes to scheduler_history — added 2026-08-05, originally just for
+        the three LinkedIn-monitor jobs after finding scan_hashtags_daily
+        (CronTrigger hour=6) had never once fired in over two days of real
+        container logs, then widened the same day to also cover the five
+        core discover_* jobs after the owner reported "my home page search
+        doesn't seem to run every hour" and scheduler_history confirmed a
+        real ~17h gap in discover_linux/openshift/vmware/storage/devops —
+        the exact same shape of bug, just on the app's most central
+        automated feature. Root cause for all eight: this host's backend
+        restarts far more often than these jobs' own intervals (routine
+        rebuilds/redeploys, plus at least one unplanned multi-hour downtime
+        window found live), and APScheduler's IntervalTrigger/CronTrigger
+        only schedule their *first* run at start-time-plus-interval, never
+        immediately — so a fixed trigger can silently miss its window
+        entirely, sometimes for many hours or days running, with nothing to
+        catch it back up on its own. Checks scheduler_history for each
+        job's last real run and fires it once in the background if it
+        hasn't run recently enough. Self-limiting by design — a job that
+        already ran within its own window this restart is a no-op — so this
+        is safe to call unconditionally on every startup, however frequent."""
+        if not settings.scheduler_enabled:
+            return
+
+        from smarthunt.database.session import AsyncSessionLocal
+        from smarthunt.scheduler.history.service import scheduler_history_service
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Same max-age as each job's own recurring trigger (see start()
+        # above) — a run that already happened within that window this
+        # restart doesn't need catching up, it's simply not due yet.
+        checks = [
+            ("scheduler:linux", timedelta(hours=1), discover_linux),
+            ("scheduler:openshift", timedelta(hours=2), discover_openshift),
+            ("scheduler:vmware", timedelta(hours=3), discover_vmware),
+            ("scheduler:storage", timedelta(hours=4), discover_storage),
+            ("scheduler:devops", timedelta(hours=5), discover_devops),
+            (LINKEDIN_FEED_PROVIDER, timedelta(hours=1), scan_linkedin_home_feed_hourly),
+            (LINKEDIN_ACCOUNTS_PROVIDER, timedelta(days=1), scan_all_linkedin_accounts_daily),
+            (LINKEDIN_HASHTAGS_PROVIDER, timedelta(days=1), scan_hashtags_daily),
+        ]
+
+        async with AsyncSessionLocal() as db:
+            for provider, max_age, job_func in checks:
+                try:
+                    latest = await scheduler_history_service.latest_for_provider(db, provider)
+                except Exception:
+                    logger.exception("scheduled_job_catchup_check_failed", provider=provider)
+                    continue
+
+                due = latest is None or (now - latest.started_at) > max_age
+                if not due:
+                    continue
+
+                logger.info(
+                    "scheduled_job_catchup_triggered",
+                    provider=provider,
+                    last_run=latest.started_at.isoformat() if latest else None,
+                )
+                asyncio.create_task(job_func())

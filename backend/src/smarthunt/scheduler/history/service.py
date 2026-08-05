@@ -67,5 +67,16 @@ class SchedulerHistoryService:
         )
         return result.scalar_one_or_none()
 
+    async def latest_for_provider(
+        self, db: AsyncSession, provider: str
+    ) -> Optional[SchedulerHistory]:
+        result = await db.execute(
+            select(SchedulerHistory)
+            .where(SchedulerHistory.provider == provider)
+            .order_by(SchedulerHistory.started_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
 
 scheduler_history_service = SchedulerHistoryService()
