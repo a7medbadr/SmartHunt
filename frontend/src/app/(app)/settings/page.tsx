@@ -45,6 +45,7 @@ function LanguageCard() {
 }
 
 function ChangePasswordCard() {
+  const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -65,11 +66,11 @@ function ChangePasswordCard() {
     mutation.reset();
 
     if (newPassword.length < 6) {
-      setFormError("الباسورد الجديدة لازم تكون 6 حروف/أرقام على الأقل.");
+      setFormError(t("settings", "passwordMinLength"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setFormError("الباسورد الجديدة والتأكيد مش متطابقين.");
+      setFormError(t("settings", "passwordMismatch"));
       return;
     }
 
@@ -85,13 +86,13 @@ function ChangePasswordCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <KeyRound className="size-4 text-amber-400" />
-          تغيير الباسورد
+          {t("settings", "changePassword")}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="current-password">الباسورد الحالية</Label>
+            <Label htmlFor="current-password">{t("settings", "currentPassword")}</Label>
             <Input
               id="current-password"
               type="password"
@@ -100,7 +101,7 @@ function ChangePasswordCard() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-password">الباسورد الجديدة</Label>
+            <Label htmlFor="new-password">{t("settings", "newPassword")}</Label>
             <Input
               id="new-password"
               type="password"
@@ -110,7 +111,7 @@ function ChangePasswordCard() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="confirm-password">تأكيد الباسورد الجديدة</Label>
+            <Label htmlFor="confirm-password">{t("settings", "confirmPassword")}</Label>
             <Input
               id="confirm-password"
               type="password"
@@ -126,7 +127,7 @@ function ChangePasswordCard() {
             disabled={mutation.isPending || !currentPassword || !newPassword || !confirmPassword}
             className="self-start"
           >
-            {mutation.isPending ? "جاري التغيير..." : "غيّر الباسورد"}
+            {mutation.isPending ? t("settings", "changing") : t("settings", "changePasswordButton")}
           </Button>
 
           {formError && <p className="text-sm text-destructive">{formError}</p>}
@@ -134,7 +135,7 @@ function ChangePasswordCard() {
             <p className="text-sm text-destructive">{serverError}</p>
           )}
           {mutation.isSuccess && (
-            <p className="text-sm text-primary">تم تغيير الباسورد بنجاح.</p>
+            <p className="text-sm text-primary">{t("settings", "passwordChanged")}</p>
           )}
         </div>
       </CardContent>
@@ -143,6 +144,7 @@ function ChangePasswordCard() {
 }
 
 function SettingsForm({ initial }: { initial: UserSettings }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<UserSettings>(initial);
 
@@ -157,11 +159,11 @@ function SettingsForm({ initial }: { initial: UserSettings }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">التفضيلات العامة</CardTitle>
+        <CardTitle className="text-base">{t("settings", "generalPreferences")}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="email-notif">إشعارات البريد الإلكتروني</Label>
+          <Label htmlFor="email-notif">{t("settings", "emailNotifications")}</Label>
           <Switch
             id="email-notif"
             checked={form.email_notifications}
@@ -170,7 +172,7 @@ function SettingsForm({ initial }: { initial: UserSettings }) {
         </div>
 
         <div className="flex items-center justify-between">
-          <Label htmlFor="job-alerts">تنبيهات الوظائف الجديدة</Label>
+          <Label htmlFor="job-alerts">{t("settings", "newJobAlerts")}</Label>
           <Switch
             id="job-alerts"
             checked={form.job_alerts}
@@ -183,10 +185,10 @@ function SettingsForm({ initial }: { initial: UserSettings }) {
           disabled={mutation.isPending}
           className="self-start"
         >
-          {mutation.isPending ? "جاري الحفظ..." : "حفظ"}
+          {mutation.isPending ? t("settings", "saving") : t("common", "save")}
         </Button>
         {mutation.isSuccess && (
-          <p className="text-sm text-muted-foreground">اتحفظت الإعدادات.</p>
+          <p className="text-sm text-muted-foreground">{t("settings", "settingsSaved")}</p>
         )}
       </CardContent>
     </Card>
@@ -204,11 +206,12 @@ function NotificationTestCard({
   hint: string;
   message: string;
 }) {
+  const { t } = useTranslation();
   const testMutation = useMutation({
     mutationFn: () =>
       createNotification({
         type: "TEST",
-        title: "إشعار تجريبي من SmartHunt",
+        title: t("settings", "testNotificationTitle"),
         message,
         channel,
       }),
@@ -227,16 +230,17 @@ function NotificationTestCard({
           disabled={testMutation.isPending}
           className="self-start"
         >
-          {testMutation.isPending ? "جاري الإرسال..." : "ابعت إشعار تجريبي"}
+          {testMutation.isPending
+            ? t("settings", "sending")
+            : t("settings", "sendTestNotification")}
         </Button>
         {testMutation.isSuccess && (
           <p className="text-sm text-muted-foreground">
-            اتبعتت — لو القناة معطلة هتلاقيها في تبويب الإشعارات بس مش هتوصلك فعليًا
-            لحد ما تظبط الإعدادات.
+            {t("settings", "testNotificationSentHint")}
           </p>
         )}
         {testMutation.isError && (
-          <p className="text-sm text-destructive">حصل خطأ أثناء الإرسال.</p>
+          <p className="text-sm text-destructive">{t("settings", "testNotificationError")}</p>
         )}
       </CardContent>
     </Card>
@@ -271,23 +275,23 @@ export default function SettingsPage() {
 
         <NotificationTestCard
           channel="TELEGRAM"
-          title="إشعارات تيليجرام"
-          hint="محتاج TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID متظبطين في السيرفر الأول. دوس هنا تبعت رسالة تجريبية تتأكد إنها شغالة."
-          message="لو وصلك ده على تيليجرام، يبقى الإعداد شغال صح."
+          title={t("settings", "telegramNotifications")}
+          hint={t("settings", "telegramHint")}
+          message={t("settings", "telegramTestMessage")}
         />
 
         <NotificationTestCard
           channel="WHATSAPP"
-          title="إشعارات واتساب"
-          hint="محتاج WHATSAPP_API_KEY و WHATSAPP_RECIPIENT_NUMBER متظبطين في السيرفر الأول. دوس هنا تبعت رسالة تجريبية تتأكد إنها شغالة."
-          message="لو وصلك ده على واتساب، يبقى الإعداد شغال صح."
+          title={t("settings", "whatsappNotifications")}
+          hint={t("settings", "whatsappHint")}
+          message={t("settings", "whatsappTestMessage")}
         />
 
         <NotificationTestCard
           channel="EMAIL"
-          title="إشعارات الإيميل"
-          hint="محتاج بيانات SMTP متظبطة في السيرفر الأول. دوس هنا تبعت رسالة تجريبية تتأكد إنها شغالة."
-          message="لو وصلك ده على الإيميل، يبقى الإعداد شغال صح."
+          title={t("settings", "emailChannelNotifications")}
+          hint={t("settings", "emailHint")}
+          message={t("settings", "emailTestMessage")}
         />
       </div>
     </div>
