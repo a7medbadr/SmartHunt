@@ -811,6 +811,31 @@ upload from ~1.6GB to ~109MB and the resulting build time from 27+ minutes (when
 stall) down to a consistent ~5-7 minutes. Prefer this `--from-archive` approach for backend builds
 going forward instead of `--from-dir=.`.
 
+**The real, definitive cause of every persistent "حصل خطأ أثناء الفحص" report on the LinkedIn scan
+buttons (home feed, monitored accounts, hashtags) — found and fixed 2026-08-06, after several
+earlier sessions each fixed a real-but-partial cause (browser launch races, the OpenShift OOM crash
+loop, an unbounded lock wait) without fully explaining why it kept coming back.** Next.js's
+`rewrites()` proxy (`next.config.ts`) is implemented internally on top of the `http-proxy` package,
+which has its own request timeout completely independent of any client-side axios timeout
+(`SCAN_TIMEOUT_MS`, `AI_REQUEST_TIMEOUT_MS`, etc. in the frontend API clients never got a chance to
+matter). Confirmed live via direct measurement: the exact same `POST
+/api/v1/linkedin-monitor/scan-feed` request succeeded every time when curled straight at the
+backend (real posts returned, 25-60s), but through the frontend's own proxy on `:3000` it died with
+a plain 500 at **exactly 30.0 seconds**, every single time — a hardcoded default, not a fluke. The
+knob is `proxyTimeout` (milliseconds) — undocumented in Next.js's public docs, but present in the
+framework's own bundled `config-schema.js`/`config-shared.js` under `experimental`. Fixed by setting
+`experimental: { proxyTimeout: 900000 }` in `next.config.ts` (comfortably above the app's longest
+real client-side timeout, the AI calls at 850s), verified live afterward: the same scan-feed call
+through the proxy completed in 32.4s with a real 200, and a hashtag scan (61s) also passed cleanly
+through — both would have died under the old default. **This proxy-layer timeout was very likely
+also a real, uninvestigated contributor to the whole separate "AI request times out" saga
+documented above** (real Ollama generations regularly take 100-400s+, i.e. also past the old 30s
+proxy ceiling, independent of whatever the backend's own `AIRequest.timeout`/retry logic was doing)
+— not pursued further only because the owner explicitly closed out AI-on-OpenShift as a hardware
+limitation not worth chasing (see memory), not because this angle was ruled out. If any other
+proxied request that legitimately takes longer than ~30s starts mysteriously 500ing again, check
+this setting first before assuming it's the specific feature's own backend logic.
+
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
 work — check current `git status` / `git log origin/master..master`, don't assume it's still true.
