@@ -29,6 +29,32 @@ from smarthunt.scheduler.jobs import (
 logger = structlog.get_logger()
 
 
+async def _run_catchup_jobs_sequentially(due_jobs: list) -> None:
+    """Runs every overdue job one at a time, in a single background task
+    — added 2026-08-06 after a real OpenShift OOM crash loop: the
+    previous version fired each due job as its own separate
+    `asyncio.create_task`, so on a restart where multiple jobs were
+    overdue at once (routine — e.g. discover_linux and discover_vmware
+    both overdue after any downtime past an hour), several full discovery
+    passes (each fanning out across ~11 providers, several driving real
+    Chromium) ran fully concurrently within seconds of startup. Confirmed
+    live via `oc describe pod`/`--previous` logs: the pod was OOMKilled
+    (2Gi limit) twice in immediate succession, each time within ~2
+    minutes of `scheduler_started`, right after `scheduler:linux` and
+    `scheduler:vmware` catchup both fired in the same few milliseconds —
+    a crash loop, since every restart re-triggered the same overdue jobs
+    again. Running them sequentially instead keeps at most one heavy
+    catch-up job's memory footprint active at a time, while still not
+    blocking the startup/readiness probes (this whole function is itself
+    one background task, same as before — only what happens *inside* it
+    changed from concurrent to sequential)."""
+    for job_func in due_jobs:
+        try:
+            await job_func()
+        except Exception:
+            logger.exception("scheduled_job_catchup_run_failed", job=job_func.__name__)
+
+
 class SchedulerService:
 
     def start(self) -> None:
@@ -227,6 +253,8 @@ class SchedulerService:
             (LINKEDIN_HASHTAGS_PROVIDER, timedelta(days=1), scan_hashtags_daily),
         ]
 
+        due_jobs = []
+
         async with AsyncSessionLocal() as db:
             for provider, max_age, job_func in checks:
                 try:
@@ -244,4 +272,7 @@ class SchedulerService:
                     provider=provider,
                     last_run=latest.started_at.isoformat() if latest else None,
                 )
-                asyncio.create_task(job_func())
+                due_jobs.append(job_func)
+
+        if due_jobs:
+            asyncio.create_task(_run_catchup_jobs_sequentially(due_jobs))

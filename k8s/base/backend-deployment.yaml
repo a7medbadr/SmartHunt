@@ -41,15 +41,32 @@ spec:
           # Chromium, same as login()/apply()) OOMKilled the pod
           # (exitCode 137) every time, which is what every "حصل خطأ أثناء
           # الفحص" report on OpenShift actually was — the backend crashed
-          # mid-request, not a code bug in the scan logic itself. Ample
-          # quota headroom available (compute-deploy: 30Gi limit, ~1.5Gi
-          # used before this change).
+          # mid-request, not a code bug in the scan logic itself.
+          #
+          # 2Gi still wasn't enough on its own — found 2026-08-06 via
+          # `oc describe pod` showing Restart Count: 3, Last State:
+          # OOMKilled, each crash landing within ~2 minutes of
+          # `scheduler_started`. Root cause: SchedulerService's own
+          # startup catch-up (services/scheduler_service.py) used to fire
+          # every overdue job as a separate concurrent asyncio.create_task
+          # — on a restart where e.g. both discover_linux and
+          # discover_vmware were overdue (routine), two full discovery
+          # passes (each fanning out across ~11 providers, several
+          # driving real Chromium) ran fully concurrently seconds after
+          # boot, and every restart re-triggered the same overdue jobs
+          # again — a genuine crash loop. Fixed in code
+          # (_run_catchup_jobs_sequentially runs due jobs one at a time
+          # instead of all at once), but bumping the ceiling here too as
+          # real safety margin — a single discovery pass plus the
+          # periodic browser recycle/session-healthcheck jobs still add
+          # up to more than the old 2Gi comfortably allows. Ample quota
+          # headroom available (compute-deploy: 30Gi limit).
           requests:
             cpu: 200m
-            memory: 512Mi
+            memory: 768Mi
           limits:
             cpu: "1"
-            memory: 2Gi
+            memory: 3Gi
         volumeMounts:
         - name: resume-storage
           mountPath: /data/resumes
