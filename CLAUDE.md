@@ -730,6 +730,87 @@ inserted 6 new ones, in 43s. LinkedIn's own two-pass search (list page, then eac
 page for its description — see the provider's own file) costs roughly ~4.3s/job, which is why this
 endpoint's default `limit` is 15 (not `discover()`'s 25) and its frontend axios timeout is 150s.
 
+**`browser_manager.launch()` had no lock, so concurrent scheduled jobs raced N simultaneous
+`chromium.launch()` calls — found and fixed 2026-08-05/06 chasing "the hourly LinkedIn feed scan
+basically never returns anything."** Every hourly-ish job (`discover_linux`, `scan_linkedin_home_feed_hourly`,
+etc.) checks `self.browser is None` and calls `launch()` if so; when two or more landed in the same
+APScheduler tick (routine on this host, since every interval job's phase resets on every
+restart — see below), each one raced its own `chromium.launch()`, and N simultaneous launches
+fighting for this host's limited CPU reliably pushed every one of them past the existing 30s
+timeout together, even though a single launch alone takes ~15s idle. `BrowserManager` now has an
+`asyncio.Lock` around `launch()` (`browser/playwright/manager.py`) — a caller that arrives while
+another launch is in flight just awaits and reuses the result instead of racing a second browser.
+`post_scanner.py`'s three functions that all share the single persistent `get_page("linkedin")`
+page (`scan_home_feed`, `scan_hashtag_posts`, `scan_profile_posts`) got the same treatment via a
+module-level `_linkedin_page_lock`, since two of them landing concurrently would otherwise
+navigate the same `Page` object out from under each other. Verified live under real 5-way
+concurrent load (see catch-up note below): zero `RuntimeError: Browser launch timed out` afterward,
+where before the same scenario produced 8+ of them per restart.
+
+**Separately — and the bigger reliability gap — `scan_hashtags_daily` (`CronTrigger(hour=6)`) had
+never once fired in over two days of real container logs, and the five core `discover_*` jobs had
+an actual, confirmed ~17h blank gap in `scheduler_history` — found and fixed 2026-08-06 after the
+owner reported "my home page search doesn't seem to run every hour."** Root cause: this host's
+backend restarts far more often than these jobs' own intervals (routine rebuilds/redeploys, plus at
+least one unplanned multi-hour downtime window confirmed live via `docker logs`), and
+APScheduler's `IntervalTrigger`/`CronTrigger` only schedule their *first* run at
+start-time-plus-interval, never immediately on startup — so a fixed trigger can silently miss its
+window entirely, sometimes for many hours or days running, with nothing to catch it back up on its
+own. Fixed by having all eight of these jobs (5 `discover_*` + `scan_linkedin_home_feed_hourly` +
+`scan_all_linkedin_accounts_daily` + `scan_hashtags_daily`) write a `scheduler_history` row on
+completion (the three LinkedIn-monitor ones previously only logged via structlog, invisible to the
+job-search page's run history and to any "did this run today" check), and adding
+`SchedulerService.catch_up_scheduled_jobs()` — called from `lifespan.py` right after
+`SchedulerService().start()` — which checks each job's last `scheduler_history` row on every
+startup and fires it once in the background immediately if it's overdue relative to its own normal
+interval. Self-limiting by design (a job that already ran within its window this restart is a
+no-op), so safe to call unconditionally on every restart, however frequent. Verified live on both
+local and OpenShift: a fresh restart's catch-up correctly fired every job that was actually overdue
+(including `scheduler:devops`, which had *never* run before) and skipped the ones that weren't;
+the hashtag catch-up run found 32/32 hashtags for real and saved multiple new real jobs on each
+environment (8 on OpenShift, 2+ on local across separate runs).
+
+**A live "AI request hangs then times out" report traced back to host CPU contention from
+Chromium's own idle renderer-process pool, not an AI/timeout bug — found and fixed 2026-08-06.**
+Every real browser-using call site (`linkedin`/`baaeed`/`sabbar` providers, `post_scanner.py`)
+already closes its own context correctly in a `finally` block — this isn't an application-level
+leak of Playwright objects. `ps` showed a `chrome-headless-shell` renderer process pinned at 66%
+CPU for 87+ minutes straight with *zero* scans actively running at the time, load average 5.55 on
+this host's ~3 cores; a trivial 20-token Ollama request timed out at 90s purely from that
+contention, confirmed by a direct Ollama benchmark run seconds later on the same host (a real
+generation took 257s, of which 75s was just prompt-eval). This is Chromium's own
+renderer-process pooling keeping OS processes warm for reuse indefinitely on a long-lived browser
+instance — expected browser behavior, but not something a resource-constrained shared host (or the
+OpenShift pod, which is capped at just `1` CPU core — see `k8s`/`helm` resource limits — even
+tighter than local) can comfortably absorb over many hours of accumulated scan/discovery activity.
+Fixed with a new `recycle_browser` scheduled job (`scheduler/jobs.py`, registered every 6h in
+`scheduler_service.py`) that tears the shared browser down via `browser_manager.close()` (which
+already saves every named context's session state first, so the LinkedIn login isn't lost) so the
+next call to `launch()` starts clean. Verified live, before/after, on the same host: a trivial
+Ollama request that had been timing out at 90s completed in **10.1s** immediately after a restart
+cleared the accumulated renderer processes, and a real end-to-end `/ai/generate` call (matching the
+AI Assistant's "قيّم السيرة الذاتية بتاعتي" resume-evaluation button) completed for real
+(`provider: "ollama"`, not the fake fallback stub) in 23.6s. If "17% then error" (or any early
+progress-bar plateau) comes back, check `ps aux | grep chrome-headless-shell` for a long-lived,
+heavy-CPU renderer process and current host `uptime`/load average before assuming it's a timeout- or
+prompt-size regression again — this has now been the real cause twice.
+
+**OpenShift binary builds for the backend were uploading the *entire* repo (~1.6GB) including
+~787MB of `frontend/node_modules`, even though `backend/Dockerfile` never references anything under
+`frontend/` at all — found 2026-08-06 after two consecutive builds stalled/hung for 27+ minutes each
+on a slow upload.** `.dockerignore` only affects what the server-side `docker build` step sees
+inside the build pod, not what `oc start-build --from-dir=.` tars and uploads client-side — that
+upload includes everything in the given directory regardless of `.dockerignore`. Since
+`backend/Dockerfile`'s `COPY` paths only ever touch `backend/requirements.txt` and `backend/`, the
+repo-root build context requirement (see the build/deploy notes above) doesn't actually require
+`frontend/` to be present at all. Building a filtered `tar.gz` first (`tar --exclude='.git'
+--exclude='frontend/node_modules' --exclude='frontend/.next' --exclude='frontend/.turbo'
+--exclude='backend/.venv' --exclude='backend/__pycache__' -czf ... .`) and passing it via `oc
+start-build smarthunt-backend --from-archive=<file> --wait` instead of `--from-dir=.` cut the
+upload from ~1.6GB to ~109MB and the resulting build time from 27+ minutes (when it didn't outright
+stall) down to a consistent ~5-7 minutes. Prefer this `--from-archive` approach for backend builds
+going forward instead of `--from-dir=.`.
+
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
 work — check current `git status` / `git log origin/master..master`, don't assume it's still true.

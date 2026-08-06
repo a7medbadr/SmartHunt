@@ -118,6 +118,41 @@ async def discover_devops():
     await _run_scheduled_discovery("devops", TOPIC_QUERIES["devops"])
 
 
+async def recycle_browser():
+    """Periodically tears down and lets the shared Playwright browser
+    relaunch fresh — added 2026-08-06 after tracing a real, live "AI
+    request hangs then times out" incident back to host resource
+    starvation, not an AI/timeout bug: `ps` showed a chrome-headless-shell
+    renderer process pinned at 66% CPU for 87+ minutes straight with zero
+    scans actively running at the time, load average 5.55 on this host's
+    ~3 cores, and a trivial 20-token Ollama request timing out at 90s
+    purely from CPU contention (confirmed via a direct Ollama benchmark
+    run seconds later on the same host: a real generation took 257s, of
+    which 75s was just prompt-eval). Every real browser-using call site
+    (linkedin/baaeed/sabbar providers, post_scanner.py) already closes its
+    own context correctly in a `finally` block — this isn't an
+    application-level leak of Playwright objects, it's Chromium's own
+    renderer-process pooling keeping OS processes warm for reuse
+    indefinitely on a long-lived browser instance, which a resource-
+    constrained shared host can't comfortably absorb over many hours of
+    accumulated scan/discovery activity. browser_manager.close() saves
+    every named context's session state (see save_state() in
+    browser/playwright/manager.py) before tearing down, so the LinkedIn
+    login isn't lost — the next call to launch() just starts a clean
+    browser and restores it from disk, same as it already does across a
+    normal container restart."""
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    if not browser_manager.is_running:
+        return
+
+    try:
+        await browser_manager.close()
+        logger.info("browser_recycle_completed")
+    except Exception:
+        logger.exception("browser_recycle_failed")
+
+
 async def process_failed_scheduler_jobs():
     """Periodic sweep that retries FAILED scheduler jobs (with backoff via
     retry_count) instead of letting them accumulate forever unprocessed."""

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
-from smarthunt.scheduler.jobs import discover_linux
+from smarthunt.scheduler.jobs import discover_linux, recycle_browser
 
 """Regression tests: the APScheduler-registered discover_* jobs called
 `async with track_scheduler_execution("...")`, but that function took a
@@ -60,3 +60,50 @@ async def test_discover_linux_records_failure_on_error(monkeypatch, db_session: 
     assert failed is not None
     assert failed.job_reference == "linux"
     assert "provider network error" in failed.last_error
+
+
+"""recycle_browser regression tests: added 2026-08-06 after a live incident
+traced a trivial Ollama request timing out to host CPU contention from a
+long-lived Chromium renderer process, not an AI/timeout bug — every
+browser-using provider already closes its own context correctly, but
+Chromium's own idle renderer-process pool accumulates over many hours on
+this resource-constrained host regardless. recycle_browser periodically
+tears the shared browser down so it relaunches clean."""
+
+
+@pytest.mark.asyncio
+async def test_recycle_browser_is_noop_when_not_running(monkeypatch):
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    monkeypatch.setattr(browser_manager, "browser", None)
+
+    close_called = False
+
+    async def _close(self):
+        nonlocal close_called
+        close_called = True
+
+    monkeypatch.setattr(type(browser_manager), "close", _close)
+
+    await recycle_browser()
+
+    assert close_called is False
+
+
+@pytest.mark.asyncio
+async def test_recycle_browser_closes_when_running(monkeypatch):
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    monkeypatch.setattr(browser_manager, "browser", object())
+
+    close_called = False
+
+    async def _close(self):
+        nonlocal close_called
+        close_called = True
+
+    monkeypatch.setattr(type(browser_manager), "close", _close)
+
+    await recycle_browser()
+
+    assert close_called is True

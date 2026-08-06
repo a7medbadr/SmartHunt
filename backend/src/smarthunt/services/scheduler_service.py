@@ -19,6 +19,7 @@ from smarthunt.scheduler.jobs import (
     discover_storage,
     discover_vmware,
     process_failed_scheduler_jobs,
+    recycle_browser,
     scan_all_linkedin_accounts_daily,
     scan_hashtags_daily,
     scan_linkedin_home_feed_hourly,
@@ -95,6 +96,25 @@ class SchedulerService:
                 replace_existing=True,
             )
 
+            # Every 6h — bounds how long Chromium's own idle renderer-
+            # process pool can accumulate on this resource-constrained
+            # shared host (see recycle_browser's docstring for the live
+            # incident that motivated this: a stale renderer process
+            # pinned at 66% CPU for 87+ minutes with no active scan
+            # running was enough to push a trivial Ollama request past a
+            # 90s timeout). A recycle landing mid-scan can make that one
+            # provider's run return fewer/zero results for that cycle
+            # (its context.close()/goto() just raises into the same
+            # broad try/except every provider already has) — an accepted,
+            # self-healing tradeoff against letting the host degrade
+            # unbounded over many hours of uptime.
+            scheduler.add_job(
+                recycle_browser,
+                IntervalTrigger(hours=6),
+                id="recycle_browser",
+                replace_existing=True,
+            )
+
             # hour=5 UTC = ~8am in Saudi Arabia (UTC+3) — the container's
             # own system timezone is UTC (see TZ=UTC in the configmap/
             # .env), and APScheduler's CronTrigger uses that by default,
@@ -140,6 +160,7 @@ class SchedulerService:
                     "process_failed_scheduler_jobs",
                     "check_email_replies",
                     "scan_linkedin_home_feed_hourly",
+                    "recycle_browser",
                     "daily_morning_discovery",
                     "scan_all_linkedin_accounts_daily",
                     "scan_hashtags_daily",
