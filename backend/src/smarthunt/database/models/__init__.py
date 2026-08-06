@@ -12,12 +12,11 @@ from smarthunt.favorites.models import FavoriteJob
 from smarthunt.idempotency.models import IdempotencyKey
 from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
-from smarthunt.linkedin_monitor.models import MonitoredLinkedInAccount
+from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
 from smarthunt.notifications.models import Notification
 from smarthunt.providers.health.models import ProviderHealth
 from smarthunt.providers.settings.models import ProviderSetting
 from smarthunt.resume.models import TailoredResume
-from smarthunt.saved_searches.models import SavedSearch
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
 from smarthunt.scheduler.locks.models import SchedulerLock
@@ -37,12 +36,12 @@ __all__ = [
     "Job",
     "JobNote",
     "JobTag",
+    "MonitoredHashtag",
     "MonitoredLinkedInAccount",
     "Notification",
     "ProviderHealth",
     "ProviderSetting",
     "Resume",
-    "SavedSearch",
     "SchedulerHistory",
     "SchedulerLock",
     "SearchHistory",

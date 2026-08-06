@@ -42,7 +42,6 @@ from smarthunt.resume.api.router import router as resume_router
 from smarthunt.resume.reviewer.router import (
     router as resume_reviewer_router,
 )
-from smarthunt.saved_searches.router import router as saved_searches_router
 from smarthunt.scheduler.history.router import (
     router as scheduler_history_router,
 )
@@ -168,12 +167,6 @@ api_router.include_router(
 api_router.include_router(
     search_metrics_router,
     tags=["search-metrics"],
-)
-
-api_router.include_router(
-    saved_searches_router,
-    prefix="/saved-searches",
-    tags=["saved-searches"],
 )
 
 api_router.include_router(

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.playwright.manager import BrowserManager, browser_manager
 from smarthunt.providers.linkedin.provider import POSTED_DATE_SELECTOR, LinkedInProvider
 
 """Regression tests: LinkedInProvider.search() used to return one
@@ -68,13 +68,13 @@ async def test_linkedin_search_skips_malformed_cards(monkeypatch):
 
     fake_context = AsyncMock()
 
-    async def fake_new_isolated_page():
+    async def fake_new_isolated_page(self):
         return fake_context, fake_page
 
     # is_running is a read-only property derived from `browser` — set the
     # underlying attribute, not the property itself.
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "new_isolated_page", fake_new_isolated_page)
+    monkeypatch.setattr(BrowserManager, "new_isolated_page", fake_new_isolated_page)
 
     jobs = await provider.search(query="backend", location="Saudi Arabia", limit=10)
 
@@ -130,11 +130,11 @@ async def test_linkedin_search_extracts_posted_at_from_listdate(monkeypatch):
 
     fake_context = AsyncMock()
 
-    async def fake_new_isolated_page():
+    async def fake_new_isolated_page(self):
         return fake_context, fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "new_isolated_page", fake_new_isolated_page)
+    monkeypatch.setattr(BrowserManager, "new_isolated_page", fake_new_isolated_page)
 
     jobs = await provider.search(query="backend", location="Saudi Arabia", limit=10)
 
@@ -200,11 +200,11 @@ async def test_linkedin_search_fetches_real_description_from_job_detail_page(mon
 
     fake_context = AsyncMock()
 
-    async def fake_new_isolated_page():
+    async def fake_new_isolated_page(self):
         return fake_context, fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "new_isolated_page", fake_new_isolated_page)
+    monkeypatch.setattr(BrowserManager, "new_isolated_page", fake_new_isolated_page)
 
     jobs = await provider.search(query="linux", location="Saudi Arabia", limit=10)
 
@@ -226,10 +226,10 @@ async def test_linkedin_search_returns_empty_list_on_browser_failure(monkeypatch
 
     monkeypatch.setattr(browser_manager, "browser", None)
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         raise RuntimeError("no browser binary available")
 
-    monkeypatch.setattr(browser_manager, "launch", fake_launch)
+    monkeypatch.setattr(BrowserManager, "launch", fake_launch)
 
     jobs = await provider.search(query="python", location="Saudi Arabia")
 

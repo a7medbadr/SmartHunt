@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.playwright.manager import BrowserManager, browser_manager
 from smarthunt.linkedin_monitor import post_scanner
 
 
@@ -26,11 +26,11 @@ async def test_scan_profile_posts_extracts_urn_and_text(monkeypatch):
     fake_page.wait_for_timeout = AsyncMock()
     fake_page.locator = MagicMock(return_value=containers)
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_profile_posts("https://linkedin.com/in/someone", limit=10)
 
@@ -54,11 +54,11 @@ async def test_scan_profile_posts_skips_duplicate_urns(monkeypatch):
     fake_page.wait_for_timeout = AsyncMock()
     fake_page.locator = MagicMock(return_value=containers)
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_profile_posts("https://linkedin.com/in/someone", limit=10)
 
@@ -81,11 +81,11 @@ async def test_scan_profile_posts_skips_malformed_containers(monkeypatch):
     fake_page.wait_for_timeout = AsyncMock()
     fake_page.locator = MagicMock(return_value=containers)
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_profile_posts("https://linkedin.com/in/someone", limit=10)
 
@@ -98,11 +98,11 @@ async def test_scan_profile_posts_returns_empty_on_navigation_failure(monkeypatc
     fake_page = MagicMock()
     fake_page.goto = AsyncMock(side_effect=Exception("navigation failed"))
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_profile_posts("https://linkedin.com/in/someone")
 
@@ -118,10 +118,10 @@ async def test_scan_profile_posts_returns_empty_when_browser_launch_fails(monkey
     every other failure mode here."""
     monkeypatch.setattr(browser_manager, "browser", None)
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         raise RuntimeError("Browser launch timed out after 30s")
 
-    monkeypatch.setattr(browser_manager, "launch", fake_launch)
+    monkeypatch.setattr(BrowserManager, "launch", fake_launch)
 
     posts = await post_scanner.scan_profile_posts("https://linkedin.com/in/someone")
 
@@ -132,10 +132,10 @@ async def test_scan_profile_posts_returns_empty_when_browser_launch_fails(monkey
 async def test_scan_home_feed_returns_empty_when_browser_launch_fails(monkeypatch):
     monkeypatch.setattr(browser_manager, "browser", None)
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         raise RuntimeError("Browser launch timed out after 30s")
 
-    monkeypatch.setattr(browser_manager, "launch", fake_launch)
+    monkeypatch.setattr(BrowserManager, "launch", fake_launch)
 
     posts = await post_scanner.scan_home_feed()
 
@@ -163,11 +163,11 @@ async def test_scan_home_feed_scrolls_and_extracts(monkeypatch):
     fake_page.evaluate = AsyncMock()
     fake_page.locator = MagicMock(return_value=containers)
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_home_feed(limit=10, scroll_rounds=2)
 
@@ -200,11 +200,11 @@ async def test_scan_home_feed_skips_duplicate_component_keys(monkeypatch):
     fake_page.evaluate = AsyncMock()
     fake_page.locator = MagicMock(return_value=containers)
 
-    async def fake_get_page(provider):
+    async def fake_get_page(self, provider):
         return fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     posts = await post_scanner.scan_home_feed(limit=10, scroll_rounds=1)
 

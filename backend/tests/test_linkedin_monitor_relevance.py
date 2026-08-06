@@ -43,6 +43,28 @@ def test_is_job_related_post_rejects_empty_text():
     assert is_job_related_post("") is False
 
 
+def test_is_job_related_post_rejects_job_seeker_own_post():
+    # Regression: a real saved "job" turned out to be someone's own
+    # #OpenToWork post, not a hiring post — it still added #Hiring/#ITJobs
+    # hashtags itself (hoping recruiters would find it), which alone was
+    # enough to pass the old hiring-signal check.
+    text = (
+        "#OpenToWork | Network Engineer\n"
+        "السلام عليكم جميعاً 👋 أبحث حالياً عن فرصة جديدة في الرياض، السعودية "
+        "في مجال Linux و Networking.\n"
+        "#Hiring #ITJobs #SaudiArabia #Riyadh"
+    )
+    assert is_job_related_post(text) is False
+
+
+def test_is_job_related_post_rejects_english_job_seeker_post():
+    text = (
+        "Open to work! I'm currently looking for a new opportunity as a "
+        "Linux Administrator in Riyadh, Saudi Arabia. #Hiring #Linux"
+    )
+    assert is_job_related_post(text) is False
+
+
 def test_synthesize_title_uses_first_nonempty_line():
     text = "\n\nHiring a Linux Administrator\nMore details below."
     assert synthesize_title(text) == "Hiring a Linux Administrator"

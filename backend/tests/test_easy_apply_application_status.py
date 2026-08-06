@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.playwright.manager import BrowserManager, browser_manager
 from smarthunt.database.models.application import Application
 
 
@@ -13,20 +13,25 @@ def mock_browser_manager(monkeypatch):
     mock_page = MagicMock()
     mock_page.url = "https://www.linkedin.com/jobs/view/test"
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         browser_manager.browser = MagicMock()
 
-    async def fake_close():
+    async def fake_close(self):
         browser_manager.browser = None
         browser_manager.contexts.clear()
         browser_manager.pages.clear()
 
-    async def fake_get_page(provider: str):
+    async def fake_get_page(self, provider: str):
         return mock_page
 
-    monkeypatch.setattr(browser_manager, "launch", fake_launch)
-    monkeypatch.setattr(browser_manager, "close", fake_close)
-    monkeypatch.setattr(browser_manager, "get_page", fake_get_page)
+    # Patch the class, not the singleton instance — patching the
+    # instance permanently stamps these fakes onto it at monkeypatch
+    # teardown (real methods currently resolve through the class), which
+    # then silently shadows every later test's own class-level patch for
+    # the rest of the suite run. See CLAUDE.md's "Test-suite gotcha" note.
+    monkeypatch.setattr(BrowserManager, "launch", fake_launch)
+    monkeypatch.setattr(BrowserManager, "close", fake_close)
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
 
     yield mock_page
 

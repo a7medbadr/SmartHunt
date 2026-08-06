@@ -5,9 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.database.models.job import Job
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.linkedin_monitor import post_scanner
-from smarthunt.linkedin_monitor.models import MonitoredLinkedInAccount
+from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
 from smarthunt.scheduler.jobs import (
-    HASHTAG_LIST,
     daily_morning_discovery,
     scan_all_linkedin_accounts_daily,
     scan_hashtags_daily,
@@ -25,6 +24,7 @@ async def cleanup(db_session: AsyncSession):
     yield
     await db_session.execute(delete(Job).where(Job.source == "linkedin_post"))
     await db_session.execute(delete(MonitoredLinkedInAccount))
+    await db_session.execute(delete(MonitoredHashtag))
     await db_session.commit()
 
 
@@ -165,7 +165,15 @@ async def test_scan_all_linkedin_accounts_daily_survives_one_account_failing(
 
 
 @pytest.mark.asyncio
-async def test_scan_hashtags_daily_scans_every_hashtag(monkeypatch):
+async def test_scan_hashtags_daily_scans_every_enabled_hashtag(
+    monkeypatch, db_session: AsyncSession
+):
+    enabled_1 = MonitoredHashtag(tag="Hiring", enabled=True)
+    enabled_2 = MonitoredHashtag(tag="Linux", enabled=True)
+    disabled = MonitoredHashtag(tag="DevOps", enabled=False)
+    db_session.add_all([enabled_1, enabled_2, disabled])
+    await db_session.commit()
+
     scanned_hashtags = []
 
     async def fake_scan_hashtag_posts(hashtag, limit=50, scroll_rounds=10):
@@ -176,11 +184,21 @@ async def test_scan_hashtags_daily_scans_every_hashtag(monkeypatch):
 
     await scan_hashtags_daily()
 
-    assert sorted(scanned_hashtags) == sorted(HASHTAG_LIST)
+    assert sorted(scanned_hashtags) == ["Hiring", "Linux"]
 
 
 @pytest.mark.asyncio
-async def test_scan_hashtags_daily_continues_past_a_failing_hashtag(monkeypatch):
+async def test_scan_hashtags_daily_continues_past_a_failing_hashtag(
+    monkeypatch, db_session: AsyncSession
+):
+    db_session.add_all(
+        [
+            MonitoredHashtag(tag="Hiring", enabled=True),
+            MonitoredHashtag(tag="Linux", enabled=True),
+        ]
+    )
+    await db_session.commit()
+
     call_count = 0
 
     async def fake_scan_hashtag_posts(hashtag, limit=50, scroll_rounds=10):
@@ -192,6 +210,6 @@ async def test_scan_hashtags_daily_continues_past_a_failing_hashtag(monkeypatch)
 
     monkeypatch.setattr(post_scanner, "scan_hashtag_posts", fake_scan_hashtag_posts)
 
-    # Must not raise, and must still attempt every hashtag in the list.
+    # Must not raise, and must still attempt every enabled hashtag.
     await scan_hashtags_daily()
-    assert call_count == len(HASHTAG_LIST)
+    assert call_count == 2

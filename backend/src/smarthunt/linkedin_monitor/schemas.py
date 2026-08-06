@@ -29,5 +29,19 @@ class ScanResultResponse(BaseModel):
     job_ids: list[int]
 
 
-class HashtagScanRequest(BaseModel):
-    hashtags: list[str]
+class MonitoredHashtagCreate(BaseModel):
+    tag: str
+
+
+class MonitoredHashtagUpdate(BaseModel):
+    enabled: bool
+
+
+class MonitoredHashtagResponse(BaseModel):
+    id: int
+    tag: str
+    enabled: bool
+    last_checked_at: datetime | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

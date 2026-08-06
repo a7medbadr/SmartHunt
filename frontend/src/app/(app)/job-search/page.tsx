@@ -8,13 +8,16 @@ import { searchProvider } from "@/lib/scheduler-api";
 import { listProviders } from "@/lib/providers-api";
 import { PageGlow } from "@/components/page-glow";
 import {
+  addHashtag,
   addMonitoredAccount,
   listHashtags,
   listMonitoredAccounts,
+  removeHashtag,
   removeMonitoredAccount,
   scanAccountNow,
-  scanHashtagsNow,
+  scanHashtagNow,
   scanHomeFeedNow,
+  setHashtagEnabled,
   setMonitoredAccountEnabled,
 } from "@/lib/linkedin-monitor-api";
 import { Button } from "@/components/ui/button";
@@ -144,11 +147,13 @@ export default function JobSearchPage() {
   }
 
   // 4) البحث بالهاشتاج — نفس فكرة بلوك حسابات لينكدان بالظبط: كل هاشتاج
-  // من القائمة المتفق عليها ليه زرار "افحص دلوقتي" لوحده، بدل مربع نص واحد.
-  // نفس فكرة الطابور بتاعة queueAccountScan فوق — علشان لو ضغط على أكتر من
-  // هاشتاج ورا بعض، كل فحص يستنى دوره بدل ما يتزاحموا على نفس صفحة لينكدان.
+  // صف لوحده، بزرار تفعيل/تعطيل وزرار "افحص دلوقتي" وزرار حذف، بدل مربع
+  // نص واحد أو أزرار متفرقة. نفس فكرة الطابور بتاعة queueAccountScan فوق
+  // — علشان لو ضغط على أكتر من هاشتاج ورا بعض، كل فحص يستنى دوره بدل ما
+  // يتزاحموا على نفس صفحة لينكدان.
+  const [newHashtagTag, setNewHashtagTag] = useState("");
   const [hashtagScanMessage, setHashtagScanMessage] = useState<string | null>(null);
-  const [hashtagScanQueue, setHashtagScanQueue] = useState<string[]>([]);
+  const [hashtagScanQueue, setHashtagScanQueue] = useState<number[]>([]);
 
   const hashtagsQuery = useQuery({
     queryKey: ["linkedin-hashtags"],
@@ -156,15 +161,13 @@ export default function JobSearchPage() {
   });
 
   const hashtagScanMutation = useMutation({
-    mutationFn: (hashtag: string) => scanHashtagsNow([hashtag]),
-    onSuccess: (result, hashtag) => {
-      setHashtagScanMessage(
-        `#${hashtag}: لقينا ${result.scanned} بوست، وحفظنا ${result.saved} وظيفة مناسبة.`,
-      );
+    mutationFn: scanHashtagNow,
+    onSuccess: (result) => {
+      setHashtagScanMessage(`لقينا ${result.scanned} بوست، وحفظنا ${result.saved} وظيفة مناسبة.`);
+      queryClient.invalidateQueries({ queryKey: ["linkedin-hashtags"] });
       queryClient.invalidateQueries({ queryKey: ["search-jobs"] });
     },
-    onError: (_err, hashtag) =>
-      setHashtagScanMessage(`#${hashtag}: حصل خطأ أثناء الفحص، جرب تاني.`),
+    onError: () => setHashtagScanMessage("حصل خطأ أثناء الفحص، جرب تاني."),
     onSettled: () => {
       setHashtagScanQueue((queue) => {
         const [next, ...rest] = queue;
@@ -174,13 +177,36 @@ export default function JobSearchPage() {
     },
   });
 
-  function queueHashtagScan(hashtag: string) {
+  function queueHashtagScan(hashtagId: number) {
     if (!hashtagScanMutation.isPending) {
-      hashtagScanMutation.mutate(hashtag);
+      hashtagScanMutation.mutate(hashtagId);
     } else {
-      setHashtagScanQueue((queue) => (queue.includes(hashtag) ? queue : [...queue, hashtag]));
+      setHashtagScanQueue((queue) =>
+        queue.includes(hashtagId) ? queue : [...queue, hashtagId],
+      );
     }
   }
+
+  const addHashtagMutation = useMutation({
+    mutationFn: addHashtag,
+    onSuccess: (hashtag) => {
+      setNewHashtagTag("");
+      queryClient.invalidateQueries({ queryKey: ["linkedin-hashtags"] });
+      // زي "أضف حساب" بالظبط — أول ما يتضاف الهاشتاج، يتفحص على طول.
+      queueHashtagScan(hashtag.id);
+    },
+  });
+
+  const toggleHashtagMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      setHashtagEnabled(id, enabled),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["linkedin-hashtags"] }),
+  });
+
+  const removeHashtagMutation = useMutation({
+    mutationFn: removeHashtag,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["linkedin-hashtags"] }),
+  });
 
 
   return (
@@ -375,36 +401,78 @@ export default function JobSearchPage() {
         </CardContent>
       </Card>
 
-      {/* 4) البحث بالهاشتاج — نفس فكرة بلوك حسابات لينكدان، هاشتاج لكل واحد زرار فحص لوحده */}
+      {/* 4) البحث بالهاشتاج — نفس بلوك حسابات لينكدان بالظبط: صف لكل هاشتاج */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">البحث بالهاشتاج</CardTitle>
           <p className="text-xs text-muted-foreground">
-            نفس الهاشتاجات المتفق عليها — كل هاشتاج بيفحص أول 50 بوست فيه
-            ويحفظ أي وظيفة مناسبة تلقائيًا. النظام كمان بيعمل فحص لكل
-            الهاشتاجات دي مرة كل يوم لوحده من غير ما تحتاج تدوس حاجة.
+            كل هاشتاج بيفحص أول 50 بوست فيه ويحفظ أي وظيفة مناسبة تلقائيًا.
+            النظام كمان بيعمل فحص لكل الهاشتاجات المفعّلة دي مرة كل يوم
+            لوحده من غير ما تحتاج تدوس حاجة.
           </p>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Input
+              placeholder="اسم الهاشتاج (من غير #)"
+              value={newHashtagTag}
+              onChange={(e) => setNewHashtagTag(e.target.value)}
+              className="max-w-xs"
+            />
+            <Button
+              disabled={!newHashtagTag.trim() || addHashtagMutation.isPending}
+              onClick={() => addHashtagMutation.mutate(newHashtagTag.trim())}
+            >
+              {addHashtagMutation.isPending ? "جاري الإضافة والفحص..." : "أضف هاشتاج"}
+            </Button>
+          </div>
+
           {hashtagsQuery.isPending ? (
-            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-20 w-full" />
           ) : hashtagsQuery.data && hashtagsQuery.data.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {hashtagsQuery.data.map((tag) => (
-                <Button
-                  key={tag}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => queueHashtagScan(tag)}
+            <div className="flex flex-col gap-2">
+              {hashtagsQuery.data.map((hashtag) => (
+                <div
+                  key={hashtag.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
                 >
-                  #{tag}
-                  {" — "}
-                  {hashtagScanMutation.isPending && hashtagScanMutation.variables === tag
-                    ? "جاري الفحص..."
-                    : hashtagScanQueue.includes(tag)
-                      ? "في الانتظار..."
-                      : "افحص دلوقتي"}
-                </Button>
+                  <div className="flex flex-col">
+                    <span className="text-sm">#{hashtag.tag}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {hashtag.last_checked_at
+                        ? `آخر فحص: ${new Date(hashtag.last_checked_at).toLocaleString("ar-SA")}`
+                        : "لسه ماتفحصش"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={hashtag.enabled}
+                      onCheckedChange={(checked) =>
+                        toggleHashtagMutation.mutate({ id: hashtag.id, enabled: checked })
+                      }
+                      disabled={toggleHashtagMutation.isPending}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => queueHashtagScan(hashtag.id)}
+                    >
+                      {hashtagScanMutation.isPending &&
+                      hashtagScanMutation.variables === hashtag.id
+                        ? "جاري الفحص..."
+                        : hashtagScanQueue.includes(hashtag.id)
+                          ? "في الانتظار..."
+                          : "افحص دلوقتي"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeHashtagMutation.mutate(hashtag.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (

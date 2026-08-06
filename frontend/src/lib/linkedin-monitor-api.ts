@@ -9,6 +9,14 @@ export interface MonitoredAccount {
   created_at: string;
 }
 
+export interface MonitoredHashtag {
+  id: number;
+  tag: string;
+  enabled: boolean;
+  last_checked_at: string | null;
+  created_at: string;
+}
+
 export interface ScanResult {
   scanned: number;
   saved: number;
@@ -24,12 +32,6 @@ export interface ScanResult {
 // few seconds later — raised with real margin so a slow-but-real scan
 // isn't reported as failed.
 const SCAN_TIMEOUT_MS = 240000;
-
-// Hashtag scans loop through every given hashtag sequentially on the
-// backend (~60-65s each, measured live 2026-08-04) — a handful of
-// hashtags in one request easily exceeds SCAN_TIMEOUT_MS, so this gets
-// its own, much longer budget instead.
-const HASHTAG_SCAN_TIMEOUT_MS = 850000;
 
 export async function listMonitoredAccounts(): Promise<MonitoredAccount[]> {
   const { data } = await apiClient.get<MonitoredAccount[]>("/linkedin-monitor/accounts");
@@ -79,16 +81,37 @@ export async function scanHomeFeedNow(): Promise<ScanResult> {
   return data;
 }
 
-export async function scanHashtagsNow(hashtags: string[]): Promise<ScanResult> {
-  const { data } = await apiClient.post<ScanResult>(
-    "/linkedin-monitor/scan-hashtags",
-    { hashtags },
-    { timeout: HASHTAG_SCAN_TIMEOUT_MS },
-  );
+// Hashtags moved 2026-08-06 from a hardcoded, read-only list to a real,
+// owner-editable DB table — the below mirrors the monitored-accounts
+// functions above exactly (add/list/enable/delete/scan-one), replacing
+// the old listHashtags(): string[] + scanHashtagsNow(hashtags: string[])
+// bulk pair.
+export async function listHashtags(): Promise<MonitoredHashtag[]> {
+  const { data } = await apiClient.get<MonitoredHashtag[]>("/linkedin-monitor/hashtags");
   return data;
 }
 
-export async function listHashtags(): Promise<string[]> {
-  const { data } = await apiClient.get<string[]>("/linkedin-monitor/hashtags");
+export async function addHashtag(tag: string): Promise<MonitoredHashtag> {
+  const { data } = await apiClient.post<MonitoredHashtag>("/linkedin-monitor/hashtags", { tag });
+  return data;
+}
+
+export async function setHashtagEnabled(id: number, enabled: boolean): Promise<MonitoredHashtag> {
+  const { data } = await apiClient.patch<MonitoredHashtag>(`/linkedin-monitor/hashtags/${id}`, {
+    enabled,
+  });
+  return data;
+}
+
+export async function removeHashtag(id: number): Promise<void> {
+  await apiClient.delete(`/linkedin-monitor/hashtags/${id}`);
+}
+
+export async function scanHashtagNow(id: number): Promise<ScanResult> {
+  const { data } = await apiClient.post<ScanResult>(
+    `/linkedin-monitor/hashtags/${id}/scan`,
+    undefined,
+    { timeout: SCAN_TIMEOUT_MS },
+  );
   return data;
 }

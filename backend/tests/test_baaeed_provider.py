@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.playwright.manager import BrowserManager, browser_manager
 from smarthunt.providers.baaeed.provider import BaaeedProvider
 
 """Baaeed (baaeed.com, a Hsoub product) is a real remote-jobs board —
@@ -76,11 +76,11 @@ async def test_baaeed_search_skips_malformed_cards(monkeypatch):
 
     fake_context = AsyncMock()
 
-    async def fake_new_isolated_page():
+    async def fake_new_isolated_page(self):
         return fake_context, fake_page
 
     monkeypatch.setattr(browser_manager, "browser", MagicMock())
-    monkeypatch.setattr(browser_manager, "new_isolated_page", fake_new_isolated_page)
+    monkeypatch.setattr(BrowserManager, "new_isolated_page", fake_new_isolated_page)
 
     jobs = await provider.search(limit=10)
 
@@ -97,10 +97,10 @@ async def test_baaeed_search_returns_empty_list_on_browser_failure(monkeypatch):
 
     monkeypatch.setattr(browser_manager, "browser", None)
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         raise RuntimeError("no browser binary available")
 
-    monkeypatch.setattr(browser_manager, "launch", fake_launch)
+    monkeypatch.setattr(BrowserManager, "launch", fake_launch)
 
     jobs = await provider.search()
 

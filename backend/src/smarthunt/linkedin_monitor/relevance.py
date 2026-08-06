@@ -27,6 +27,29 @@ _SAUDI_LOCATION_PATTERNS = [
     )
 ]
 
+# A post asking for a job on the poster's OWN behalf, not offering one —
+# found live 2026-08-06 via a real saved "job" that was actually someone's
+# own #OpenToWork post ("أبحث حالياً عن فرصة جديدة..."/"I'm currently
+# looking for..."). These posts routinely add "#Hiring"/"#ITJobs" hashtags
+# themselves hoping recruiters will find them, which alone is enough to
+# pass _HIRING_SIGNAL_PATTERNS — so this has to be its own check, checked
+# first, not folded into a "stricter" hiring-signal regex; it's a
+# perspective distinction (who's looking for whom), not a keyword-strength
+# one. Any match here means "not a real job opening," full stop, no
+# matter what else the post also says.
+_JOB_SEEKER_SIGNAL_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"#opentowork",
+        r"open\s+to\s+work",
+        r"\bi(?:'|’)?m\s+(?:currently\s+)?(?:looking|searching)\s+for\s+(?:a\s+)?(?:new\s+)?(?:job|role|opportunity|position)\b",
+        r"\bseeking\s+(?:a\s+)?(?:new\s+)?(?:job|role|opportunity|position)\b",
+        r"أبحث\s+(?:حالياً\s+)?عن\s+(?:فرصة|وظيفة|عمل)",
+        r"ابحث\s+(?:حالياً\s+)?عن\s+(?:فرصة|وظيفة|عمل)",
+        r"أبحث\s+عن\s+فرصة\s+عمل",
+    )
+]
+
 # Signals that a post is actually announcing an open role (as opposed to
 # e.g. celebrating a hire, congratulating someone, or discussing the job
 # market generally) — mirrors the kind of keyword search the owner's
@@ -90,6 +113,9 @@ def is_job_related_post(text: str) -> bool:
         return False
 
     matchable_text = _split_hashtag_words(text)
+
+    if any(pattern.search(matchable_text) for pattern in _JOB_SEEKER_SIGNAL_PATTERNS):
+        return False
 
     has_hiring_signal = any(pattern.search(matchable_text) for pattern in _HIRING_SIGNAL_PATTERNS)
     has_saudi_signal = any(pattern.search(matchable_text) for pattern in _SAUDI_LOCATION_PATTERNS)

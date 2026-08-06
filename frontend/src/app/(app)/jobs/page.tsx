@@ -1,14 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, ArrowUpDown, BookmarkPlus, Search, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Star } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { addFavorite, listFavorites, removeFavorite, searchJobs } from "@/lib/jobs-api";
 import { listProviders } from "@/lib/providers-api";
-import { createSavedSearch } from "@/lib/saved-searches-api";
 import { searchProvider } from "@/lib/scheduler-api";
 import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
@@ -123,11 +122,6 @@ function JobsPageContent() {
   });
   const enabledProviders = providersQuery.data?.filter((p) => p.enabled) ?? [];
 
-  const saveSearchMutation = useMutation({
-    mutationFn: createSavedSearch,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saved-searches"] }),
-  });
-
   // "اختار الموقع" isn't just a filter on our own DB — choosing a specific
   // site must actually go search that site live (real navigation, not
   // our local jobs table), per explicit request. Triggering this before
@@ -231,24 +225,6 @@ function JobsPageContent() {
         <Button type="submit" disabled={siteSearchMutation.isPending}>
           {siteSearchMutation.isPending ? "جاري البحث في الموقع..." : "بحث"}
         </Button>
-        {(appliedFilters.keyword || appliedFilters.location) && (
-          <Button
-            type="button"
-            variant="outline"
-            className="gap-1.5"
-            disabled={saveSearchMutation.isPending}
-            onClick={() =>
-              saveSearchMutation.mutate({
-                name: appliedFilters.keyword || appliedFilters.location,
-                keyword: appliedFilters.keyword || undefined,
-                location: appliedFilters.location || undefined,
-              })
-            }
-          >
-            <BookmarkPlus className="size-4" />
-            {saveSearchMutation.isPending ? "جاري الحفظ..." : "احفظ البحث ده"}
-          </Button>
-        )}
       </form>
 
       {site !== ALL_SITES_VALUE && (

@@ -18,6 +18,7 @@ from smarthunt.scheduler.jobs import (
     discover_openshift,
     discover_storage,
     discover_vmware,
+    linkedin_session_healthcheck,
     process_failed_scheduler_jobs,
     recycle_browser,
     scan_all_linkedin_accounts_daily,
@@ -96,6 +97,16 @@ class SchedulerService:
                 replace_existing=True,
             )
 
+            # Every 30 min — see linkedin_session_healthcheck's own
+            # docstring for why not the literally-requested 5-10 (abuse-
+            # detection risk from re-submitting credentials too often).
+            scheduler.add_job(
+                linkedin_session_healthcheck,
+                IntervalTrigger(minutes=30),
+                id="linkedin_session_healthcheck",
+                replace_existing=True,
+            )
+
             # Every 6h — bounds how long Chromium's own idle renderer-
             # process pool can accumulate on this resource-constrained
             # shared host (see recycle_browser's docstring for the live
@@ -160,6 +171,7 @@ class SchedulerService:
                     "process_failed_scheduler_jobs",
                     "check_email_replies",
                     "scan_linkedin_home_feed_hourly",
+                    "linkedin_session_healthcheck",
                     "recycle_browser",
                     "daily_morning_discovery",
                     "scan_all_linkedin_accounts_daily",

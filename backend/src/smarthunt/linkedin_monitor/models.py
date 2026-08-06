@@ -22,3 +22,23 @@ class MonitoredLinkedInAccount(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class MonitoredHashtag(Base):
+    """A LinkedIn hashtag whose first ~50 posts get periodically scanned
+    for job-relevant content — moved 2026-08-06 from a hardcoded Python
+    list (scheduler/jobs.py's old HASHTAG_LIST) to a real, owner-editable
+    DB table per explicit request, mirroring MonitoredLinkedInAccount
+    above exactly: each hashtag can be individually enabled/disabled,
+    scanned on demand, or removed, instead of only being editable by
+    changing code."""
+
+    __tablename__ = "monitored_hashtags"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tag: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )

@@ -31,16 +31,6 @@ async def test_application_creation_logs_activity(client):
 
 
 @pytest.mark.asyncio
-async def test_saved_search_creation_logs_activity(client):
-    response = await client.post(
-        "/api/v1/saved-searches",
-        json={"name": "Activity Test Search", "keyword": "devops"},
-    )
-    assert response.status_code == 201
-    assert await _latest_activity_type(client) == "saved_search_created"
-
-
-@pytest.mark.asyncio
 async def test_cover_letter_generation_logs_activity(client):
     response = await client.post(
         "/api/v1/cover-letter/generate",

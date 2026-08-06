@@ -17,6 +17,30 @@ logger = logging.getLogger("smarthunt.linkedin_monitor")
 # session instead of opening a second one.
 _linkedin_page_lock = asyncio.Lock()
 
+# scan_hashtags_daily holds this lock for its *entire* ~30+ minute sweep
+# across all hashtags (one hashtag at a time, but never releasing between
+# them) — found live 2026-08-06 chasing "manual 'scan my home page'
+# button always says حصل خطأ أثناء الفحص، جرب تاني": a manual scan
+# landing while that daily sweep (or the account sweep) is running used
+# to just wait on `async with _linkedin_page_lock` with no bound at all,
+# silently queueing for up to ~30 minutes — the frontend's 240s timeout
+# fires long before that, showing a generic error even though the
+# backend request wasn't actually broken, just stuck in a very long
+# queue. A bounded wait here means a manual scan gives up on a busy
+# session quickly (scanned=0) instead of hanging until the client times
+# out; the scheduled callers already tolerate an empty result the same
+# way they tolerate any other transient scan failure.
+_LOCK_WAIT_TIMEOUT_SECONDS = 20
+
+
+async def _try_acquire_linkedin_lock() -> bool:
+    try:
+        await asyncio.wait_for(_linkedin_page_lock.acquire(), timeout=_LOCK_WAIT_TIMEOUT_SECONDS)
+        return True
+    except asyncio.TimeoutError:
+        return False
+
+
 # Profile "recent activity" cards' inner_text() includes LinkedIn's own
 # surrounding chrome ahead of the real post body — found live 2026-08-05
 # chasing saved jobs titled literally "Feed post number 1"/"...number 3"
@@ -239,7 +263,11 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
         if not browser_manager.is_running:
             await browser_manager.launch()
 
-        async with _linkedin_page_lock:
+        if not await _try_acquire_linkedin_lock():
+            logger.warning("linkedin_profile_scan_lock_busy", extra={"profile_url": profile_url})
+            return []
+
+        try:
             page = await browser_manager.get_page("linkedin")
 
             await page.goto(activity_url, wait_until="domcontentloaded", timeout=30000)
@@ -257,6 +285,8 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
                 pass
 
             posts = await _extract_posts_from_page(page, limit)
+        finally:
+            _linkedin_page_lock.release()
 
         logger.info(
             "linkedin_profile_scan_completed",
@@ -281,7 +311,11 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
     if not browser_manager.is_running:
         await browser_manager.launch()
 
-    async with _linkedin_page_lock:
+    if not await _try_acquire_linkedin_lock():
+        logger.warning("linkedin_feed_style_scan_lock_busy", extra={"url": url})
+        return []
+
+    try:
         page = await browser_manager.get_page("linkedin")
 
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -306,6 +340,8 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
             await page.wait_for_timeout(2000)
 
         return await _extract_feed_posts_from_page(page, limit)
+    finally:
+        _linkedin_page_lock.release()
 
 
 async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int = 10) -> list[dict]:

@@ -23,47 +23,17 @@ LINKEDIN_FEED_PROVIDER = "scheduler:linkedin-feed"
 LINKEDIN_ACCOUNTS_PROVIDER = "scheduler:linkedin-accounts"
 LINKEDIN_HASHTAGS_PROVIDER = "scheduler:linkedin-hashtags"
 
-# The owner's own hashtag list (2026-08-05), deduplicated — a mix of
-# general hiring/location tags and their specific tech stack. Scanned
-# daily (see scan_hashtags_daily below), not hourly: at ~60-65s/hashtag
-# measured live, ~31 hashtags is already a 30+ minute run, and this
+# The owner's original hashtag list (2026-08-05) — moved 2026-08-06 into
+# the DB-backed MonitoredHashtag table (linkedin_monitor/models.py) so
+# each hashtag is individually addable/removable/enabled from the
+# job-search page, the same as monitored accounts. The seed migration
+# (alembic/versions/) populates this same list into that table on
+# upgrade; scan_hashtags_daily below now reads from the DB, filtered to
+# enabled=True, instead of this constant. At ~60-65s/hashtag measured
+# live, the full ~31-hashtag list is already a 30+ minute run, and this
 # machine only has 3 CPU cores shared with everything else (Postgres,
 # Ollama, the backend itself) — hourly would leave almost no idle time
-# for anything else to actually get CPU.
-HASHTAG_LIST = [
-    "Hiring",
-    "HiringNow",
-    "HiringAlert",
-    "SaudiJobs",
-    "SaudiArabia",
-    "SaudiArabiaJobs",
-    "KSAJobs",
-    "RiyadhJobs",
-    "ITJobs",
-    "TechJobs",
-    "Infrastructure",
-    "InfrastructureLead",
-    "ITSupport",
-    "FieldSupport",
-    "DesktopSupport",
-    "SystemAdministration",
-    "Cloud",
-    "CloudInfrastructure",
-    "Networking",
-    "OnsiteJobs",
-    "Recruitment",
-    "CareerOpportunities",
-    "JoinUs",
-    "Linux",
-    "RHEL",
-    "RHCE",
-    "Ansible",
-    "Terraform",
-    "Kubernetes",
-    "CKA",
-    "DevOps",
-    "Automation",
-]
+# for anything else to actually get CPU, hence still daily, not hourly.
 
 
 async def _run_scheduled_discovery(topic: str, query: str) -> None:
@@ -116,6 +86,88 @@ async def discover_storage():
 
 async def discover_devops():
     await _run_scheduled_discovery("devops", TOPIC_QUERIES["devops"])
+
+
+async def linkedin_session_healthcheck():
+    """Periodically verifies the persistent LinkedIn session is still
+    logged in, and attempts a real re-login if not — added 2026-08-06 per
+    explicit request ("عاوز سكربت يفضل فاتح سيشن مفتوحه بين المشروع
+    ولينكدان") so the hourly/daily LinkedIn scans always have a live
+    session instead of silently degrading as cookies age out over days.
+
+    Deliberately every 30 minutes, not the literally-requested 5-10:
+    `linkedin_login()` re-submitting credentials too often is exactly
+    what already triggered LinkedIn's own repeated-login abuse detection
+    once before on this project (see browser/playwright/manager.py's
+    BROWSER_PROFILES_DIR note) — 30 minutes is frequent enough to catch a
+    dropped session same-day without hammering LinkedIn's login endpoint.
+    Also, when the session really is logged out, a *full* automated
+    recovery isn't safely unattended at all: LinkedIn's own device-
+    approval checkpoint needs the owner to tap a push notification on
+    their phone (see CLAUDE.md's LinkedIn login notes) — this job
+    attempts one real `linkedin_login()` call (cheap when already logged
+    in — see that function's own early-return for an already-authenticated
+    session), and if that comes back MANUAL_REQUIRED, notifies the owner
+    instead of retrying blindly, matching the project's standing "only
+    CAPTCHA/MFA should ever pause and wait for a human" rule rather than
+    silently looping forever on something a script cannot solve.
+
+    Shares post_scanner.py's `_linkedin_page_lock` since this navigates
+    the same persistent "linkedin" page every other LinkedIn scan
+    function does — skips this run entirely (rather than blocking) if a
+    scan is already using it, same bounded-wait pattern as those
+    functions use for the reverse case."""
+    from smarthunt.browser.playwright.manager import browser_manager
+    from smarthunt.browser.providers.linkedin.login import linkedin_login
+    from smarthunt.linkedin_monitor.post_scanner import (
+        _linkedin_page_lock,
+        _try_acquire_linkedin_lock,
+    )
+    from smarthunt.notifications.schemas import NotificationCreate
+    from smarthunt.notifications.service import notification_service
+
+    try:
+        if not browser_manager.is_running:
+            await browser_manager.launch()
+
+        if not await _try_acquire_linkedin_lock():
+            logger.info("linkedin_session_healthcheck_skipped_busy")
+            return
+
+        try:
+            page = await browser_manager.get_page("linkedin")
+            result = await linkedin_login(page)
+        finally:
+            _linkedin_page_lock.release()
+
+        status = result.get("status")
+
+        if status == "SUCCESS":
+            await browser_manager.save_state("linkedin")
+            logger.info("linkedin_session_healthcheck_ok")
+            return
+
+        logger.warning("linkedin_session_healthcheck_failed", extra={"status": status})
+
+        if status == "MANUAL_REQUIRED":
+            async with AsyncSessionLocal() as db:
+                await notification_service.create(
+                    db,
+                    NotificationCreate(
+                        type="WARNING",
+                        title="لينكدان محتاج تدخل يدوي",
+                        message=(
+                            "السيشن بتاع لينكدان اتقفلت ومحتاجة موافقة يدوية (كابتشا أو "
+                            "تحقق ثنائي) — افتح لينكدان وسجّل دخول يدوي، أو وافق على طلب "
+                            "الموافقة اللي وصلك على موبايلك، علشان الفحص الدوري يرجع يشتغل."
+                        ),
+                        channel="TELEGRAM",
+                        priority="HIGH",
+                    ),
+                )
+                await db.commit()
+    except Exception:
+        logger.exception("linkedin_session_healthcheck_error")
 
 
 async def recycle_browser():
@@ -291,32 +343,44 @@ async def scan_all_linkedin_accounts_daily():
 
 
 async def scan_hashtags_daily():
-    """Once a day, scans the first ~50 posts under every hashtag in
-    HASHTAG_LIST for job-relevant content — the automatic counterpart to
-    the manual "افحص الهاشتاجات" block on the job-search page, added
-    2026-08-05 per explicit request. One hashtag failing (navigation
-    error, etc.) doesn't skip the rest of the list."""
+    """Once a day, scans the first ~50 posts under every *enabled*
+    hashtag in the owner's DB-backed hashtag list (linkedin_monitor
+    MonitoredHashtag — moved 2026-08-06 from a hardcoded Python list so
+    each hashtag can be added/removed/enabled from the job-search page,
+    the same as monitored accounts) for job-relevant content — the
+    automatic counterpart to each hashtag's own "افحص دلوقتي" button. One
+    hashtag failing (navigation error, etc.) doesn't skip the rest of the
+    list."""
     from smarthunt.linkedin_monitor import service as linkedin_monitor_service
     from smarthunt.linkedin_monitor.post_scanner import scan_hashtag_posts
     from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
     from smarthunt.scheduler.history.service import scheduler_history_service
 
+    async with AsyncSessionLocal() as db:
+        hashtags = await linkedin_monitor_service.list_hashtags(db)
+
     total_scanned = 0
     total_saved = 0
+    scanned_count = 0
 
-    for hashtag in HASHTAG_LIST:
+    for hashtag in hashtags:
+        if not hashtag.enabled:
+            continue
+
+        scanned_count += 1
         async with AsyncSessionLocal() as db:
             try:
-                posts = await scan_hashtag_posts(hashtag)
+                posts = await scan_hashtag_posts(hashtag.tag)
                 saved = await linkedin_monitor_service.scan_and_save(db, posts)
+                await linkedin_monitor_service.mark_hashtag_checked(db, hashtag.id)
                 total_scanned += len(posts)
                 total_saved += len(saved)
                 logger.info(
                     "scheduled_hashtag_scan_completed",
-                    extra={"hashtag": hashtag, "scanned": len(posts), "saved": len(saved)},
+                    extra={"hashtag": hashtag.tag, "scanned": len(posts), "saved": len(saved)},
                 )
             except Exception:
-                logger.exception("scheduled_hashtag_scan_failed", extra={"hashtag": hashtag})
+                logger.exception("scheduled_hashtag_scan_failed", extra={"hashtag": hashtag.tag})
                 continue
 
     async with AsyncSessionLocal() as db:
@@ -326,9 +390,7 @@ async def scan_hashtags_daily():
                 provider=LINKEDIN_HASHTAGS_PROVIDER,
                 status="completed",
                 jobs_found=total_saved,
-                message=(
-                    f"hashtags={len(HASHTAG_LIST)} scanned={total_scanned} saved={total_saved}"
-                ),
+                message=f"hashtags={scanned_count} scanned={total_scanned} saved={total_saved}",
             ),
         )
         await db.commit()

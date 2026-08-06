@@ -9,25 +9,70 @@ from smarthunt.linkedin_monitor.post_scanner import (
     scan_profile_posts,
 )
 from smarthunt.linkedin_monitor.schemas import (
-    HashtagScanRequest,
     MonitoredAccountCreate,
     MonitoredAccountResponse,
     MonitoredAccountUpdate,
+    MonitoredHashtagCreate,
+    MonitoredHashtagResponse,
+    MonitoredHashtagUpdate,
     ScanResultResponse,
 )
 
 router = APIRouter(prefix="/linkedin-monitor", tags=["linkedin-monitor"])
 
 
-@router.get("/hashtags", response_model=list[str])
-async def list_hashtags():
-    """The owner's curated hashtag list, same list scan_hashtags_daily
-    (scheduler/jobs.py) sweeps once a day — exposed here so the
-    job-search page's per-hashtag scan buttons stay in sync with it
-    instead of duplicating the list client-side."""
-    from smarthunt.scheduler.jobs import HASHTAG_LIST
+@router.get("/hashtags", response_model=list[MonitoredHashtagResponse])
+async def list_hashtags(db: AsyncSession = Depends(get_db)):
+    """The owner's own, DB-backed hashtag list — moved 2026-08-06 from a
+    hardcoded Python list to a real table (see linkedin_monitor/models.py's
+    MonitoredHashtag) so each hashtag can be added/removed/enabled from
+    the job-search page directly, the same as monitored accounts below,
+    instead of only being editable by changing code."""
+    return await service.list_hashtags(db)
 
-    return HASHTAG_LIST
+
+@router.post(
+    "/hashtags", response_model=MonitoredHashtagResponse, status_code=status.HTTP_201_CREATED
+)
+async def add_hashtag(payload: MonitoredHashtagCreate, db: AsyncSession = Depends(get_db)):
+    return await service.add_hashtag(db, payload.tag)
+
+
+@router.patch("/hashtags/{hashtag_id}", response_model=MonitoredHashtagResponse)
+async def update_hashtag(
+    hashtag_id: int, payload: MonitoredHashtagUpdate, db: AsyncSession = Depends(get_db)
+):
+    hashtag = await service.set_hashtag_enabled(db, hashtag_id, payload.enabled)
+    if hashtag is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hashtag not found.")
+    return hashtag
+
+
+@router.delete("/hashtags/{hashtag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_hashtag(hashtag_id: int, db: AsyncSession = Depends(get_db)):
+    deleted = await service.remove_hashtag(db, hashtag_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hashtag not found.")
+
+
+@router.post("/hashtags/{hashtag_id}/scan", response_model=ScanResultResponse)
+async def scan_hashtag(hashtag_id: int, db: AsyncSession = Depends(get_db)):
+    """Manual trigger for a single hashtag — mirrors scan_account below
+    exactly, replacing the old bulk POST /scan-hashtags (which took an
+    arbitrary hashtag list from the request body) now that hashtags are
+    individually addressable DB rows with their own "scan now" button."""
+    hashtags = await service.list_hashtags(db)
+    hashtag = next((h for h in hashtags if h.id == hashtag_id), None)
+    if hashtag is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hashtag not found.")
+
+    posts = await scan_hashtag_posts(hashtag.tag)
+    saved = await service.scan_and_save(db, posts)
+    await service.mark_hashtag_checked(db, hashtag_id)
+
+    return ScanResultResponse(
+        scanned=len(posts), saved=len(saved), job_ids=[job.id for job in saved]
+    )
 
 
 @router.get("/accounts", response_model=list[MonitoredAccountResponse])
@@ -87,23 +132,4 @@ async def scan_feed(db: AsyncSession = Depends(get_db)):
 
     return ScanResultResponse(
         scanned=len(posts), saved=len(saved), job_ids=[job.id for job in saved]
-    )
-
-
-@router.post("/scan-hashtags", response_model=ScanResultResponse)
-async def scan_hashtags(payload: HashtagScanRequest, db: AsyncSession = Depends(get_db)):
-    """Manual trigger — scans each given hashtag's first ~50 posts (owner
-    supplies the hashtag list from the job-search page), aggregating
-    scanned/saved counts across all of them into one response."""
-    total_scanned = 0
-    all_saved = []
-    for hashtag in payload.hashtags:
-        posts = await scan_hashtag_posts(hashtag)
-        total_scanned += len(posts)
-        all_saved.extend(await service.scan_and_save(db, posts))
-
-    return ScanResultResponse(
-        scanned=total_scanned,
-        saved=len(all_saved),
-        job_ids=[job.id for job in all_saved],
     )

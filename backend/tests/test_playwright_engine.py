@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from httpx import AsyncClient
 
-from smarthunt.browser.playwright.manager import browser_manager
+from smarthunt.browser.playwright.manager import BrowserManager, browser_manager
 
 
 @pytest.fixture(autouse=True)
@@ -43,31 +43,31 @@ def mock_browser_manager(monkeypatch):
     mock_page.locator.return_value.fill = AsyncMock()
     mock_page.locator.return_value.press = AsyncMock()
 
-    async def fake_launch(headless: bool = True):
+    async def fake_launch(self, headless: bool = True):
         browser_manager.browser = MagicMock()
 
-    async def fake_close():
+    async def fake_close(self):
         browser_manager.browser = None
         browser_manager.contexts.clear()
         browser_manager.pages.clear()
 
-    async def fake_get_page(provider: str):
+    async def fake_get_page(self, provider: str):
         return mock_page
 
     monkeypatch.setattr(
-        browser_manager,
+        BrowserManager,
         "launch",
         fake_launch,
     )
 
     monkeypatch.setattr(
-        browser_manager,
+        BrowserManager,
         "close",
         fake_close,
     )
 
     monkeypatch.setattr(
-        browser_manager,
+        BrowserManager,
         "get_page",
         fake_get_page,
     )
@@ -130,10 +130,10 @@ async def test_login_saves_session_on_success(client: AsyncClient, monkeypatch):
     credentials) every time, which was also what was triggering
     LinkedIn's own repeated-login abuse detection. A successful login
     must persist its session to disk immediately."""
-    from smarthunt.browser.playwright.manager import browser_manager
+    from smarthunt.browser.playwright.manager import BrowserManager
 
     save_state_mock = AsyncMock()
-    monkeypatch.setattr(browser_manager, "save_state", save_state_mock)
+    monkeypatch.setattr(BrowserManager, "save_state", save_state_mock)
 
     response = await client.post(
         "/api/v1/browser/playwright/login",
@@ -146,7 +146,7 @@ async def test_login_saves_session_on_success(client: AsyncClient, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_login_does_not_save_session_on_manual_required(client: AsyncClient, monkeypatch):
-    from smarthunt.browser.playwright.manager import browser_manager
+    from smarthunt.browser.playwright.manager import BrowserManager
 
     async def fake_login(page):
         return {"status": "MANUAL_REQUIRED"}
@@ -157,7 +157,7 @@ async def test_login_does_not_save_session_on_manual_required(client: AsyncClien
     )
 
     save_state_mock = AsyncMock()
-    monkeypatch.setattr(browser_manager, "save_state", save_state_mock)
+    monkeypatch.setattr(BrowserManager, "save_state", save_state_mock)
 
     response = await client.post(
         "/api/v1/browser/playwright/login",

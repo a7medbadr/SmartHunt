@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
-from smarthunt.scheduler.jobs import discover_linux, recycle_browser
+from smarthunt.scheduler.jobs import discover_linux, linkedin_session_healthcheck, recycle_browser
 
 """Regression tests: the APScheduler-registered discover_* jobs called
 `async with track_scheduler_execution("...")`, but that function took a
@@ -107,3 +107,76 @@ async def test_recycle_browser_closes_when_running(monkeypatch):
     await recycle_browser()
 
     assert close_called is True
+
+
+"""linkedin_session_healthcheck regression tests: added 2026-08-06 per
+explicit request for the project to keep its own LinkedIn session alive
+between the periodic scans instead of letting it silently go stale."""
+
+
+@pytest.mark.asyncio
+async def test_linkedin_session_healthcheck_saves_state_on_success(monkeypatch):
+    from smarthunt.browser.playwright.manager import browser_manager
+
+    monkeypatch.setattr(browser_manager, "browser", object())
+
+    async def _launch(self, *args, **kwargs):
+        pass
+
+    async def _get_page(self, provider):
+        return object()
+
+    save_state_called = False
+
+    async def _save_state(self, provider):
+        nonlocal save_state_called
+        save_state_called = True
+
+    monkeypatch.setattr(type(browser_manager), "launch", _launch)
+    monkeypatch.setattr(type(browser_manager), "get_page", _get_page)
+    monkeypatch.setattr(type(browser_manager), "save_state", _save_state)
+
+    async def _login(page):
+        return {"status": "SUCCESS"}
+
+    monkeypatch.setattr("smarthunt.browser.providers.linkedin.login.linkedin_login", _login)
+
+    await linkedin_session_healthcheck()
+
+    assert save_state_called is True
+
+
+@pytest.mark.asyncio
+async def test_linkedin_session_healthcheck_notifies_owner_on_manual_required(
+    monkeypatch, db_session: AsyncSession
+):
+    from smarthunt.browser.playwright.manager import browser_manager
+    from smarthunt.notifications.models import Notification
+
+    monkeypatch.setattr(browser_manager, "browser", object())
+
+    async def _launch(self, *args, **kwargs):
+        pass
+
+    async def _get_page(self, provider):
+        return object()
+
+    monkeypatch.setattr(type(browser_manager), "launch", _launch)
+    monkeypatch.setattr(type(browser_manager), "get_page", _get_page)
+
+    async def _login(page):
+        return {"status": "MANUAL_REQUIRED"}
+
+    monkeypatch.setattr("smarthunt.browser.providers.linkedin.login.linkedin_login", _login)
+
+    await linkedin_session_healthcheck()
+
+    result = await db_session.execute(
+        select(Notification).where(Notification.title == "لينكدان محتاج تدخل يدوي")
+    )
+    notification = result.scalars().first()
+    assert notification is not None
+    assert notification.priority == "HIGH"
+
+    await db_session.execute(delete(Notification).where(Notification.id == notification.id))
+    await db_session.commit()
