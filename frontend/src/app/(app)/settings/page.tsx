@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage, useTranslation } from "@/lib/i18n/language-context";
 import type { Locale } from "@/lib/i18n/translations";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 function LanguageCard() {
   const { locale, setLocale } = useLanguage();
@@ -77,9 +78,7 @@ function ChangePasswordCard() {
     mutation.mutate({ current_password: currentPassword, new_password: newPassword });
   }
 
-  const serverError =
-    mutation.isError &&
-    (mutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+  const serverError = mutation.isError && getApiErrorMessage(mutation.error);
 
   return (
     <Card>

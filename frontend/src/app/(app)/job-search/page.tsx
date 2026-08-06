@@ -33,6 +33,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/lib/i18n/language-context";
 import { Switch } from "@/components/ui/switch";
+import { EstimatedProgressBar } from "@/components/ui/estimated-progress-bar";
+import { useEstimatedProgress } from "@/hooks/use-estimated-progress";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 export default function JobSearchPage() {
   const queryClient = useQueryClient();
@@ -48,8 +51,12 @@ export default function JobSearchPage() {
       setScanResultMessage(`لقينا ${result.scanned} بوست، وحفظنا ${result.saved} وظيفة مناسبة.`);
       queryClient.invalidateQueries({ queryKey: ["search-jobs"] });
     },
-    onError: () => setScanResultMessage("حصل خطأ أثناء الفحص، جرب تاني."),
+    onError: (error) =>
+      setScanResultMessage(getApiErrorMessage(error) ?? "حصل خطأ أثناء الفحص، جرب تاني."),
   });
+  // 200s: measured live 2026-08-06 after raising scroll_rounds to reach
+  // the owner's ~50-post target — a real scan took ~3m19s to find all 50.
+  const scanFeedProgress = useEstimatedProgress(scanFeedMutation.isPending, 200000);
 
   // 2) البحث في بوستات لينكدان — حسابات الأشخاص/الاتش آر.
   const [newAccountUrl, setNewAccountUrl] = useState("");
@@ -78,7 +85,8 @@ export default function JobSearchPage() {
       queryClient.invalidateQueries({ queryKey: ["linkedin-monitor-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["search-jobs"] });
     },
-    onError: () => setAccountScanMessage("حصل خطأ أثناء الفحص، جرب تاني."),
+    onError: (error) =>
+      setAccountScanMessage(getApiErrorMessage(error) ?? "حصل خطأ أثناء الفحص، جرب تاني."),
     onSettled: () => {
       setScanQueue((queue) => {
         const [next, ...rest] = queue;
@@ -95,6 +103,10 @@ export default function JobSearchPage() {
       setScanQueue((queue) => (queue.includes(accountId) ? queue : [...queue, accountId]));
     }
   }
+
+  // 60s: a profile scan doesn't scroll (fixed "recent activity" page), so
+  // it's much faster than the feed/hashtag scans — measured live ~25s.
+  const scanAccountProgress = useEstimatedProgress(scanAccountMutation.isPending, 60000);
 
   const addAccountMutation = useMutation({
     mutationFn: addMonitoredAccount,
@@ -134,6 +146,9 @@ export default function JobSearchPage() {
   const siteSearchMutation = useMutation({
     mutationFn: () => searchProvider(siteName, siteKeyword),
   });
+  // 70s: real two-pass LinkedIn search (list page + each job's own detail
+  // page) costs ~4.3s/job at this endpoint's limit=15, per CLAUDE.md notes.
+  const siteSearchProgress = useEstimatedProgress(siteSearchMutation.isPending, 70000);
 
   function handleSiteSearch() {
     setSiteSearchError(null);
@@ -167,7 +182,8 @@ export default function JobSearchPage() {
       queryClient.invalidateQueries({ queryKey: ["linkedin-hashtags"] });
       queryClient.invalidateQueries({ queryKey: ["search-jobs"] });
     },
-    onError: () => setHashtagScanMessage("حصل خطأ أثناء الفحص، جرب تاني."),
+    onError: (error) =>
+      setHashtagScanMessage(getApiErrorMessage(error) ?? "حصل خطأ أثناء الفحص، جرب تاني."),
     onSettled: () => {
       setHashtagScanQueue((queue) => {
         const [next, ...rest] = queue;
@@ -186,6 +202,10 @@ export default function JobSearchPage() {
       );
     }
   }
+
+  // 200s: hashtag pages use the same scroll-and-extract flow as the home
+  // feed scan above (same expected duration).
+  const hashtagScanProgress = useEstimatedProgress(hashtagScanMutation.isPending, 200000);
 
   const addHashtagMutation = useMutation({
     mutationFn: addHashtag,
@@ -233,16 +253,19 @@ export default function JobSearchPage() {
             النظام كمان بيعمل الفحص ده لوحده كل ساعة من غير ما تحتاج تدوس
             حاجة.
           </p>
-          <Button
-            variant="secondary"
-            disabled={scanFeedMutation.isPending}
-            onClick={() => scanFeedMutation.mutate()}
-            className="self-start"
-          >
-            {scanFeedMutation.isPending
-              ? "جاري فحص الصفحة الرئيسية..."
-              : "افحص الصفحة الرئيسية بتاعتي"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              disabled={scanFeedMutation.isPending}
+              onClick={() => scanFeedMutation.mutate()}
+              className="self-start"
+            >
+              {scanFeedMutation.isPending
+                ? "جاري فحص الصفحة الرئيسية..."
+                : "افحص الصفحة الرئيسية بتاعتي"}
+            </Button>
+            {scanFeedMutation.isPending && <EstimatedProgressBar percent={scanFeedProgress} />}
+          </div>
           {scanResultMessage && <p className="text-sm text-primary">{scanResultMessage}</p>}
         </CardContent>
       </Card>
@@ -334,6 +357,10 @@ export default function JobSearchPage() {
                           ? "في الانتظار..."
                           : "افحص دلوقتي"}
                     </Button>
+                    {scanAccountMutation.isPending &&
+                      scanAccountMutation.variables === account.id && (
+                        <EstimatedProgressBar percent={scanAccountProgress} />
+                      )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -385,11 +412,14 @@ export default function JobSearchPage() {
             <Button onClick={handleSiteSearch} disabled={siteSearchMutation.isPending}>
               {siteSearchMutation.isPending ? "جاري البحث..." : "بحث"}
             </Button>
+            {siteSearchMutation.isPending && <EstimatedProgressBar percent={siteSearchProgress} />}
           </div>
 
           {siteSearchError && <p className="text-sm text-destructive">{siteSearchError}</p>}
           {siteSearchMutation.isError && !siteSearchError && (
-            <p className="text-sm text-destructive">حصل خطأ أثناء البحث، جرب تاني.</p>
+            <p className="text-sm text-destructive">
+              {getApiErrorMessage(siteSearchMutation.error) ?? "حصل خطأ أثناء البحث، جرب تاني."}
+            </p>
           )}
           {siteSearchMutation.data && (
             <p className="text-sm text-primary">
@@ -464,6 +494,10 @@ export default function JobSearchPage() {
                           ? "في الانتظار..."
                           : "افحص دلوقتي"}
                     </Button>
+                    {hashtagScanMutation.isPending &&
+                      hashtagScanMutation.variables === hashtag.id && (
+                        <EstimatedProgressBar percent={hashtagScanProgress} />
+                      )}
                     <Button
                       variant="ghost"
                       size="icon"

@@ -2,10 +2,71 @@ import asyncio
 import logging
 import re
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
 from smarthunt.browser.playwright.manager import browser_manager
 from smarthunt.linkedin_monitor.relevance import is_job_related_post
 
 logger = logging.getLogger("smarthunt.linkedin_monitor")
+
+
+class LinkedInScanError(Exception):
+    """Raised by scan_home_feed/scan_hashtag_posts/scan_profile_posts on
+    a real failure, carrying a specific, human-readable (Arabic) reason —
+    added 2026-08-06 per explicit request: the owner wants to actually
+    know *why* a manual scan failed (no connection to LinkedIn? browser
+    couldn't start? another scan already running?) instead of always
+    seeing the same generic "حصل خطأ أثناء الفحص، جرب تاني" regardless of
+    cause. The scheduled callers in scheduler/jobs.py already wrap each
+    scan call in their own try/except Exception (defensive redundancy
+    from when these functions used to swallow their own errors) — this
+    being an Exception subclass means that existing "one hashtag/account
+    failing doesn't skip the rest of the batch" resilience is unchanged,
+    it's still caught there the same as any other exception. Only the
+    router (linkedin_monitor/router.py), which owns the manual/UI-facing
+    path, catches this specifically to surface `.reason` back to the
+    frontend as the HTTPException detail."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _classify_scan_error(exc: Exception) -> str:
+    """Turns a raw exception from a LinkedIn scan into a specific,
+    actionable Arabic reason instead of a generic failure message —
+    pattern-matches on exception type/message since Playwright wraps
+    real browser/network failures (timeouts, DNS/connection errors) into
+    fairly generic Error/TimeoutError types with the real cause only
+    identifiable from the message text."""
+    message = str(exc).lower()
+
+    if isinstance(exc, PlaywrightTimeoutError) or "timeout" in message:
+        return "مشكلة في الاتصال مع لينكدان — الصفحة أخدت وقت طويل من غير رد."
+
+    if any(
+        marker in message
+        for marker in (
+            "net::err",
+            "econnrefused",
+            "econnreset",
+            "enotfound",
+            "name_not_resolved",
+            "internet_disconnected",
+        )
+    ):
+        return (
+            "حصلت مشكلة في الاتصال ما بين المشروع وموقع لينكدان — تأكد إن السيرفر متصل بالإنترنت."
+        )
+
+    if "browser launch timed out" in message or "browser is not started" in message:
+        return "المتصفح مش قادر يشتغل دلوقتي — جرب تاني بعد شوية."
+
+    if "target closed" in message or "target page, context or browser has been closed" in message:
+        return "المتصفح اتقفل فجأة أثناء الفحص (غالبًا بسبب إعادة تشغيل أو تنظيف دوري) — جرب تاني."
+
+    return f"حصل خطأ غير متوقع أثناء الفحص: {exc}"
+
 
 # scan_profile_posts / scan_home_feed / scan_hashtag_posts all navigate the
 # same shared, session-persisting get_page("linkedin") — fine one at a
@@ -199,28 +260,32 @@ async def _resolve_real_feed_post_url(page, post_container, fallback_url: str) -
     return fallback_url
 
 
-async def _extract_feed_posts_from_page(page, limit: int) -> list[dict]:
-    """Home feed — no real per-post permalink survives in the obfuscated
-    markup by default, so post_url starts as a synthetic-but-real,
-    unique link built from the post's own stable `componentkey`; for any
-    post that actually looks job-relevant, _resolve_real_feed_post_url
+async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list[dict]:
+    """Extracts whatever FEED_POST_SELECTOR-matching posts are *currently*
+    in the DOM that aren't already in `seen_keys` (mutated in place as new
+    ones are found) — pulled out of the old single-shot
+    _extract_feed_posts_from_page 2026-08-06 so the caller can call this
+    repeatedly *during* scrolling instead of once at the very end (see
+    _scan_feed_style_page's docstring for why that matters: LinkedIn's
+    feed virtualizes/recycles old post DOM nodes as new ones load in, so
+    a single end-of-scroll extraction only ever sees whatever's rendered
+    near the current scroll position, not everything that was ever
+    loaded). No real per-post permalink survives in the obfuscated
+    markup by default, so post_url starts as a synthetic-but-real, unique
+    link built from the post's own stable `componentkey`; for any post
+    that actually looks job-relevant, _resolve_real_feed_post_url
     upgrades that to the real permalink via the post's own "Copy link to
-    post" menu action so clicking through from a saved job actually
-    lands on that specific post, not just the feed."""
+    post" menu action so clicking through from a saved job actually lands
+    on that specific post, not just the feed."""
     posts: list[dict] = []
 
-    try:
-        context = page.context
-        await context.grant_permissions(["clipboard-read", "clipboard-write"])
-    except Exception:
-        logger.exception("linkedin_feed_clipboard_permission_failed")
-
     containers = page.locator(FEED_POST_SELECTOR)
-    count = min(await containers.count(), limit)
-
-    seen_keys: set[str] = set()
+    count = await containers.count()
 
     for i in range(count):
+        if len(seen_keys) >= limit:
+            break
+
         container = containers.nth(i)
 
         try:
@@ -259,45 +324,47 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
     viewing another member's activity requires being logged in."""
     activity_url = profile_url.rstrip("/") + "/recent-activity/all/"
 
-    try:
-        if not browser_manager.is_running:
-            await browser_manager.launch()
-
-        if not await _try_acquire_linkedin_lock():
-            logger.warning("linkedin_profile_scan_lock_busy", extra={"profile_url": profile_url})
-            return []
-
+    if not browser_manager.is_running:
         try:
-            page = await browser_manager.get_page("linkedin")
+            await browser_manager.launch()
+        except Exception as exc:
+            logger.exception("linkedin_profile_scan_failed", extra={"profile_url": profile_url})
+            raise LinkedInScanError(_classify_scan_error(exc)) from exc
 
-            await page.goto(activity_url, wait_until="domcontentloaded", timeout=30000)
-            # Found live 2026-08-04: a blind 3s sleep was flaky — the exact
-            # same profile/selector reliably found posts in an isolated
-            # manual check, but returned 0 through this endpoint right after
-            # a heavy scan_home_feed() call (10 scroll rounds) on the same
-            # shared "linkedin" page/context, i.e. genuine page-load timing
-            # variance under load, not a wrong selector. Wait for the actual
-            # post markup to appear (bounded, so a genuinely-empty activity
-            # page still resolves quickly) instead of guessing a fixed delay.
-            try:
-                await page.wait_for_selector(POST_CONTAINER_SELECTOR, timeout=15000)
-            except Exception:
-                pass
+    if not await _try_acquire_linkedin_lock():
+        logger.warning("linkedin_profile_scan_lock_busy", extra={"profile_url": profile_url})
+        raise LinkedInScanError("فيه فحص تاني شغال دلوقتي على نفس السيشن — استنى شوية وجرب تاني.")
 
-            posts = await _extract_posts_from_page(page, limit)
-        finally:
-            _linkedin_page_lock.release()
+    try:
+        page = await browser_manager.get_page("linkedin")
 
-        logger.info(
-            "linkedin_profile_scan_completed",
-            extra={"profile_url": profile_url, "found": len(posts)},
-        )
+        await page.goto(activity_url, wait_until="domcontentloaded", timeout=30000)
+        # Found live 2026-08-04: a blind 3s sleep was flaky — the exact
+        # same profile/selector reliably found posts in an isolated
+        # manual check, but returned 0 through this endpoint right after
+        # a heavy scan_home_feed() call (10 scroll rounds) on the same
+        # shared "linkedin" page/context, i.e. genuine page-load timing
+        # variance under load, not a wrong selector. Wait for the actual
+        # post markup to appear (bounded, so a genuinely-empty activity
+        # page still resolves quickly) instead of guessing a fixed delay.
+        try:
+            await page.wait_for_selector(POST_CONTAINER_SELECTOR, timeout=15000)
+        except Exception:
+            pass
 
-        return posts
-
-    except Exception:
+        posts = await _extract_posts_from_page(page, limit)
+    except Exception as exc:
         logger.exception("linkedin_profile_scan_failed", extra={"profile_url": profile_url})
-        return []
+        raise LinkedInScanError(_classify_scan_error(exc)) from exc
+    finally:
+        _linkedin_page_lock.release()
+
+    logger.info(
+        "linkedin_profile_scan_completed",
+        extra={"profile_url": profile_url, "found": len(posts)},
+    )
+
+    return posts
 
 
 async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> list[dict]:
@@ -309,11 +376,14 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
     exact same component, so the exact same extraction/relevance/real-
     link-resolution logic applies unchanged."""
     if not browser_manager.is_running:
-        await browser_manager.launch()
+        try:
+            await browser_manager.launch()
+        except Exception as exc:
+            raise LinkedInScanError(_classify_scan_error(exc)) from exc
 
     if not await _try_acquire_linkedin_lock():
         logger.warning("linkedin_feed_style_scan_lock_busy", extra={"url": url})
-        return []
+        raise LinkedInScanError("فيه فحص تاني شغال دلوقتي على نفس السيشن — استنى شوية وجرب تاني.")
 
     try:
         page = await browser_manager.get_page("linkedin")
@@ -323,6 +393,11 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
             await page.wait_for_selector(FEED_POST_SELECTOR, timeout=15000)
         except Exception:
             pass
+
+        try:
+            await page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        except Exception:
+            logger.exception("linkedin_feed_clipboard_permission_failed")
 
         # page.mouse.wheel() fires at the mouse's current position, which
         # defaults to (0, 0) with no prior mouse.move() — found live
@@ -335,16 +410,42 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
         # no overflow) — scrolling that element directly is what actually
         # loads more posts (verified live: post count grew from 2 to 25 over
         # 10 rounds on the home feed, and from 9 to 14 on a hashtag search).
-        for _ in range(scroll_rounds):
-            await page.evaluate("() => document.querySelector('main')?.scrollBy(0, 2000)")
-            await page.wait_for_timeout(2000)
+        #
+        # Extracts *during* the scroll loop now, not once at the very end
+        # — found live 2026-08-06 raising scroll_rounds 10->40 to reach
+        # the owner's ~50-post target: a real scan took the expected
+        # ~2.5 minutes but found *fewer* posts (10) than the old 10-round/
+        # extract-once-at-the-end version found (15). LinkedIn's feed
+        # virtualizes/recycles old post DOM nodes as new ones load further
+        # down — by the time a single extraction pass ran after all 40
+        # rounds, most of what loaded earlier had already been removed
+        # from the DOM, so more scrolling was actively making the single
+        # end-of-scroll snapshot *worse*, not better. Extracting after
+        # every round instead means each newly-loaded batch gets captured
+        # before it can be recycled away; seen_keys carries over across
+        # rounds so nothing gets double-counted. Also stops scrolling
+        # early once `limit` unique posts have been found, instead of
+        # always burning the full scroll_rounds budget regardless.
+        seen_keys: set[str] = set()
+        posts = await _extract_new_feed_posts(page, seen_keys, limit)
 
-        return await _extract_feed_posts_from_page(page, limit)
+        for _ in range(scroll_rounds):
+            if len(seen_keys) >= limit:
+                break
+            await page.evaluate("() => document.querySelector('main')?.scrollBy(0, 2000)")
+            await page.wait_for_timeout(2500)
+            posts.extend(await _extract_new_feed_posts(page, seen_keys, limit))
+
+        return posts
+    except LinkedInScanError:
+        raise
+    except Exception as exc:
+        raise LinkedInScanError(_classify_scan_error(exc)) from exc
     finally:
         _linkedin_page_lock.release()
 
 
-async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int = 10) -> list[dict]:
+async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int = 40) -> list[dict]:
     """Scans the first ~50 posts under a given LinkedIn hashtag (owner-
     supplied, e.g. "Hiring", "SaudiJobs") for job-relevant content — added
     2026-08-05 per explicit request, the hashtag-driven counterpart to
@@ -359,12 +460,15 @@ async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int =
             "linkedin_hashtag_scan_completed", extra={"hashtag": clean_tag, "found": len(posts)}
         )
         return posts
-    except Exception:
+    except LinkedInScanError:
         logger.exception("linkedin_hashtag_scan_failed", extra={"hashtag": clean_tag})
-        return []
+        raise
+    except Exception as exc:
+        logger.exception("linkedin_hashtag_scan_failed", extra={"hashtag": clean_tag})
+        raise LinkedInScanError(_classify_scan_error(exc)) from exc
 
 
-async def scan_home_feed(limit: int = 50, scroll_rounds: int = 10) -> list[dict]:
+async def scan_home_feed(limit: int = 50, scroll_rounds: int = 40) -> list[dict]:
     """Scans the owner's own LinkedIn home feed for job-relevant posts
     from anyone (not just monitored accounts) — reposts/shares by
     connections, recruiter posts, etc. Scrolls a bounded number of times
@@ -380,6 +484,9 @@ async def scan_home_feed(limit: int = 50, scroll_rounds: int = 10) -> list[dict]
 
         return posts
 
-    except Exception:
+    except LinkedInScanError:
         logger.exception("linkedin_feed_scan_failed")
-        return []
+        raise
+    except Exception as exc:
+        logger.exception("linkedin_feed_scan_failed")
+        raise LinkedInScanError(_classify_scan_error(exc)) from exc

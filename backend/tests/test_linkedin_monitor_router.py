@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.database.models.job import Job
 from smarthunt.linkedin_monitor import router as router_module
 from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
+from smarthunt.linkedin_monitor.post_scanner import LinkedInScanError
 
 
 @pytest.fixture(autouse=True)
@@ -199,3 +200,58 @@ async def test_scan_hashtag_saves_relevant_posts_and_marks_checked(
 async def test_scan_hashtag_requires_existing_hashtag(client: AsyncClient):
     response = await client.post("/api/v1/linkedin-monitor/hashtags/999999/scan")
     assert response.status_code == 404
+
+
+"""Scan-failure-reason regression tests: added 2026-08-06 per explicit
+request — a failed scan must surface a specific reason (connection
+issue? browser down? session busy?) through the API, not just a generic
+500 that the frontend renders as the same "حصل خطأ، جرب تاني" every
+time."""
+
+
+@pytest.mark.asyncio
+async def test_scan_feed_surfaces_specific_error_reason(client: AsyncClient, monkeypatch):
+    async def fake_scan_home_feed():
+        raise LinkedInScanError("مشكلة في الاتصال مع لينكدان — الصفحة أخدت وقت طويل من غير رد.")
+
+    monkeypatch.setattr(router_module, "scan_home_feed", fake_scan_home_feed)
+
+    response = await client.post("/api/v1/linkedin-monitor/scan-feed")
+
+    assert response.status_code == 502
+    assert "الاتصال" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_scan_account_surfaces_specific_error_reason(client: AsyncClient, monkeypatch):
+    create = await client.post(
+        "/api/v1/linkedin-monitor/accounts",
+        json={"profile_url": "https://linkedin.com/in/error-test"},
+    )
+    account_id = create.json()["id"]
+
+    async def fake_scan_profile_posts(profile_url):
+        raise LinkedInScanError("المتصفح مش قادر يشتغل دلوقتي — جرب تاني بعد شوية.")
+
+    monkeypatch.setattr(router_module, "scan_profile_posts", fake_scan_profile_posts)
+
+    response = await client.post(f"/api/v1/linkedin-monitor/accounts/{account_id}/scan")
+
+    assert response.status_code == 502
+    assert "المتصفح" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_scan_hashtag_surfaces_specific_error_reason(client: AsyncClient, monkeypatch):
+    create = await client.post("/api/v1/linkedin-monitor/hashtags", json={"tag": "ErrorTest"})
+    hashtag_id = create.json()["id"]
+
+    async def fake_scan_hashtag_posts(hashtag):
+        raise LinkedInScanError("فيه فحص تاني شغال دلوقتي على نفس السيشن — استنى شوية وجرب تاني.")
+
+    monkeypatch.setattr(router_module, "scan_hashtag_posts", fake_scan_hashtag_posts)
+
+    response = await client.post(f"/api/v1/linkedin-monitor/hashtags/{hashtag_id}/scan")
+
+    assert response.status_code == 502
+    assert "فحص تاني" in response.json()["message"]

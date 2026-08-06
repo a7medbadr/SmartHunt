@@ -29,11 +29,14 @@ LINKEDIN_HASHTAGS_PROVIDER = "scheduler:linkedin-hashtags"
 # job-search page, the same as monitored accounts. The seed migration
 # (alembic/versions/) populates this same list into that table on
 # upgrade; scan_hashtags_daily below now reads from the DB, filtered to
-# enabled=True, instead of this constant. At ~60-65s/hashtag measured
-# live, the full ~31-hashtag list is already a 30+ minute run, and this
-# machine only has 3 CPU cores shared with everything else (Postgres,
-# Ollama, the backend itself) — hourly would leave almost no idle time
-# for anything else to actually get CPU, hence still daily, not hourly.
+# enabled=True, instead of this constant. Was ~60-65s/hashtag (30+
+# minutes for the full ~32-hashtag list) before post_scanner.py's
+# scroll_rounds got raised 10->40 on 2026-08-06 to actually reach the
+# owner's ~50-post-per-scan target — each hashtag now realistically takes
+# ~2-3 minutes, so the full daily sweep is more like 60-95 minutes. Still
+# fine as a once-a-day background job on this 3-core-shared machine
+# (Postgres, Ollama, the backend itself) — hourly would leave almost no
+# idle time for anything else to actually get CPU, hence still daily.
 
 
 async def _run_scheduled_discovery(topic: str, query: str) -> None:

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.api.dependencies import get_db
 from smarthunt.linkedin_monitor import service
 from smarthunt.linkedin_monitor.post_scanner import (
+    LinkedInScanError,
     scan_hashtag_posts,
     scan_home_feed,
     scan_profile_posts,
@@ -66,7 +67,11 @@ async def scan_hashtag(hashtag_id: int, db: AsyncSession = Depends(get_db)):
     if hashtag is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hashtag not found.")
 
-    posts = await scan_hashtag_posts(hashtag.tag)
+    try:
+        posts = await scan_hashtag_posts(hashtag.tag)
+    except LinkedInScanError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.reason) from exc
+
     saved = await service.scan_and_save(db, posts)
     await service.mark_hashtag_checked(db, hashtag_id)
 
@@ -115,7 +120,11 @@ async def scan_account(account_id: int, db: AsyncSession = Depends(get_db)):
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found.")
 
-    posts = await scan_profile_posts(account.profile_url)
+    try:
+        posts = await scan_profile_posts(account.profile_url)
+    except LinkedInScanError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.reason) from exc
+
     saved = await service.scan_and_save(db, posts)
     await service.mark_account_checked(db, account_id)
 
@@ -127,7 +136,11 @@ async def scan_account(account_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/scan-feed", response_model=ScanResultResponse)
 async def scan_feed(db: AsyncSession = Depends(get_db)):
     """Manual trigger only — see scan_account's docstring."""
-    posts = await scan_home_feed()
+    try:
+        posts = await scan_home_feed()
+    except LinkedInScanError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.reason) from exc
+
     saved = await service.scan_and_save(db, posts)
 
     return ScanResultResponse(
