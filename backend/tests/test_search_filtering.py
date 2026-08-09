@@ -72,6 +72,63 @@ def test_no_results(sample_jobs):
     assert results == []
 
 
+def test_filter_by_source_does_not_substring_match_a_longer_source():
+    """Regression: source filtering used to be a substring match, so
+    filtering by source="linkedin" also pulled in source="linkedin_post"
+    rows (LinkedIn-post-sourced jobs), since "linkedin" is a substring of
+    "linkedin_post" — found 2026-08-07 while building a separate tab for
+    LinkedIn-post jobs. Must be an exact (case-insensitive) match."""
+    jobs = [
+        {"title": "Real LinkedIn search job", "source": "linkedin"},
+        {"title": "LinkedIn post job", "source": "linkedin_post"},
+    ]
+    results = filter_jobs(jobs, source="linkedin")
+    assert len(results) == 1
+    assert results[0]["title"] == "Real LinkedIn search job"
+
+
+def test_exclude_source_removes_only_the_exact_match(sample_jobs):
+    jobs = sample_jobs + [{"title": "A post job", "source": "linkedin_post"}]
+    results = filter_jobs(jobs, exclude_source="linkedin_post")
+    assert all(j["source"].lower() != "linkedin_post" for j in results)
+    assert len(results) == len(sample_jobs)
+
+
+def test_exclude_source_accepts_comma_separated_list():
+    """Added 2026-08-09 for the discovered-jobs "job sites" tab, which
+    needs to exclude both linkedin_post and whatsapp_message sources at
+    once — a single exclude_source value alone can't express that."""
+    jobs = [
+        {"title": "Real site job", "source": "tanqeeb"},
+        {"title": "A LinkedIn post", "source": "linkedin_post"},
+        {"title": "A WhatsApp message", "source": "whatsapp_message"},
+    ]
+    results = filter_jobs(jobs, exclude_source="linkedin_post,whatsapp_message")
+    assert len(results) == 1
+    assert results[0]["title"] == "Real site job"
+
+
+def test_filter_by_review_status_exact_match():
+    jobs = [
+        {"title": "Applied job", "review_status": "applied"},
+        {"title": "Not suitable job", "review_status": "not_suitable"},
+        {"title": "Unreviewed job", "review_status": None},
+    ]
+    results = filter_jobs(jobs, review_status="applied")
+    assert len(results) == 1
+    assert results[0]["title"] == "Applied job"
+
+
+def test_filter_by_review_status_none_returns_unreviewed_only():
+    jobs = [
+        {"title": "Applied job", "review_status": "applied"},
+        {"title": "Unreviewed job", "review_status": None},
+    ]
+    results = filter_jobs(jobs, review_status="none")
+    assert len(results) == 1
+    assert results[0]["title"] == "Unreviewed job"
+
+
 def test_router_integration_with_mock_jobs():
     from smarthunt.search.filtering import filter_jobs
 

@@ -148,7 +148,7 @@ async def test_catch_up_scheduled_jobs_runs_due_jobs_sequentially_not_concurrent
     (multiple jobs overdue on the same restart). Confirms
     catch_up_scheduled_jobs feeds them into the one sequential runner
     instead of spawning a separate concurrent task per job. Clears
-    scheduler_history for the 8 catch-up-eligible providers first — other
+    scheduler_history for the 10 catch-up-eligible providers first — other
     tests in this suite (test_scheduler_jobs.py etc.) commit real rows
     for these same providers via their own AsyncSessionLocal() sessions,
     which persist across tests same as this test's own writes would."""
@@ -163,6 +163,8 @@ async def test_catch_up_scheduled_jobs_runs_due_jobs_sequentially_not_concurrent
         "scheduler:linkedin-feed",
         "scheduler:linkedin-accounts",
         "scheduler:linkedin-hashtags",
+        "scheduler:tanqeeb-daily",
+        "scheduler:whatsapp-chats",
     ]
     await db_session.execute(
         delete(SchedulerHistory).where(SchedulerHistory.provider.in_(providers))
@@ -183,4 +185,4 @@ async def test_catch_up_scheduled_jobs_runs_due_jobs_sequentially_not_concurrent
     await asyncio.sleep(0)  # let the created task actually run
 
     assert len(sequential_calls) == 1
-    assert len(sequential_calls[0]) == 8  # all 8 catch-up-eligible jobs are due
+    assert len(sequential_calls[0]) == 10  # all 10 catch-up-eligible jobs are due

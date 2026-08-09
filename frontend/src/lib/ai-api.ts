@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { translations, type Locale } from "@/lib/i18n/translations";
 
 export interface AIGenerateRequest {
   prompt: string;
@@ -34,18 +35,18 @@ const AI_SERVER_TIMEOUT_SECONDS = 260;
 // substantially.
 const MAX_RESUME_CHARS_FOR_AI = 1500;
 
-export function truncateResumeForAI(resume: string): string {
+export function truncateResumeForAI(resume: string, locale: Locale = "ar"): string {
   return resume.length > MAX_RESUME_CHARS_FOR_AI
-    ? resume.slice(0, MAX_RESUME_CHARS_FOR_AI) + "\n...(تم اختصار باقي السيرة الذاتية)"
+    ? resume.slice(0, MAX_RESUME_CHARS_FOR_AI) + translations[locale].aiPrompts.resumeTruncatedNote
     : resume;
 }
 
 // A job description can be just as long as a resume — unbounded here
 // before, so an interview-prep call against a long real posting could
 // blow past the timeout budget the same way an untruncated resume did.
-function truncateJobForAI(job: string): string {
+function truncateJobForAI(job: string, locale: Locale = "ar"): string {
   return job.length > MAX_RESUME_CHARS_FOR_AI
-    ? job.slice(0, MAX_RESUME_CHARS_FOR_AI) + "\n...(تم اختصار باقي وصف الوظيفة)"
+    ? job.slice(0, MAX_RESUME_CHARS_FOR_AI) + translations[locale].aiPrompts.jobTruncatedNote
     : job;
 }
 
@@ -68,11 +69,12 @@ export async function generateAIResponse(
 export async function generateInterviewPrep(
   resume: string,
   job: string,
+  locale: Locale = "ar",
 ): Promise<AIGenerateResponse> {
+  const t = translations[locale].aiPrompts;
   const prompt =
-    `سيرتي الذاتية:\n\n${truncateResumeForAI(resume)}\n\n---\n\nوصف الوظيفة:\n\n${truncateJobForAI(job)}\n\n---\n\n` +
-    "جهزني لمقابلة شخصية لهذه الوظيفة بالتحديد: اكتب 3 أسئلة تقنية متوقعة بناءً على متطلبات الوظيفة، " +
-    "و3 أسئلة سلوكية (behavioral) متوقعة، ولكل سؤال نصيحة مختصرة للإجابة عليه بناءً على خبرتي في السيرة الذاتية.";
+    `${t.myResumeLabel}:\n\n${truncateResumeForAI(resume, locale)}\n\n---\n\n${t.jobDescriptionLabel}:\n\n${truncateJobForAI(job, locale)}\n\n---\n\n` +
+    t.interviewPrepInstruction;
 
   const { data } = await apiClient.post<AIGenerateResponse>(
     "/ai/generate",

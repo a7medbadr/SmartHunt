@@ -13,12 +13,14 @@ import { EstimatedProgressBar } from "@/components/ui/estimated-progress-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useEstimatedProgress } from "@/hooks/use-estimated-progress";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { cn } from "@/lib/utils";
 
 export default function ApplicationThreadPage() {
   const params = useParams<{ id: string }>();
   const applicationId = params.id;
   const queryClient = useQueryClient();
+  const { t, locale } = useTranslation();
 
   const [replyBody, setReplyBody] = useState("");
 
@@ -45,18 +47,19 @@ export default function ApplicationThreadPage() {
   });
 
   const hasInboundMessage = threadQuery.data?.some((m) => m.direction === "inbound");
+  const dateLocale = locale === "ar" ? "ar-SA" : "en-US";
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="flex items-center gap-2 text-2xl font-semibold">
         <Mail className="size-6 text-orange-400" />
-        محادثة التقديم بالإيميل
+        {t("applicationDetail", "title")}
       </h1>
 
       {threadQuery.isPending ? (
         <Skeleton className="h-40 w-full" />
       ) : threadQuery.isError ? (
-        <p className="text-sm text-destructive">مقدرناش نجيب المحادثة، جرب تاني.</p>
+        <p className="text-sm text-destructive">{t("applicationDetail", "loadError")}</p>
       ) : threadQuery.data && threadQuery.data.length > 0 ? (
         <div className="flex flex-col gap-3">
           {threadQuery.data.map((message) => (
@@ -67,10 +70,13 @@ export default function ApplicationThreadPage() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between text-sm font-normal text-muted-foreground">
                   <span>
-                    {message.direction === "outbound" ? "بعتناه إحنا" : "رد منهم"} —{" "}
+                    {message.direction === "outbound"
+                      ? t("applicationDetail", "outbound")
+                      : t("applicationDetail", "inbound")}{" "}
+                    —{" "}
                     {message.direction === "outbound" ? message.to_address : message.from_address}
                   </span>
-                  <span>{new Date(message.created_at).toLocaleString("ar-SA")}</span>
+                  <span>{new Date(message.created_at).toLocaleString(dateLocale)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
@@ -84,14 +90,14 @@ export default function ApplicationThreadPage() {
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          مفيش محادثة إيميل مسجلة للتقديم ده لسه.
+          {t("applicationDetail", "noThreadYet")}
         </p>
       )}
 
       {hasInboundMessage && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">رد على آخر رسالة</CardTitle>
+            <CardTitle className="text-base">{t("applicationDetail", "replyToLastMessage")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
@@ -101,7 +107,9 @@ export default function ApplicationThreadPage() {
                 disabled={draftReplyMutation.isPending || aiBusyElsewhere}
                 className="self-start"
               >
-                {draftReplyMutation.isPending ? "جاري التجهيز..." : "جهزلي رد"}
+                {draftReplyMutation.isPending
+                  ? t("applicationDetail", "preparing")
+                  : t("applicationDetail", "prepareReply")}
               </Button>
               {draftReplyMutation.isPending && (
                 <EstimatedProgressBar percent={draftReplyProgress} />
@@ -110,19 +118,19 @@ export default function ApplicationThreadPage() {
 
             {aiBusyElsewhere && !draftReplyMutation.isPending && (
               <p className="text-xs text-muted-foreground">
-                في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+                {t("applicationDetail", "aiBusyElsewhere")}
               </p>
             )}
 
             {draftReplyMutation.isError && (
-              <p className="text-sm text-destructive">حصل خطأ، جرب تاني.</p>
+              <p className="text-sm text-destructive">{t("applicationDetail", "genericError")}</p>
             )}
 
             <Textarea
               value={replyBody}
               onChange={(e) => setReplyBody(e.target.value)}
               rows={6}
-              placeholder="اكتب ردك هنا، أو دوس جهزلي رد..."
+              placeholder={t("applicationDetail", "replyPlaceholder")}
             />
 
             <Button
@@ -130,14 +138,16 @@ export default function ApplicationThreadPage() {
               disabled={!replyBody.trim() || sendReplyMutation.isPending}
               className="self-start"
             >
-              {sendReplyMutation.isPending ? "جاري الإرسال..." : "ابعت الرد"}
+              {sendReplyMutation.isPending
+                ? t("applicationDetail", "sending")
+                : t("applicationDetail", "sendReply")}
             </Button>
 
             {sendReplyMutation.isError && (
-              <p className="text-sm text-destructive">حصل خطأ أثناء الإرسال، جرب تاني.</p>
+              <p className="text-sm text-destructive">{t("applicationDetail", "sendError")}</p>
             )}
             {sendReplyMutation.isSuccess && (
-              <p className="text-sm text-primary">اتبعت الرد.</p>
+              <p className="text-sm text-primary">{t("applicationDetail", "replySent")}</p>
             )}
           </CardContent>
         </Card>

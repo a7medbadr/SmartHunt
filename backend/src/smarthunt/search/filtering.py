@@ -13,12 +13,17 @@ def filter_jobs(
     keyword: Optional[str] = None,
     location: Optional[str] = None,
     source: Optional[str] = None,
+    exclude_source: Optional[str] = None,
+    review_status: Optional[str] = None,
 ) -> List[Any]:
     """
     تصفية قائمة الوظائف حسب:
     - keyword: البحث داخل title و description
     - location: التصفية حسب الموقع
-    - source: التصفية حسب المصدر
+    - source: التصفية حسب المصدر (تطابق تام، مش جزء من النص)
+    - exclude_source: استبعاد مصدر أو أكتر (مفصولين بفاصلة)، تطابق تام لكل واحد
+    - review_status: التصفية حسب حالة المراجعة (applied / not_suitable) —
+      "none" بيرجع بس الوظايف اللي لسه ماتراجعتش (review_status فاضية)
     جميع المقارنات غير حساسة لحالة الأحرف (Case-insensitive).
     """
     filtered = jobs
@@ -37,8 +42,38 @@ def filter_jobs(
         filtered = [j for j in filtered if loc in str(_get_field(j, "location") or "").lower()]
 
     if source and source.strip():
+        # Exact match, not substring — found 2026-08-07 while building a
+        # separate tab for LinkedIn-post-sourced jobs (source="linkedin_post")
+        # from real LinkedIn-search-discovered ones (source="linkedin"):
+        # substring matching meant filtering by source="linkedin" (e.g. the
+        # Jobs page's "search this site directly" dropdown) silently pulled
+        # in every linkedin_post row too, since "linkedin" is a substring of
+        # "linkedin_post". Every real caller already sends an exact provider
+        # name, never a partial one, so this tightens correctness with no
+        # loss of existing functionality.
         src = source.strip().lower()
-        filtered = [j for j in filtered if src in str(_get_field(j, "source") or "").lower()]
+        filtered = [j for j in filtered if str(_get_field(j, "source") or "").lower() == src]
+
+    if exclude_source and exclude_source.strip():
+        # Comma-separated list — added 2026-08-09 for the discovered-jobs
+        # "job sites" tab, which needs to exclude BOTH linkedin_post AND
+        # whatsapp_message sources (each has its own separate tab
+        # instead), not just the single source the original LinkedIn-only
+        # split needed. A single value with no comma still works exactly
+        # as before.
+        excluded = {s.strip().lower() for s in exclude_source.split(",") if s.strip()}
+        filtered = [
+            j for j in filtered if str(_get_field(j, "source") or "").lower() not in excluded
+        ]
+
+    if review_status and review_status.strip():
+        target = review_status.strip().lower()
+        if target == "none":
+            filtered = [j for j in filtered if not _get_field(j, "review_status")]
+        else:
+            filtered = [
+                j for j in filtered if str(_get_field(j, "review_status") or "").lower() == target
+            ]
 
     return filtered
 

@@ -63,26 +63,23 @@ export default function ProvidersPage() {
         <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
           <DialogTrigger className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
             <Plus className="size-4" />
-            إضافة موقع جديد
+            {t("providers", "addNewSite")}
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>طلب إضافة موقع توظيف جديد</DialogTitle>
+              <DialogTitle>{t("providers", "requestDialogTitle")}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-3 text-sm">
               <p className="text-muted-foreground">
-                إضافة موقع جديد محتاجة كود اكتشاف حقيقي مكتوب خصيصًا له (كل
-                موقع بنية صفحاته مختلفة) — مش زرار سحري بيشتغل مع أي رابط.
-                اكتب اسم الموقع ورابطه هنا وهبني هعمله بنفس الطريقة اللي
-                عملت بيها LinkedIn.
+                {t("providers", "requestDialogBody")}
               </p>
               <Input
-                placeholder="اسم الموقع (مثلاً: Bayt)"
+                placeholder={t("providers", "siteNamePlaceholder")}
                 value={requestSiteName}
                 onChange={(e) => setRequestSiteName(e.target.value)}
               />
               <Textarea
-                placeholder="أي تفاصيل إضافية (رابط البحث، هل محتاج تسجيل دخول...)"
+                placeholder={t("providers", "notesPlaceholder")}
                 value={requestNote}
                 onChange={(e) => setRequestNote(e.target.value)}
               />
@@ -91,13 +88,15 @@ export default function ProvidersPage() {
                 onClick={() =>
                   requestMutation.mutate({
                     type: "PROVIDER_REQUEST",
-                    title: `طلب إضافة موقع: ${requestSiteName.trim()}`,
-                    message: requestNote.trim() || "بدون تفاصيل إضافية",
+                    title: `${t("providers", "requestTitlePrefix")}: ${requestSiteName.trim()}`,
+                    message: requestNote.trim() || t("providers", "noAdditionalNotes"),
                     priority: "NORMAL",
                   })
                 }
               >
-                {requestMutation.isPending ? "جاري الحفظ..." : "حفظ الطلب"}
+                {requestMutation.isPending
+                  ? t("providers", "savingRequest")
+                  : t("providers", "saveRequest")}
               </Button>
             </div>
           </DialogContent>
@@ -105,7 +104,7 @@ export default function ProvidersPage() {
       </div>
 
       {isError && (
-        <p className="text-sm text-destructive">مقدرناش نجيب مواقع التوظيف، جرب تاني.</p>
+        <p className="text-sm text-destructive">{t("providers", "loadError")}</p>
       )}
 
       {isPending ? (
@@ -133,20 +132,24 @@ export default function ProvidersPage() {
                   {provider.real_discovery ? (
                     <Badge variant="default" className="gap-1 text-xs">
                       <CheckCircle2 className="size-3" />
-                      اكتشاف حقيقي
+                      {t("providers", "realDiscovery")}
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <CircleDot className="size-3" />
-                      اكتشاف فقط (لسه مش حقيقي)
+                      {t("providers", "discoveryOnly")}
                     </Badge>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                  {provider.supports_login && <span>تسجيل دخول</span>}
-                  {provider.supports_apply && <span>· تقديم تلقائي</span>}
-                  {provider.supports_resume_upload && <span>· رفع سيرة ذاتية</span>}
-                  {provider.supports_cover_letter && <span>· خطاب تقديم</span>}
+                  {provider.supports_login && <span>{t("providers", "supportsLogin")}</span>}
+                  {provider.supports_apply && <span>{t("providers", "supportsApply")}</span>}
+                  {provider.supports_resume_upload && (
+                    <span>{t("providers", "supportsResumeUpload")}</span>
+                  )}
+                  {provider.supports_cover_letter && (
+                    <span>{t("providers", "supportsCoverLetter")}</span>
+                  )}
                 </div>
               </CardContent>
             </Card>

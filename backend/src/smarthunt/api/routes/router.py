@@ -20,6 +20,7 @@ from smarthunt.dashboard.api import router as dashboard_router
 from smarthunt.discovery.router import router as discovery_router
 from smarthunt.email_apply.router import router as email_apply_router
 from smarthunt.linkedin_monitor.router import router as linkedin_monitor_router
+from smarthunt.whatsapp_monitor.router import router as whatsapp_monitor_router
 from smarthunt.events.router import router as events_router
 from smarthunt.favorites.router import router as favorites_router
 from smarthunt.idempotency.router import router as idempotency_router
@@ -97,6 +98,11 @@ api_router.include_router(
 api_router.include_router(
     linkedin_monitor_router,
     tags=["linkedin-monitor"],
+)
+
+api_router.include_router(
+    whatsapp_monitor_router,
+    tags=["whatsapp-monitor"],
 )
 
 api_router.include_router(

@@ -82,6 +82,28 @@ async def lifespan(app: FastAPI):
         service="smarthunt-backend",
     )
 
+    # Found live 2026-08-08: a real WhatsApp QR login succeeded (session
+    # live in the shared "whatsapp" browser context), but a routine
+    # backend restart moments later — before any explicit save_state()
+    # call had a reason to fire — silently discarded it, forcing a second
+    # real QR scan. BrowserManager.close() already exists specifically as
+    # a safety net for this ("capture whatever session state exists right
+    # now for every named context, so an unplanned shutdown doesn't lose
+    # a session that was never explicitly saved" — see its own docstring)
+    # but nothing here ever actually called it, so every provider's
+    # session (LinkedIn included) was exposed to the same risk, not just
+    # WhatsApp's newer login flow. Safe to call unconditionally — a no-op
+    # when the browser was never launched this run.
+    try:
+        from smarthunt.browser.playwright.manager import browser_manager
+
+        await browser_manager.close()
+    except Exception:
+        logger.exception(
+            "browser_manager_close_failed_at_shutdown",
+            service="smarthunt-backend",
+        )
+
     if scheduler.running:
         scheduler.shutdown(wait=False)
 

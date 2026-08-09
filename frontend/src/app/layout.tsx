@@ -5,7 +5,7 @@ import "./globals.css";
 
 import { QueryProvider } from "@/lib/query-provider";
 import { LanguageProvider } from "@/lib/i18n/language-context";
-import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/translations";
+import { LOCALE_COOKIE, translations, type Locale } from "@/lib/i18n/translations";
 
 const cairo = Cairo({
   variable: "--font-sans",
@@ -17,10 +17,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "SmartHunt",
-  description: "منصة البحث الذكي عن الوظائف والتقديم التلقائي بالذكاء الاصطناعي",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies();
+  const locale: Locale = cookieStore.get(LOCALE_COOKIE)?.value === "en" ? "en" : "ar";
+  return {
+    title: translations[locale].meta.title,
+    description: translations[locale].meta.description,
+  };
+}
 
 export default async function RootLayout({
   children,

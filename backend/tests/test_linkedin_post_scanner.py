@@ -196,6 +196,51 @@ async def test_scan_home_feed_scrolls_and_extracts(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_scan_home_feed_clicks_more_toggle_before_reading_text(monkeypatch):
+    """Regression test: LinkedIn truncates any post past ~3 lines behind a
+    "…more" toggle, so a still-collapsed post's inner_text() only returns
+    the preview — real Saudi hiring posts routinely put the location or
+    "apply now" a couple of lines in, past that cutoff, so
+    is_job_related_post() was checking text the post never got to. Found
+    live 2026-08-07 chasing "لقينا 50 بوست، وحفظنا 0 وظيفة" despite the
+    owner seeing real relevant posts manually. The toggle must get clicked
+    (best-effort) before the post's text is read."""
+    post = _make_post_locator(
+        "feed-commentary_expand-me",
+        "Hiring a Linux Administrator in Riyadh, Saudi Arabia — apply now",
+    )
+
+    toggle = MagicMock()
+    toggle.count = AsyncMock(return_value=1)
+    toggle.click = AsyncMock()
+    toggle_locator = MagicMock()
+    toggle_locator.first = toggle
+    post.locator = MagicMock(return_value=toggle_locator)
+
+    containers = MagicMock()
+    containers.count = AsyncMock(return_value=1)
+    containers.nth = MagicMock(return_value=post)
+
+    fake_page = MagicMock()
+    fake_page.goto = AsyncMock()
+    fake_page.wait_for_timeout = AsyncMock()
+    fake_page.evaluate = AsyncMock()
+    fake_page.locator = MagicMock(return_value=containers)
+
+    async def fake_get_page(self, provider):
+        return fake_page
+
+    monkeypatch.setattr(browser_manager, "browser", MagicMock())
+    monkeypatch.setattr(BrowserManager, "get_page", fake_get_page)
+
+    posts = await post_scanner.scan_home_feed(limit=10, scroll_rounds=1)
+
+    toggle.click.assert_awaited()
+    assert len(posts) == 1
+    assert "Riyadh, Saudi Arabia" in posts[0]["text"]
+
+
+@pytest.mark.asyncio
 async def test_scan_home_feed_skips_duplicate_component_keys(monkeypatch):
     post_1 = _make_post_locator("feed-commentary_aaa", "First mention")
     post_2 = _make_post_locator("feed-commentary_aaa", "Same post, seen again")

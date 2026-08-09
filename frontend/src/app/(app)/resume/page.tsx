@@ -17,6 +17,7 @@ import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EstimatedProgressBar } from "@/components/ui/estimated-progress-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/lib/i18n/language-context";
@@ -34,6 +35,7 @@ export default function ResumePage() {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [skills, setSkills] = useState<string[] | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const resumeQuery = useQuery({
     queryKey: ["resume"],
@@ -102,7 +104,7 @@ export default function ResumePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">الملف الحالي</CardTitle>
+          <CardTitle className="text-base">{t("resume", "currentFile")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {resumeQuery.isPending ? (
@@ -118,15 +120,24 @@ export default function ResumePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => deleteMutation.mutate()}
+                onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleteMutation.isPending}
               >
-                حذف
+                {t("common", "delete")}
               </Button>
+              <ConfirmDialog
+                open={confirmDeleteOpen}
+                onOpenChange={setConfirmDeleteOpen}
+                isPending={deleteMutation.isPending}
+                onConfirm={() => {
+                  deleteMutation.mutate();
+                  setConfirmDeleteOpen(false);
+                }}
+              />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              لسه مفيش سيرة ذاتية مرفوعة.
+              {t("resume", "noResumeUploaded")}
             </p>
           )}
 
@@ -143,16 +154,16 @@ export default function ResumePage() {
               disabled={uploadMutation.isPending}
             >
               {uploadMutation.isPending
-                ? "جاري الرفع..."
+                ? t("resume", "uploading")
                 : resumeQuery.data?.uploaded
-                  ? "استبدال الملف"
-                  : "رفع سيرة ذاتية (PDF أو DOCX)"}
+                  ? t("resume", "replaceFile")
+                  : t("resume", "uploadResume")}
             </Button>
           </div>
 
           {uploadMutation.isError && (
             <p className="text-sm text-destructive">
-              الرفع فشل — تأكد إن الملف PDF أو DOCX.
+              {t("resume", "uploadError")}
             </p>
           )}
         </CardContent>
@@ -161,7 +172,7 @@ export default function ResumePage() {
       {skills && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">المهارات المستخرجة</CardTitle>
+            <CardTitle className="text-base">{t("resume", "extractedSkills")}</CardTitle>
           </CardHeader>
           <CardContent>
             {skills.length > 0 ? (
@@ -174,7 +185,7 @@ export default function ResumePage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                مقدرناش نستخرج مهارات من الملف ده.
+                {t("resume", "noSkillsExtracted")}
               </p>
             )}
           </CardContent>
@@ -183,34 +194,34 @@ export default function ResumePage() {
 
       <h2 className="flex items-center gap-2 text-xl font-semibold">
         <Mail className="size-5 text-cyan-400" />
-        خطاب التقديم
+        {t("resume", "coverLetter")}
       </h2>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">إنشاء خطاب جديد</CardTitle>
+          <CardTitle className="text-base">{t("resume", "createNewLetter")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {resumeTextPending ? null : resumeText ? (
             <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
               <CheckCircle2 className="size-4 shrink-0" />
-              هنستخدم سيرتك الذاتية المرفوعة تلقائيًا
+              {t("resume", "willUseResume")}
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               <TriangleAlert className="size-4 shrink-0" />
-              ارفع سيرتك الذاتية فوق الأول
+              {t("resume", "uploadResumeFirst")}
             </div>
           )}
           <div>
             <label className="mb-1 block text-sm text-muted-foreground">
-              وصف الوظيفة
+              {t("resume", "jobDescription")}
             </label>
             <Textarea
               value={job}
               onChange={(e) => setJob(e.target.value)}
               rows={5}
-              placeholder="الصق وصف الوظيفة هنا..."
+              placeholder={t("resume", "jobDescriptionPlaceholder")}
             />
           </div>
           <div className="flex items-center gap-3">
@@ -221,7 +232,7 @@ export default function ResumePage() {
               }
               className="self-start"
             >
-              {generateMutation.isPending ? "جاري الإنشاء..." : "إنشاء خطاب"}
+              {generateMutation.isPending ? t("resume", "generating") : t("resume", "generateLetter")}
             </Button>
             {generateMutation.isPending && (
               <EstimatedProgressBar percent={generateProgress} />
@@ -230,20 +241,20 @@ export default function ResumePage() {
 
           {aiBusyElsewhere && !generateMutation.isPending && (
             <p className="text-xs text-muted-foreground">
-              في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+              {t("resume", "aiBusyElsewhere")}
             </p>
           )}
 
           {generateMutation.isError && (
             <p className="text-sm text-destructive">
-              حصل خطأ — ممكن يكون النموذج مشغول، جرب تاني.
+              {t("resume", "generateError")}
             </p>
           )}
 
           {generateMutation.data && (
             <div className="mt-2 flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">نسبة التطابق:</span>
+                <span className="text-sm text-muted-foreground">{t("resume", "matchScore")}</span>
                 <Badge>{generateMutation.data.score}%</Badge>
               </div>
               {generateMutation.data.matched_skills.length > 0 && (
@@ -263,7 +274,7 @@ export default function ResumePage() {
       {letterText && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">الخطاب الناتج</CardTitle>
+            <CardTitle className="text-base">{t("resume", "resultingLetter")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <Textarea
@@ -277,22 +288,22 @@ export default function ResumePage() {
               disabled={reviewMutation.isPending || aiBusyElsewhere}
               className="self-start"
             >
-              {reviewMutation.isPending ? "جاري المراجعة..." : "راجع الخطاب"}
+              {reviewMutation.isPending ? t("resume", "reviewing") : t("resume", "reviewLetter")}
             </Button>
 
             {reviewMutation.isError && (
-              <p className="text-sm text-destructive">حصل خطأ، جرب تاني.</p>
+              <p className="text-sm text-destructive">{t("resume", "genericError")}</p>
             )}
 
             {reviewMutation.data && (
               <div className="flex flex-col gap-2 rounded-md border p-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">التقييم:</span>
+                  <span className="text-sm text-muted-foreground">{t("resume", "evaluation")}</span>
                   <Badge>{reviewMutation.data.score}/100</Badge>
                 </div>
                 {reviewMutation.data.issues.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium">ملاحظات:</p>
+                    <p className="text-sm font-medium">{t("resume", "notes")}</p>
                     <ul className="list-inside list-disc text-sm text-muted-foreground">
                       {reviewMutation.data.issues.map((issue) => (
                         <li key={issue}>{issue}</li>
@@ -302,7 +313,7 @@ export default function ResumePage() {
                 )}
                 {reviewMutation.data.recommendations.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium">توصيات:</p>
+                    <p className="text-sm font-medium">{t("resume", "recommendations")}</p>
                     <ul className="list-inside list-disc text-sm text-muted-foreground">
                       {reviewMutation.data.recommendations.map((rec) => (
                         <li key={rec}>{rec}</li>

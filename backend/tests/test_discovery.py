@@ -72,6 +72,40 @@ async def test_discover_lets_remote_jobs_through_a_physical_location_filter(
 
 
 @pytest.mark.asyncio
+async def test_discover_can_restrict_to_specific_providers(db_session, monkeypatch):
+    """discover_tanqeeb_daily (scheduler/jobs.py) needs discover() to run
+    the exact same filtered/scored/saved pipeline every other scheduled
+    discovery job gets, just restricted to one named provider instead of
+    every enabled one — added 2026-08-07. Confirms the `providers` kwarg
+    actually narrows which providers fetch_all_jobs is called with,
+    intersected with enabled/disabled rather than bypassing it."""
+    captured: dict = {}
+
+    async def fake_fetch_all_jobs(self, **kwargs):
+        captured["providers"] = kwargs.get("providers")
+        return []
+
+    async def fake_get_enabled_map(self, session):
+        return {}
+
+    monkeypatch.setattr(
+        provider_registry_module.ProviderRegistry, "fetch_all_jobs", fake_fetch_all_jobs
+    )
+    monkeypatch.setattr(
+        provider_settings_module.ProviderSettingsService,
+        "get_enabled_map",
+        fake_get_enabled_map,
+    )
+
+    await DiscoveryService(db_session).discover(
+        query="linux", location="Saudi Arabia", providers=["tanqeeb"]
+    )
+
+    assert captured["providers"] is not None
+    assert [p.name for p in captured["providers"]] == ["tanqeeb"]
+
+
+@pytest.mark.asyncio
 async def test_search_single_provider_only_calls_the_named_provider(db_session, monkeypatch):
     """ "Search this specific site" (2026-08-04) must actually search only
     that one site, not fall back to the local jobs table, and must not

@@ -46,3 +46,12 @@ class JobService:
 
     async def delete_job(self, job_id: int) -> bool:
         return await self.repository.delete(job_id)
+
+    async def update_review_status(self, job_id: int, review_status: str | None) -> Job | None:
+        job = await self.repository.get(job_id)
+        if job is None:
+            return None
+        job.review_status = review_status
+        await self.repository.session.commit()
+        await self.repository.session.refresh(job)
+        return job

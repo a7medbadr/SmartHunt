@@ -54,6 +54,40 @@ async def test_search_jobs_endpoint(client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_search_jobs_filters_by_review_status(client, db_session):
+    marker = uuid.uuid4().hex[:8]
+    db_session.add(
+        Job(
+            title=f"Applied Marker Job {marker}",
+            company="Acme",
+            location="Remote",
+            source="test",
+            url=f"https://example.com/jobs/applied-{marker}",
+            review_status="applied",
+        )
+    )
+    db_session.add(
+        Job(
+            title=f"Not Suitable Marker Job {marker}",
+            company="Acme",
+            location="Remote",
+            source="test",
+            url=f"https://example.com/jobs/not-suitable-{marker}",
+            review_status="not_suitable",
+        )
+    )
+    await db_session.commit()
+
+    response = await client.get(
+        "/api/v1/search/jobs", params={"keyword": marker, "review_status": "applied"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["jobs"]) == 1
+    assert data["jobs"][0]["title"] == f"Applied Marker Job {marker}"
+
+
+@pytest.mark.asyncio
 async def test_search_score_reflects_real_resume_match(tmp_path, monkeypatch, client, db_session):
     """score_min/sort=score used to be accepted but silently ignored (no
     salary/score data existed anywhere). They now reflect a real match

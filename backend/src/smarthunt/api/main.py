@@ -58,10 +58,24 @@ app.add_middleware(
 )
 
 
+# allow_credentials=True combined with a wildcard origin is a known CORS
+# misconfiguration — starlette's CORSMiddleware doesn't literally send
+# "*" once credentials are enabled, it reflects the request's actual
+# Origin header back as the allowed origin, which means "any site,
+# with credentials" (any cookie/browser-credentialed request from any
+# origin would be allowed through). Found 2026-08-07 during a security
+# audit: BACKEND_CORS_ORIGINS has never been configured in this deployment
+# (empty list), so this was live in that exact configuration on the
+# publicly-routed backend, which also serves the Swagger UI by default
+# (enable_docs=True). Credentials are now only allowed once specific
+# trusted origins are actually configured; the wildcard fallback for the
+# common case (no origins configured) stays permissive for anonymous
+# requests but never reflects credentials.
+_cors_origins = settings.BACKEND_CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS or ["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins or ["*"],
+    allow_credentials=bool(_cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

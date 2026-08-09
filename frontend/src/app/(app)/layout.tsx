@@ -7,23 +7,28 @@ import {
   Bot,
   Briefcase,
   Building2,
+  ChevronDown,
   FileText,
   History,
   Home,
   LogOut,
+  MessageCircle,
+  Rss,
   Search,
   SearchCheck,
   Settings,
   Activity,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { getCurrentUser, refreshToken } from "@/lib/auth-api";
 import { clearToken, getToken, setToken } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/notifications-api";
 import { useTranslation } from "@/lib/i18n/language-context";
+import type { translations } from "@/lib/i18n/translations";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,24 +39,71 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-const NAV_LINKS = [
-  { href: "/", key: "dashboard" as const, icon: Home, color: "text-blue-400" },
-  { href: "/jobs", key: "jobs" as const, icon: Search, color: "text-emerald-400" },
+// Discovered Jobs and Job Search each used to hold their 3 sub-views
+// (job sites / LinkedIn posts / WhatsApp messages) as in-page Tabs. Moved
+// to real nested nav entries (own routes, own back button, deep-linkable)
+// per explicit request 2026-08-09 — a "group" entry has no href of its
+// own and just expands/collapses its children in place, matching "دوس
+// عليها تفتح تحتها 3 تابات، ودوس على واحدة فيهم تفتح الصفحة بتاعتها".
+interface NavChild {
+  href: string;
+  icon: LucideIcon;
+  section: "discoveredJobs";
+  labelKey: keyof typeof translations.ar.discoveredJobs;
+}
+
+interface NavLeaf {
+  kind: "link";
+  href: string;
+  key: keyof typeof translations.ar.nav;
+  icon: LucideIcon;
+  color: string;
+}
+
+interface NavGroup {
+  kind: "group";
+  key: keyof typeof translations.ar.nav;
+  icon: LucideIcon;
+  color: string;
+  children: NavChild[];
+}
+
+const DISCOVERED_JOBS_CHILDREN = (basePath: string): NavChild[] => [
+  { href: `${basePath}/sites`, icon: Search, section: "discoveredJobs", labelKey: "tabJobSites" },
+  { href: `${basePath}/linkedin`, icon: Rss, section: "discoveredJobs", labelKey: "tabLinkedin" },
   {
-    href: "/job-search",
-    key: "jobSearch" as const,
+    href: `${basePath}/whatsapp`,
+    icon: MessageCircle,
+    section: "discoveredJobs",
+    labelKey: "tabWhatsapp",
+  },
+];
+
+const NAV_LINKS: Array<NavLeaf | NavGroup> = [
+  { kind: "link", href: "/", key: "dashboard", icon: Home, color: "text-blue-400" },
+  {
+    kind: "group",
+    key: "jobs",
+    icon: Search,
+    color: "text-emerald-400",
+    children: DISCOVERED_JOBS_CHILDREN("/jobs"),
+  },
+  {
+    kind: "group",
+    key: "jobSearch",
     icon: SearchCheck,
     color: "text-teal-400",
+    children: DISCOVERED_JOBS_CHILDREN("/job-search"),
   },
-  { href: "/applications", key: "applications" as const, icon: Briefcase, color: "text-orange-400" },
-  { href: "/resume", key: "resume" as const, icon: FileText, color: "text-violet-400" },
-  { href: "/ai-assistant", key: "aiAssistant" as const, icon: Bot, color: "text-fuchsia-400" },
-  { href: "/providers", key: "providers" as const, icon: Building2, color: "text-indigo-400" },
-  { href: "/notifications", key: "notifications" as const, icon: Bell, color: "text-yellow-400" },
-  { href: "/activity", key: "activity" as const, icon: History, color: "text-teal-400" },
-  { href: "/docs", key: "docs" as const, icon: BookOpen, color: "text-amber-400" },
-  { href: "/settings", key: "settings" as const, icon: Settings, color: "text-slate-400" },
-  { href: "/system-health", key: "systemHealth" as const, icon: Activity, color: "text-red-400" },
+  { kind: "link", href: "/applications", key: "applications", icon: Briefcase, color: "text-orange-400" },
+  { kind: "link", href: "/resume", key: "resume", icon: FileText, color: "text-violet-400" },
+  { kind: "link", href: "/ai-assistant", key: "aiAssistant", icon: Bot, color: "text-fuchsia-400" },
+  { kind: "link", href: "/providers", key: "providers", icon: Building2, color: "text-indigo-400" },
+  { kind: "link", href: "/notifications", key: "notifications", icon: Bell, color: "text-yellow-400" },
+  { kind: "link", href: "/activity", key: "activity", icon: History, color: "text-teal-400" },
+  { kind: "link", href: "/docs", key: "docs", icon: BookOpen, color: "text-amber-400" },
+  { kind: "link", href: "/settings", key: "settings", icon: Settings, color: "text-slate-400" },
+  { kind: "link", href: "/system-health", key: "systemHealth", icon: Activity, color: "text-red-400" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -59,6 +111,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t, locale } = useTranslation();
   const isRtl = locale === "ar";
+
+  // Undefined (not yet manually toggled) falls back to "expanded because
+  // the current page lives inside this group" — so landing on /jobs/linkedin
+  // directly (a deep link, a refresh) shows that group already open instead
+  // of requiring an extra click to reveal the page you're already on.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  function isGroupExpanded(group: NavGroup) {
+    const activeByPath = group.children.some((child) => pathname === child.href);
+    return openGroups[group.key] ?? activeByPath;
+  }
+
+  function toggleGroup(group: NavGroup) {
+    setOpenGroups((prev) => ({ ...prev, [group.key]: !isGroupExpanded(group) }));
+  }
 
   useEffect(() => {
     if (!getToken()) {
@@ -170,6 +237,59 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {NAV_LINKS.map((link) => {
             const Icon = link.icon;
+
+            if (link.kind === "group") {
+              const expanded = isGroupExpanded(link);
+              const groupActive = link.children.some((child) => pathname === child.href);
+              return (
+                <div key={link.key} className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(link)}
+                    aria-expanded={expanded}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start text-sm transition-colors",
+                      groupActive
+                        ? "bg-primary/10 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+                    )}
+                  >
+                    <Icon className={cn("size-4 shrink-0", link.color)} />
+                    <span className="flex-1">{t("nav", link.key)}</span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 shrink-0 transition-transform",
+                        expanded ? "" : "-rotate-90",
+                      )}
+                    />
+                  </button>
+                  {expanded && (
+                    <div className="flex flex-col gap-1 ps-6">
+                      {link.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        const active = pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                              active
+                                ? "bg-primary/10 font-medium text-foreground"
+                                : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+                            )}
+                          >
+                            <ChildIcon className={cn("size-4 shrink-0", link.color)} />
+                            <span className="flex-1">{t(child.section, child.labelKey)}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             const active = pathname === link.href;
             return (
               <Link

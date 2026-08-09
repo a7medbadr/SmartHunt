@@ -836,6 +836,52 @@ limitation not worth chasing (see memory), not because this angle was ruled out.
 proxied request that legitimately takes longer than ~30s starts mysteriously 500ing again, check
 this setting first before assuming it's the specific feature's own backend logic.
 
+**Tanqeeb is now real (made real 2026-08-06, at the owner's request to activate it and DrJobs) —
+enabled in the DB, added to `REAL_DISCOVERY_PROVIDERS`.** `providers/tanqeeb/provider.py`'s
+`search()` used to return one hardcoded fake dict ("Senior Systems Engineer (IBM AIX)", score: 93),
+same as every other still-fake provider. Tanqeeb's own `saudi.tanqeeb.com` subdomain is a real,
+server-rendered Saudi-Arabia-scoped job search — confirmed live: no Cloudflare bot challenge (unlike
+Bayt/GulfTalent/Wuzzuf, see above), works from a plain unauthenticated request, ~20 real jobs per
+page, real pagination (`/jobs/search/page/{n}?keywords=...&country=54`). Each result card is a
+`<article data-job-id data-job-name data-job-company data-job-location data-job-url data-job-date
+...>` with everything needed read straight off data-attributes (no text-scraping needed for the list
+pass) — confirmed live that Tanqeeb aggregates postings from other boards too
+(`data-job-source="Bayt"` seen on a real card) but every card on this subdomain is still genuinely
+Saudi. Full description isn't on the list card (only a truncated excerpt) — same two-pass pattern as
+LinkedIn's provider: collect card info first, then visit each job's own detail page
+(`#jobDescriptionBody`) for the real text. **Found and fixed the same day: Tanqeeb's own
+`data-job-location` shorthands the country as `"Saudi"` (e.g. `"Saudi - Al Damam"`), never `"Saudi
+Arabia"`** — left as-is, every single Tanqeeb job would have silently failed
+`DiscoveryService.discover()`'s Saudi-only substring filter (`"saudi arabia" in job.location.lower()`)
+and never been inserted from a real scheduled/manual discovery run, the exact same class of bug as
+the baaeed `"Remote"` fix above. `search()` now normalizes a leading `"Saudi"` to `"Saudi Arabia"`
+before returning the job. Verified live end-to-end, not just unit-tested: a real
+`DiscoveryService.discover(query="linux", location="Saudi Arabia")` call (all 4 real providers
+enabled: linkedin, sabbar, baaeed, tanqeeb) inserted 10 new real jobs including several genuine
+Tanqeeb postings (KAUST, TMC Middle East, Brightskies, Penta Consulting) with correctly-normalized
+`"Saudi Arabia - <city>"` locations, confirmed via a direct `psql` check against the dev DB — not
+just trusting the discovery call's own return value.
+
+**DrJobs was investigated the same day and found to have no working Saudi Arabia site at all — left
+disabled, not made real.** This is not an anti-bot problem like Bayt/GulfTalent/Wuzzuf (see above) —
+`drjobs.ae` (the real, live UAE site) itself redirects any Saudi-Arabia-scoped search
+(`drjobs.ae/search-jobs?location=Riyadh` or similar) to `drjobs.ae/saudi-arabia/search-jobs`, which
+301s again to `www.drjobpro.com/saudi-arabia/search-jobs` — and `drjobpro.com` (with or without
+`www`) does not resolve at all (`NXDOMAIN`, confirmed via direct DNS lookup, not just a timeout).
+DrJobs' own site literally routes its Saudi Arabia country page to a dead/retired domain. Separately
+confirmed this isn't just a redirect glitch: a UAE search that finds zero real results (e.g.
+`location=Saudi+Arabia` with no matches) silently falls back to showing unrelated global "similar
+jobs" (Japan, Canada, etc.) while still title-labeling the page as if it matched the requested
+country — exactly the "echoes back whatever was searched for" trap this doc already warns about for
+the old fake providers, except here it's the *real* site doing it, not our own stub. Don't
+re-attempt DrJobs without first confirming (e.g. via a plain `curl -IL` redirect trace) that
+`drjobs.ae/saudi-arabia/search-jobs` no longer 301s to the dead `drjobpro.com` domain — if DrJobs
+ever fixes their own routing, the UAE implementation pattern above (data-attribute-free, needs real
+CSS-class scraping: `.job-card`/`.job-name`/`.company-name`/`.location span`/`.posted-date span`,
+job URLs at `/jobs/<slug>-<id>`) is a reasonable starting point, but building it against a target
+that currently has zero real Saudi inventory would just reintroduce fake/wrong-country data into a
+Saudi-only pipeline.
+
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
 work — check current `git status` / `git log origin/master..master`, don't assume it's still true.

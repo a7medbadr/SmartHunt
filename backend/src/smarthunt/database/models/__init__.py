@@ -14,6 +14,7 @@ from smarthunt.job_notes.models import JobNote
 from smarthunt.job_tags.models import JobTag
 from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
 from smarthunt.notifications.models import Notification
+from smarthunt.whatsapp_monitor.models import MonitoredWhatsAppChat
 from smarthunt.providers.health.models import ProviderHealth
 from smarthunt.providers.settings.models import ProviderSetting
 from smarthunt.resume.models import TailoredResume
@@ -38,6 +39,7 @@ __all__ = [
     "JobTag",
     "MonitoredHashtag",
     "MonitoredLinkedInAccount",
+    "MonitoredWhatsAppChat",
     "Notification",
     "ProviderHealth",
     "ProviderSetting",

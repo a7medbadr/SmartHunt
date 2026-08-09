@@ -54,7 +54,7 @@ export default function SystemHealthPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">الحالة العامة</CardTitle>
+          <CardTitle className="text-base">{t("systemHealth", "overallStatus")}</CardTitle>
         </CardHeader>
         <CardContent>
           {detailsQuery.isPending ? (
@@ -63,40 +63,40 @@ export default function SystemHealthPage() {
             <div className="flex flex-wrap gap-3">
               <StatusBadge
                 ok={detailsQuery.data.status === "ok"}
-                label={`الحالة العامة: ${detailsQuery.data.status}`}
+                label={`${t("systemHealth", "overallStatusLabel")}: ${detailsQuery.data.status}`}
               />
               <StatusBadge
                 ok={detailsQuery.data.database === "up"}
-                label={`قاعدة البيانات: ${detailsQuery.data.database}`}
+                label={`${t("systemHealth", "database")}: ${detailsQuery.data.database}`}
               />
               <StatusBadge
                 ok={detailsQuery.data.scheduler === "up"}
-                label={`الجدولة: ${detailsQuery.data.scheduler}`}
+                label={`${t("systemHealth", "scheduler")}: ${detailsQuery.data.scheduler}`}
               />
               <Badge variant="secondary">
                 Playwright: {detailsQuery.data.playwright}
               </Badge>
             </div>
           ) : (
-            <p className="text-sm text-destructive">مقدرناش نتصل بالسيرفر.</p>
+            <p className="text-sm text-destructive">{t("systemHealth", "connectionError")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">إصدار النظام</CardTitle>
+          <CardTitle className="text-base">{t("systemHealth", "systemVersion")}</CardTitle>
         </CardHeader>
         <CardContent>
           {versionQuery.isPending ? (
             <Skeleton className="h-10 w-full" />
           ) : versionQuery.data ? (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">التطبيق</dt>
+              <dt className="text-muted-foreground">{t("systemHealth", "application")}</dt>
               <dd>{versionQuery.data.application}</dd>
-              <dt className="text-muted-foreground">الإصدار</dt>
+              <dt className="text-muted-foreground">{t("systemHealth", "version")}</dt>
               <dd>{versionQuery.data.version}</dd>
-              <dt className="text-muted-foreground">البيئة</dt>
+              <dt className="text-muted-foreground">{t("systemHealth", "environment")}</dt>
               <dd>{versionQuery.data.environment}</dd>
               <dt className="text-muted-foreground">Python</dt>
               <dd>{versionQuery.data.python}</dd>
@@ -107,7 +107,7 @@ export default function SystemHealthPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">مزودات الذكاء الاصطناعي</CardTitle>
+          <CardTitle className="text-base">{t("systemHealth", "aiProviders")}</CardTitle>
         </CardHeader>
         <CardContent>
           {aiHealthQuery.isPending ? (
@@ -124,7 +124,7 @@ export default function SystemHealthPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">حالة مواقع التوظيف</CardTitle>
+          <CardTitle className="text-base">{t("systemHealth", "providersStatus")}</CardTitle>
         </CardHeader>
         <CardContent>
           {providersQuery.isPending ? (
@@ -141,7 +141,7 @@ export default function SystemHealthPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              لسه مفيش بيانات حالة مسجلة لمواقع التوظيف.
+              {t("systemHealth", "noProviderStatus")}
             </p>
           )}
         </CardContent>

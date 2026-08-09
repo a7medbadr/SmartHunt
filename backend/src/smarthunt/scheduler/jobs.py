@@ -39,8 +39,11 @@ LINKEDIN_HASHTAGS_PROVIDER = "scheduler:linkedin-hashtags"
 # idle time for anything else to actually get CPU, hence still daily.
 
 
-async def _run_scheduled_discovery(topic: str, query: str) -> None:
-    """Run a real discovery pass for `query` across every provider and
+async def _run_scheduled_discovery(
+    topic: str, query: str, providers: list[str] | None = None
+) -> None:
+    """Run a real discovery pass for `query` across every provider (or
+    just `providers`, if given — see DiscoveryService.discover()) and
     persist results, tracking success/failure via the same
     scheduler_history / failed_scheduler_job tables the Scheduler page
     reads from."""
@@ -52,6 +55,7 @@ async def _run_scheduled_discovery(topic: str, query: str) -> None:
                 query=query,
                 location=DISCOVERY_LOCATION,
                 provider=provider_label,
+                providers=providers,
             )
             await db.commit()
             logger.info(
@@ -284,6 +288,67 @@ async def daily_morning_discovery():
             continue
 
 
+# scheduler_history provider labels for the dedicated Tanqeeb daily sweep
+# below — added 2026-08-07 per explicit request ("بينزل عليه وظائف كتير
+# ف ركز عليه شويه... زي لينكدان"). Tanqeeb is already swept by every one
+# of the 5 hourly/2h/3h/4h/5h discover_* jobs and by daily_morning_discovery
+# too — DiscoveryService.discover() already fans a query out across every
+# *enabled* provider, Tanqeeb included, on every single one of those runs.
+# This dedicated job doesn't change that coverage; it gives Tanqeeb its
+# own clearly-labeled, guaranteed-daily scheduler_history entry (mirroring
+# LinkedIn's own dedicated scan_all_linkedin_accounts_daily/
+# scan_hashtags_daily jobs) instead of its results being folded invisibly
+# into the shared multi-provider topic runs, plus a single summary row
+# (TANQEEB_DAILY_PROVIDER) so SchedulerService.catch_up_scheduled_jobs()
+# has one clean "did this run today" signal to check, same as the two
+# LinkedIn daily jobs already do.
+TANQEEB_PROVIDER = "tanqeeb"
+TANQEEB_DAILY_PROVIDER = "scheduler:tanqeeb-daily"
+
+# scheduler_history provider label for the WhatsApp channel/group monitor
+# — mirrors LINKEDIN_ACCOUNTS_PROVIDER's role exactly: one summary row per
+# sweep, read back by SchedulerService.catch_up_scheduled_jobs() to decide
+# whether this restart needs to fire an overdue catch-up run.
+WHATSAPP_CHATS_PROVIDER = "scheduler:whatsapp-chats"
+
+
+async def discover_tanqeeb_daily():
+    """Once a day, a Tanqeeb-only sweep across every tracked topic — see
+    the module comment above for why this exists on top of the shared
+    multi-provider discovery jobs that already include Tanqeeb."""
+    from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
+    from smarthunt.scheduler.history.service import scheduler_history_service
+
+    total_inserted = 0
+
+    for topic, query in TOPIC_QUERIES.items():
+        try:
+            async with AsyncSessionLocal() as db:
+                result = await DiscoveryService(db).discover(
+                    query=query,
+                    location=DISCOVERY_LOCATION,
+                    provider=f"scheduler:tanqeeb-{topic}",
+                    providers=[TANQEEB_PROVIDER],
+                )
+                total_inserted += result["inserted"]
+        except Exception:
+            logger.exception("scheduled_tanqeeb_discovery_failed", extra={"topic": topic})
+            # One topic failing shouldn't skip the rest of the sweep.
+            continue
+
+    async with AsyncSessionLocal() as db:
+        await scheduler_history_service.create(
+            db,
+            SchedulerHistoryCreate(
+                provider=TANQEEB_DAILY_PROVIDER,
+                status="completed",
+                jobs_found=total_inserted,
+                message=f"topics={len(TOPIC_QUERIES)} inserted={total_inserted}",
+            ),
+        )
+        await db.commit()
+
+
 async def scan_all_linkedin_accounts_daily():
     """Once a day, scans every enabled monitored LinkedIn account's own
     recent posts (same extraction as the manual "افحص دلوقتي" button)
@@ -394,6 +459,63 @@ async def scan_hashtags_daily():
                 status="completed",
                 jobs_found=total_saved,
                 message=f"hashtags={scanned_count} scanned={total_scanned} saved={total_saved}",
+            ),
+        )
+        await db.commit()
+
+
+async def scan_whatsapp_chats():
+    """Every few hours, scans every enabled monitored WhatsApp
+    channel/group's recent messages (same extraction as each chat's own
+    "افحص دلوقتي" button) for job-relevant content — added 2026-08-08 per
+    explicit request to link the owner's WhatsApp job channels
+    (e.g. "ELITE IT | وظائف تقنية معلومات - السعودية") into the same
+    unattended discovery pipeline as LinkedIn. Structurally identical to
+    scan_all_linkedin_accounts_daily above: one failing chat doesn't skip
+    the rest, one summary scheduler_history row at the end."""
+    from smarthunt.whatsapp_monitor import service as whatsapp_monitor_service
+    from smarthunt.whatsapp_monitor.chat_scanner import WhatsAppScanError, scan_chat
+    from smarthunt.scheduler.history.schemas import SchedulerHistoryCreate
+    from smarthunt.scheduler.history.service import scheduler_history_service
+
+    async with AsyncSessionLocal() as db:
+        chats = await whatsapp_monitor_service.list_chats(db)
+
+    total_scanned = 0
+    total_saved = 0
+    scanned_count = 0
+
+    for chat in chats:
+        if not chat.enabled:
+            continue
+
+        scanned_count += 1
+        async with AsyncSessionLocal() as db:
+            try:
+                messages = await scan_chat(chat.label, chat.chat_url, chat.chat_type)
+                saved = await whatsapp_monitor_service.scan_and_save(db, messages)
+                await whatsapp_monitor_service.mark_chat_checked(db, chat.id)
+                total_scanned += len(messages)
+                total_saved += len(saved)
+                logger.info(
+                    "scheduled_whatsapp_chat_scan_completed",
+                    extra={"chat_id": chat.id, "scanned": len(messages), "saved": len(saved)},
+                )
+            except WhatsAppScanError:
+                logger.exception("scheduled_whatsapp_chat_scan_failed", extra={"chat_id": chat.id})
+                continue
+            except Exception:
+                logger.exception("scheduled_whatsapp_chat_scan_failed", extra={"chat_id": chat.id})
+                continue
+
+    async with AsyncSessionLocal() as db:
+        await scheduler_history_service.create(
+            db,
+            SchedulerHistoryCreate(
+                provider=WHATSAPP_CHATS_PROVIDER,
+                status="completed",
+                jobs_found=total_saved,
+                message=f"chats={scanned_count} scanned={total_scanned} saved={total_saved}",
             ),
         )
         await db.commit()

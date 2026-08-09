@@ -28,6 +28,12 @@ async def search_jobs(
     keyword: str | None = Query(None, description="Search keyword in title and description"),
     location: str | None = Query(None, description="Filter jobs by location"),
     source: str | None = Query(None, description="Filter jobs by source provider"),
+    exclude_source: str | None = Query(
+        None, description="Exclude jobs from these exact source(s), comma-separated"
+    ),
+    review_status: str | None = Query(
+        None, description="Filter by review status: applied, not_suitable, or none (unreviewed)"
+    ),
     title: str | None = Query(None, alias="title"),
     company: str | None = Query(None),
     provider: str | None = Query(None),
@@ -69,6 +75,8 @@ async def search_jobs(
             keyword=eff_keyword,
             location=location,
             source=eff_source,
+            exclude_source=exclude_source,
+            review_status=review_status,
         )
 
         if score_min is not None:

@@ -23,12 +23,26 @@ class DiscoveryService:
         page: int = 1,
         limit: int = 25,
         provider: str = "manual-run",
+        providers: list[str] | None = None,
     ) -> dict:
+        """`providers`, when given, restricts the fan-out to just those
+        provider names (still intersected with enabled/disabled — a
+        disabled provider stays unsearchable even if explicitly named
+        here) — added 2026-08-07 for discover_tanqeeb_daily's dedicated
+        sweep, which needs the exact same filtered/scored/saved pipeline
+        every other scheduled discovery job goes through (Saudi-location
+        filter, title-relevance filter, scheduler_history tracking), just
+        restricted to one named provider instead of every enabled one.
+        Omitting it (the default) keeps the existing "every enabled
+        provider" behavior every other caller already relies on."""
 
         enabled_map = await provider_settings_service.get_enabled_map(self.session)
         active_providers = [
             p for p in provider_registry.providers() if enabled_map.get(p.name, True)
         ]
+        if providers is not None:
+            wanted = {p.lower() for p in providers}
+            active_providers = [p for p in active_providers if p.name.lower() in wanted]
 
         jobs = await provider_registry.fetch_all_jobs(
             query=query,
@@ -68,7 +82,7 @@ class DiscoveryService:
         inserted = await self.repository.save_discovered_jobs(jobs)
 
         result = {
-            "providers": len(provider_registry.providers()),
+            "providers": len(active_providers),
             "discovered": len(jobs),
             "inserted": inserted,
             "duplicates": len(jobs) - inserted,

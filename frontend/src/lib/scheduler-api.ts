@@ -61,17 +61,20 @@ export interface SearchProviderResult {
 // ~43s for the backend's default limit=15 (LinkedIn visits each job's
 // own detail page for its description, ~4.3s/job); generous margin over
 // that, same reasoning as linkedin-monitor-api.ts's SCAN_TIMEOUT_MS.
-const SEARCH_PROVIDER_TIMEOUT_MS = 150000;
+// Raised 2026-08-07 from 150000 (2.5 min) to 600000 (10 min) for the same
+// bigger safety margin requested for the other job-search blocks.
+const SEARCH_PROVIDER_TIMEOUT_MS = 600000;
 
 export async function searchProvider(
   provider: string,
   query: string,
   location?: string,
+  signal?: AbortSignal,
 ): Promise<SearchProviderResult> {
   const { data } = await apiClient.post<SearchProviderResult>(
     "/discovery/search-provider",
     null,
-    { params: { provider, query, location }, timeout: SEARCH_PROVIDER_TIMEOUT_MS },
+    { params: { provider, query, location }, timeout: SEARCH_PROVIDER_TIMEOUT_MS, signal },
   );
   return data;
 }

@@ -11,12 +11,15 @@ from smarthunt.scheduler.jobs import (
     LINKEDIN_ACCOUNTS_PROVIDER,
     LINKEDIN_FEED_PROVIDER,
     LINKEDIN_HASHTAGS_PROVIDER,
+    TANQEEB_DAILY_PROVIDER,
+    WHATSAPP_CHATS_PROVIDER,
     check_email_replies,
     daily_morning_discovery,
     discover_devops,
     discover_linux,
     discover_openshift,
     discover_storage,
+    discover_tanqeeb_daily,
     discover_vmware,
     linkedin_session_healthcheck,
     process_failed_scheduler_jobs,
@@ -24,6 +27,7 @@ from smarthunt.scheduler.jobs import (
     scan_all_linkedin_accounts_daily,
     scan_hashtags_daily,
     scan_linkedin_home_feed_hourly,
+    scan_whatsapp_chats,
 )
 
 logger = structlog.get_logger()
@@ -165,6 +169,20 @@ class SchedulerService:
                 replace_existing=True,
             )
 
+            # hour=5:15 UTC — after daily_morning_discovery (5:00, which
+            # already includes Tanqeeb as one of every enabled provider)
+            # and before scan_all_linkedin_accounts_daily (5:30), giving
+            # Tanqeeb its own dedicated, clearly-labeled daily sweep per
+            # explicit request — see discover_tanqeeb_daily's own
+            # docstring for why this exists on top of coverage that
+            # already technically included it.
+            scheduler.add_job(
+                discover_tanqeeb_daily,
+                CronTrigger(hour=5, minute=15),
+                id="discover_tanqeeb_daily",
+                replace_existing=True,
+            )
+
             scheduler.add_job(
                 scan_all_linkedin_accounts_daily,
                 CronTrigger(hour=5, minute=30),
@@ -184,6 +202,36 @@ class SchedulerService:
                 replace_existing=True,
             )
 
+            # Every 3h — frequent enough for a channel posting several
+            # times a day without adding to the single shared-page
+            # contention the LinkedIn jobs above already manage
+            # carefully (see chat_scanner.py's own page lock).
+            scheduler.add_job(
+                scan_whatsapp_chats,
+                IntervalTrigger(hours=3),
+                id="scan_whatsapp_chats",
+                replace_existing=True,
+            )
+
+            # hour=6:30 UTC — a dedicated, guaranteed-once-a-day WhatsApp
+            # sweep on top of the every-3h scan_whatsapp_chats job above,
+            # added 2026-08-09 per explicit request ("عاوزك تضيف عليه
+            # البحث فى واتس اب برضو يوميا يعني كل 24 ساعه يبقى مجدول هو
+            # كمان معاهم") to sit alongside the other daily jobs
+            # (daily_morning_discovery 5:00, discover_tanqeeb_daily 5:15,
+            # scan_all_linkedin_accounts_daily 5:30, scan_hashtags_daily
+            # 6:00) — same precedent as discover_tanqeeb_daily's own
+            # dedicated daily entry on top of coverage that already
+            # technically included it more often. Reuses the same
+            # scan_whatsapp_chats callable (idempotent — scan_and_save
+            # dedupes) rather than a separate near-duplicate function.
+            scheduler.add_job(
+                scan_whatsapp_chats,
+                CronTrigger(hour=6, minute=30),
+                id="scan_whatsapp_daily",
+                replace_existing=True,
+            )
+
             scheduler.start()
 
             logger.info(
@@ -200,8 +248,11 @@ class SchedulerService:
                     "linkedin_session_healthcheck",
                     "recycle_browser",
                     "daily_morning_discovery",
+                    "discover_tanqeeb_daily",
                     "scan_all_linkedin_accounts_daily",
                     "scan_hashtags_daily",
+                    "scan_whatsapp_chats",
+                    "scan_whatsapp_daily",
                 ],
             )
 
@@ -251,6 +302,8 @@ class SchedulerService:
             (LINKEDIN_FEED_PROVIDER, timedelta(hours=1), scan_linkedin_home_feed_hourly),
             (LINKEDIN_ACCOUNTS_PROVIDER, timedelta(days=1), scan_all_linkedin_accounts_daily),
             (LINKEDIN_HASHTAGS_PROVIDER, timedelta(days=1), scan_hashtags_daily),
+            (TANQEEB_DAILY_PROVIDER, timedelta(days=1), discover_tanqeeb_daily),
+            (WHATSAPP_CHATS_PROVIDER, timedelta(hours=3), scan_whatsapp_chats),
         ]
 
         due_jobs = []

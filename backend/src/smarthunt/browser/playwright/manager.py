@@ -15,6 +15,13 @@ from smarthunt.logging.logger import logger
 
 LAUNCH_TIMEOUT_SECONDS = 30
 
+_CHROMIUM_LAUNCH_ARGS = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-blink-features=AutomationControlled",
+]
+
 # Named contexts (get_page("linkedin"), etc.) persist their cookies/
 # localStorage here so a real login survives a container restart —
 # found live 2026-08-03: browser.new_context() with no storage_state is
@@ -52,6 +59,13 @@ class BrowserManager:
 
         self.contexts: Dict[str, BrowserContext] = {}
         self.pages: Dict[str, Page] = {}
+
+        # Separate from contexts/pages above: a persistent context owns
+        # its own dedicated browser process bound to a real on-disk
+        # profile directory (launch_persistent_context), not a context
+        # inside the single shared self.browser. See get_persistent_page.
+        self.persistent_contexts: Dict[str, BrowserContext] = {}
+        self.persistent_pages: Dict[str, Page] = {}
 
         # Serializes launch() across concurrent callers — found live
         # 2026-08-05 chasing "the hourly LinkedIn feed scan basically
@@ -99,12 +113,7 @@ class BrowserManager:
             self.browser = await asyncio.wait_for(
                 self.playwright.chromium.launch(
                     headless=headless,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
+                    args=_CHROMIUM_LAUNCH_ARGS,
                 ),
                 timeout=LAUNCH_TIMEOUT_SECONDS,
             )
@@ -155,7 +164,23 @@ class BrowserManager:
                 options["storage_state"] = str(profile_path)
                 logger.info(f"Restored saved browser session for provider={provider}")
 
-            context = await self.browser.new_context(**options)
+            # Same unbounded-hang risk launch() was already fixed for —
+            # found live 2026-08-07 during a real audit run: a test hung
+            # 30+ minutes here (not in launch(), which had already
+            # succeeded) under the exact host CPU contention this project
+            # has repeatedly documented (long-lived root-owned Chromium
+            # renderer processes pinning 60-70%+ CPU). new_context() on an
+            # overloaded browser process has no built-in timeout of its
+            # own, so a caller could hang forever with zero recourse.
+            try:
+                context = await asyncio.wait_for(
+                    self.browser.new_context(**options),
+                    timeout=LAUNCH_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                raise RuntimeError(
+                    f"Browser context creation timed out after {LAUNCH_TIMEOUT_SECONDS}s"
+                ) from None
 
             context.set_default_timeout(10000)
 
@@ -197,13 +222,89 @@ class BrowserManager:
         if self.browser is None:
             raise RuntimeError("Browser is not started. Call launch() first.")
 
-        context = await self.browser.new_context(**self._context_options())
+        try:
+            context = await asyncio.wait_for(
+                self.browser.new_context(**self._context_options()),
+                timeout=LAUNCH_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                f"Browser context creation timed out after {LAUNCH_TIMEOUT_SECONDS}s"
+            ) from None
         context.set_default_timeout(timeout_ms)
         context.set_default_navigation_timeout(timeout_ms)
 
         page = await context.new_page()
 
         return context, page
+
+    def has_persistent_page(self, provider: str) -> bool:
+        """Non-launching check — used by callers that poll status and
+        shouldn't spin up a whole dedicated browser process just from
+        being asked "are you logged in?" before the owner has ever
+        started that flow."""
+        page = self.persistent_pages.get(provider)
+        return page is not None and not page.is_closed()
+
+    async def get_persistent_page(self, provider: str) -> Page:
+        """A page backed by a full, real on-disk browser profile
+        (launch_persistent_context) instead of the shared self.browser +
+        storage_state snapshot every other named context (get_page)
+        relies on for session persistence — found live 2026-08-08: a
+        real WhatsApp Web login was lost on the very next backend
+        restart despite a valid storage_state.json snapshot, because
+        Playwright's storage_state() only captures cookies/localStorage,
+        never IndexedDB — and WhatsApp Web's multi-device linking stores
+        its actual session crypto keys in IndexedDB, not cookies. A full
+        profile directory (what this uses) persists everything, the same
+        way the owner's own desktop Chrome profile would, so no explicit
+        save_state() call is needed or meaningful here (unlike get_page's
+        contexts) — the browser's own on-disk profile writes as it goes.
+
+        Costs a dedicated Chromium process per persistent provider (a
+        launch_persistent_context owns its own browser, it can't share
+        self.browser the way a regular new_context() does) — only use
+        this for a provider that actually needs it, not as a default."""
+        if provider in self.persistent_pages and not self.persistent_pages[provider].is_closed():
+            return self.persistent_pages[provider]
+
+        if self.playwright is None:
+            try:
+                self.playwright = await asyncio.wait_for(
+                    async_playwright().start(), timeout=LAUNCH_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                self.playwright = None
+                raise RuntimeError(
+                    f"Playwright driver start timed out after {LAUNCH_TIMEOUT_SECONDS}s"
+                ) from None
+
+        profile_dir = BROWSER_PROFILES_DIR / f"{provider}-persistent-profile"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            context = await asyncio.wait_for(
+                self.playwright.chromium.launch_persistent_context(
+                    str(profile_dir),
+                    headless=True,
+                    args=_CHROMIUM_LAUNCH_ARGS,
+                    **self._context_options(),
+                ),
+                timeout=LAUNCH_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                f"Persistent browser context launch timed out after {LAUNCH_TIMEOUT_SECONDS}s"
+            ) from None
+
+        context.set_default_timeout(10000)
+        context.set_default_navigation_timeout(10000)
+
+        self.persistent_contexts[provider] = context
+        page = context.pages[0] if context.pages else await context.new_page()
+        self.persistent_pages[provider] = page
+
+        return page
 
     async def close(self) -> None:
 
@@ -226,6 +327,28 @@ class BrowserManager:
             await context.close()
 
         self.contexts.clear()
+
+        # Persistent contexts (get_persistent_page) write their full
+        # profile — cookies, localStorage, IndexedDB — to disk as they
+        # go, not just at close(); no save_state()-style step is needed
+        # or meaningful for them the way it is for self.contexts above.
+        # Still close explicitly rather than abandon, for a clean flush.
+        for page in self.persistent_pages.values():
+            if not page.is_closed():
+                try:
+                    await page.close()
+                except Exception:
+                    logger.exception("Failed to close a persistent browser page")
+
+        self.persistent_pages.clear()
+
+        for context in list(self.persistent_contexts.values()):
+            try:
+                await context.close()
+            except Exception:
+                logger.exception("Failed to close a persistent browser context")
+
+        self.persistent_contexts.clear()
 
         if self.browser is not None:
             await self.browser.close()

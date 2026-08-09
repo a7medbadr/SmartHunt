@@ -49,6 +49,7 @@ class SearchService:
                 "posted_at": job.posted_at.isoformat() if job.posted_at else None,
                 "post_url": job.post_url,
                 "no_sponsorship_signal": job.no_sponsorship_signal,
+                "review_status": job.review_status,
                 "score": (
                     match_resume(
                         resume_text or "",

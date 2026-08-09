@@ -21,7 +21,7 @@ import {
 import { cn, timeAgo } from "@/lib/utils";
 
 export default function ActivityPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data: activities, isPending, isError } = useQuery({
     queryKey: ["activity-log"],
     queryFn: () => getRecentActivities(200),
@@ -45,7 +45,7 @@ export default function ActivityPage() {
       </h1>
 
       {isError && (
-        <p className="text-sm text-destructive">مقدرناش نجيب سجل النشاطات، جرب تحدّث الصفحة.</p>
+        <p className="text-sm text-destructive">{t("activity", "loadError")}</p>
       )}
 
       <Card>
@@ -84,24 +84,23 @@ export default function ActivityPage() {
                       )}
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {timeAgo(activity.created_at)}
+                      {timeAgo(activity.created_at, locale)}
                     </span>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">مفيش نشاط لسه.</p>
+            <p className="text-sm text-muted-foreground">{t("activity", "noActivityYet")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">سجل التشغيل</CardTitle>
+          <CardTitle className="text-base">{t("activity", "runHistory")}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            كل مرة اشتغل فيها البحث التلقائي في الخلفية — علشان تعرف هل
-            الأتمتة شغالة فعلاً ولاقت وظائف ولا لأ.
+            {t("activity", "runHistoryHint")}
           </p>
         </CardHeader>
         <CardContent>
@@ -111,10 +110,10 @@ export default function ActivityPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>المصدر</TableHead>
-                  <TableHead>الحالة</TableHead>
-                  <TableHead>الوظائف الموجودة</TableHead>
-                  <TableHead>البداية</TableHead>
+                  <TableHead>{t("activity", "source")}</TableHead>
+                  <TableHead>{t("activity", "status")}</TableHead>
+                  <TableHead>{t("activity", "jobsFound")}</TableHead>
+                  <TableHead>{t("activity", "startedAt")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -129,17 +128,16 @@ export default function ActivityPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">مفيش سجل تشغيل لسه.</p>
+            <p className="text-sm text-muted-foreground">{t("activity", "noRunHistoryYet")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">مهام فاشلة</CardTitle>
+          <CardTitle className="text-base">{t("activity", "failedJobs")}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            بحث تلقائي حصل فيه خطأ بيتحط هنا بدل ما يختفي بصمت — النظام
-            بيعيد المحاولة له لوحده كل نص ساعة.
+            {t("activity", "failedJobsHint")}
           </p>
         </CardHeader>
         <CardContent>
@@ -149,10 +147,10 @@ export default function ActivityPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>المصدر</TableHead>
-                  <TableHead>الحالة</TableHead>
-                  <TableHead>عدد المحاولات</TableHead>
-                  <TableHead>آخر خطأ</TableHead>
+                  <TableHead>{t("activity", "source")}</TableHead>
+                  <TableHead>{t("activity", "status")}</TableHead>
+                  <TableHead>{t("activity", "retryCount")}</TableHead>
+                  <TableHead>{t("activity", "lastError")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -167,7 +165,7 @@ export default function ActivityPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-sm text-muted-foreground">مفيش مهام فاشلة.</p>
+            <p className="text-sm text-muted-foreground">{t("activity", "noFailedJobs")}</p>
           )}
         </CardContent>
       </Card>

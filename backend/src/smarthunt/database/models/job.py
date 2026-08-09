@@ -28,6 +28,14 @@ class Job(Base):
     # created_at below (when SmartHunt discovered/scraped it). Only
     # LinkedIn's real provider currently populates this; null otherwise.
     posted_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # The owner's own triage of a discovered job — "applied" (a real
+    # Application row is also created, see api/routes/jobs.py) or
+    # "not_suitable" (dismissed but kept for reference, not deleted).
+    # Null means not yet reviewed. Deliberately a separate field from
+    # Application.status (a richer, multi-stage pipeline status on the
+    # Application entity itself) — this is a lightweight, fast-filterable
+    # flag on the Job row for the discovered-jobs tabs' own list view.
+    review_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )

@@ -182,6 +182,33 @@ POST_CONTAINER_SELECTOR = "[data-urn*='urn:li:activity']"
 FEED_POST_SELECTOR = 'p[componentkey^="feed-commentary_"]'
 
 
+async def _expand_and_read_text(container) -> str:
+    """LinkedIn truncates any post past ~3 lines behind a "…more" toggle —
+    inner_text() on a still-collapsed post only returns that truncated
+    preview. Found live 2026-08-07 chasing "لقينا 50 بوست، وحفظنا 0 وظيفة"
+    reports despite the owner seeing real, relevant Saudi job posts
+    manually in the same feed: is_job_related_post() requires a hiring
+    signal AND a Saudi location AND a relevant tech title all inside the
+    scanned text — real job posts routinely put the location or the
+    "apply now"/city name a couple of lines in, past where LinkedIn cuts
+    the preview off, so the strict text-match filter was checking against
+    text the post never even got to. Best-effort: most posts have no
+    toggle at all (nothing to click, inner_text() already has everything),
+    so any failure here just falls back to the unexpanded text rather
+    than failing the post."""
+    try:
+        toggle = container.locator(
+            'button:has-text("…more"), button:has-text("more"), '
+            'span[role="button"]:has-text("…more"), span[role="button"]:has-text("more")'
+        ).first
+        if await toggle.count() > 0:
+            await toggle.click(timeout=3000, force=True)
+    except Exception:
+        pass
+
+    return (await container.inner_text()).strip()
+
+
 async def _extract_posts_from_page(page, limit: int) -> list[dict]:
     """Profile "recent activity" pages — real data-urn-based permalinks."""
     posts: list[dict] = []
@@ -200,7 +227,7 @@ async def _extract_posts_from_page(page, limit: int) -> list[dict]:
                 continue
             seen_urns.add(urn)
 
-            text = _clean_post_text(await container.inner_text())
+            text = _clean_post_text(await _expand_and_read_text(container))
             if not text:
                 continue
 
@@ -294,7 +321,7 @@ async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list
                 continue
             seen_keys.add(component_key)
 
-            text = (await container.inner_text()).strip()
+            text = await _expand_and_read_text(container)
             if not text:
                 continue
 

@@ -30,8 +30,19 @@ export interface ScanResult {
 // backend request is still genuinely running produces a false "حصل خطأ"
 // even though the scan itself succeeds and the job still gets saved a
 // few seconds later — raised with real margin so a slow-but-real scan
-// isn't reported as failed.
-const SCAN_TIMEOUT_MS = 240000;
+// isn't reported as failed. Raised again 2026-08-07 from 240000 (4 min)
+// to 600000 (10 min) per explicit request for a bigger safety margin —
+// the home feed's full 40-scroll-round scan targeting 50 posts already
+// measured ~3m19s on a quiet host, and now does extra per-post work
+// (post_scanner.py's "…more" expand-before-read fix) that can push a
+// real run closer to the old ceiling on a loaded host. This one constant
+// covers all three real LinkedIn scan actions (home feed, a single
+// monitored account, a single hashtag) uniformly, as requested — none of
+// them should be tighter than the others. Comfortably inside the Next.js
+// proxy's own 900000ms (15 min) ceiling (next.config.ts's
+// experimental.proxyTimeout), so this is still the actual limiting
+// timeout, not a dead setting shadowed by a shorter one upstream.
+const SCAN_TIMEOUT_MS = 600000;
 
 export async function listMonitoredAccounts(): Promise<MonitoredAccount[]> {
   const { data } = await apiClient.get<MonitoredAccount[]>("/linkedin-monitor/accounts");
@@ -63,20 +74,20 @@ export async function removeMonitoredAccount(id: number): Promise<void> {
   await apiClient.delete(`/linkedin-monitor/accounts/${id}`);
 }
 
-export async function scanAccountNow(id: number): Promise<ScanResult> {
+export async function scanAccountNow(id: number, signal?: AbortSignal): Promise<ScanResult> {
   const { data } = await apiClient.post<ScanResult>(
     `/linkedin-monitor/accounts/${id}/scan`,
     undefined,
-    { timeout: SCAN_TIMEOUT_MS },
+    { timeout: SCAN_TIMEOUT_MS, signal },
   );
   return data;
 }
 
-export async function scanHomeFeedNow(): Promise<ScanResult> {
+export async function scanHomeFeedNow(signal?: AbortSignal): Promise<ScanResult> {
   const { data } = await apiClient.post<ScanResult>(
     "/linkedin-monitor/scan-feed",
     undefined,
-    { timeout: SCAN_TIMEOUT_MS },
+    { timeout: SCAN_TIMEOUT_MS, signal },
   );
   return data;
 }
@@ -107,11 +118,11 @@ export async function removeHashtag(id: number): Promise<void> {
   await apiClient.delete(`/linkedin-monitor/hashtags/${id}`);
 }
 
-export async function scanHashtagNow(id: number): Promise<ScanResult> {
+export async function scanHashtagNow(id: number, signal?: AbortSignal): Promise<ScanResult> {
   const { data } = await apiClient.post<ScanResult>(
     `/linkedin-monitor/hashtags/${id}/scan`,
     undefined,
-    { timeout: SCAN_TIMEOUT_MS },
+    { timeout: SCAN_TIMEOUT_MS, signal },
   );
   return data;
 }

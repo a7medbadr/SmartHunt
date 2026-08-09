@@ -6,6 +6,7 @@ from smarthunt.database.models.job import Job
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.linkedin_monitor import post_scanner
 from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
+from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.jobs import (
     daily_morning_discovery,
     scan_all_linkedin_accounts_daily,
@@ -25,6 +26,19 @@ async def cleanup(db_session: AsyncSession):
     await db_session.execute(delete(Job).where(Job.source == "linkedin_post"))
     await db_session.execute(delete(MonitoredLinkedInAccount))
     await db_session.execute(delete(MonitoredHashtag))
+    # test_daily_morning_discovery_continues_past_a_failing_topic below
+    # deliberately drives a real failure through _run_scheduled_discovery,
+    # which commits a real FailedSchedulerJob row (provider
+    # "scheduler:daily-morning-<topic>") via its own AsyncSessionLocal —
+    # this cleanup was missing entirely, so that row silently leaked into
+    # the shared test Postgres DB and persisted past this file. Found
+    # 2026-08-07 because it inflated the FIRST test in
+    # test_scheduler_retry_worker.py (alphabetically after this file) from
+    # 1 to 2 rows processed by scheduler_retry_worker.process(), which
+    # doesn't filter by provider — a real, deterministic ordering bug, not
+    # a flake, matching this suite's documented "incomplete test cleanup"
+    # pattern.
+    await db_session.execute(delete(FailedSchedulerJob))
     await db_session.commit()
 
 
@@ -68,7 +82,9 @@ async def test_scan_linkedin_home_feed_hourly_survives_scan_failure(monkeypatch)
 async def test_daily_morning_discovery_runs_every_topic(monkeypatch):
     called_queries = []
 
-    async def fake_discover(self, query, location=None, page=1, limit=25, provider="manual-run"):
+    async def fake_discover(
+        self, query, location=None, page=1, limit=25, provider="manual-run", providers=None
+    ):
         called_queries.append(query)
         return {"providers": 0, "discovered": 0, "inserted": 0, "duplicates": 0}
 
@@ -91,7 +107,9 @@ async def test_daily_morning_discovery_runs_every_topic(monkeypatch):
 async def test_daily_morning_discovery_continues_past_a_failing_topic(monkeypatch):
     call_count = 0
 
-    async def fake_discover(self, query, location=None, page=1, limit=25, provider="manual-run"):
+    async def fake_discover(
+        self, query, location=None, page=1, limit=25, provider="manual-run", providers=None
+    ):
         nonlocal call_count
         call_count += 1
         if call_count == 1:

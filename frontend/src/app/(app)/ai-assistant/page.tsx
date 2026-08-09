@@ -21,42 +21,16 @@ interface Message {
   content: string;
 }
 
-const EVALUATE_RESUME_PROMPT = "قيّم السيرة الذاتية بتاعتي";
-
-const QUICK_PROMPTS = [
-  EVALUATE_RESUME_PROMPT,
-  "اديني نصايح لتطوير مسيرتي المهنية",
-  "جهزني لأسئلة المقابلة الشخصية",
-];
-
-// A bare "قيّم السيرة الذاتية بتاعتي" + raw resume text gave the small
-// local model too little structure — it would go off-topic instead of
+// A bare "evaluate my resume" + raw resume text gave the small local
+// model too little structure — it would go off-topic instead of
 // evaluating. Mirrors the structured-template approach that already
 // works for deep job analysis (matching/services/deep_analysis.py).
-const RESUME_EVALUATION_TEMPLATE = `أنت خبير توظيف متخصص في أنظمة تتبع المتقدمين (ATS - Applicant Tracking Systems). قيّم السيرة الذاتية دي بالتحديد، بالتنسيق ده بالظبط، بالعربي:
-
-## نقاط القوة
-- (اذكر مهارات وخبرات حقيقية موجودة فعلاً في السيرة الذاتية اللي تحت، بالاسم)
-
-## نقاط تحتاج تحسين
-- (نقص أو ضعف حقيقي في السيرة الذاتية)
-
-## التوافق مع أنظمة ATS
-(هل الصيغة والكلمات المفتاحية مناسبة لأنظمة الفرز الآلي؟ اذكر كلمات مفتاحية مفقودة لو فيه)
-
-## التقييم العام
-(رقم من 100 وسبب مختصر)
-
-السيرة الذاتية:
-
-`;
-
-function buildResumeEvaluationPrompt(resumeText: string): string {
-  return `${RESUME_EVALUATION_TEMPLATE}${resumeText}`;
+function buildResumeEvaluationPrompt(template: string, resumeText: string): string {
+  return `${template}${resumeText}`;
 }
 
 export default function AIAssistantPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -65,6 +39,13 @@ export default function AIAssistantPage() {
     queryKey: ["resume-text"],
     queryFn: getResumeText,
   });
+
+  const evaluateResumePrompt = t("aiAssistant", "quickPromptEvaluate");
+  const quickPrompts = [
+    evaluateResumePrompt,
+    t("aiAssistant", "quickPromptCareerAdvice"),
+    t("aiAssistant", "quickPromptInterviewPrep"),
+  ];
 
   // The backend can only run one AI generation at a time — see
   // ai-mutation-key.ts.
@@ -82,14 +63,14 @@ export default function AIAssistantPage() {
       // a reply.
       const content =
         data.provider === "local"
-          ? "الذكاء الاصطناعي مشغول دلوقتي، جرب تاني بعد شوية."
+          ? t("aiAssistant", "providerLocalFallback")
           : data.content;
       setMessages((prev) => [...prev, { role: "assistant", content }]);
     },
     onError: () => {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "حصل خطأ، جرب تاني." },
+        { role: "assistant", content: t("aiAssistant", "genericError") },
       ]);
     },
   });
@@ -106,11 +87,14 @@ export default function AIAssistantPage() {
 
     let fullPrompt: string;
     let maxTokens: number | undefined;
-    if (prompt === EVALUATE_RESUME_PROMPT && resumeText) {
-      fullPrompt = buildResumeEvaluationPrompt(truncateResumeForAI(resumeText));
+    if (prompt === evaluateResumePrompt && resumeText) {
+      fullPrompt = buildResumeEvaluationPrompt(
+        t("aiAssistant", "resumeEvaluationTemplate"),
+        truncateResumeForAI(resumeText, locale),
+      );
       maxTokens = 400;
     } else if (resumeText) {
-      fullPrompt = `سيرتي الذاتية:\n\n${truncateResumeForAI(resumeText)}\n\n---\n\n${prompt}`;
+      fullPrompt = `${t("aiAssistant", "resumePrefixLabel")}:\n\n${truncateResumeForAI(resumeText, locale)}\n\n---\n\n${prompt}`;
     } else {
       fullPrompt = prompt;
     }
@@ -128,17 +112,17 @@ export default function AIAssistantPage() {
 
       {resumeText ? (
         <Badge variant="secondary" className="w-fit text-xs">
-          شايف سيرتك الذاتية المرفوعة
+          {t("aiAssistant", "resumeAttached")}
         </Badge>
       ) : (
         <Badge variant="outline" className="w-fit text-xs">
-          لسه مرفعتليش سيرة ذاتية — ارفعها من صفحة السيرة الذاتية علشان أقدر أقيّمها
+          {t("aiAssistant", "noResumeUploaded")}
         </Badge>
       )}
 
       {messages.length === 0 && (
         <div className="flex flex-wrap gap-2">
-          {QUICK_PROMPTS.map((prompt) => (
+          {quickPrompts.map((prompt) => (
             <Button
               key={prompt}
               variant="outline"
@@ -154,7 +138,7 @@ export default function AIAssistantPage() {
 
       {aiBusyElsewhere && !mutation.isPending && (
         <p className="text-xs text-muted-foreground">
-          في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+          {t("aiAssistant", "aiBusyElsewhere")}
         </p>
       )}
 
@@ -174,7 +158,7 @@ export default function AIAssistantPage() {
         ))}
         {mutation.isPending && (
           <div className="flex flex-col gap-2 self-start rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-            جاري الكتابة...
+            {t("aiAssistant", "typing")}
             <EstimatedProgressBar percent={chatProgress} />
           </div>
         )}
@@ -191,7 +175,7 @@ export default function AIAssistantPage() {
               send(input);
             }
           }}
-          placeholder="اكتب سؤالك..."
+          placeholder={t("aiAssistant", "inputPlaceholder")}
           rows={2}
           className="flex-1"
         />
@@ -200,7 +184,7 @@ export default function AIAssistantPage() {
           onClick={() => send(input)}
           disabled={mutation.isPending || aiBusyElsewhere}
         >
-          إرسال
+          {t("aiAssistant", "send")}
         </Button>
       </div>
     </div>

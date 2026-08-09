@@ -6,11 +6,13 @@ import { AxiosError } from "axios";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { login, register as registerAccount } from "@/lib/auth-api";
 import { setToken } from "@/lib/auth";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,16 +29,25 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const registerSchema = z.object({
-  username: z.string().min(3, "3 حروف على الأقل"),
-  email: z.string().email("إيميل غير صحيح"),
-  password: z.string().min(8, "8 حروف على الأقل"),
-});
-
-type RegisterFormValues = z.infer<typeof registerSchema>;
+type RegisterFormValues = {
+  username: string;
+  email: string;
+  password: string;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const registerSchema = useMemo(
+    () =>
+      z.object({
+        username: z.string().min(3, t("auth", "usernameMinLength")),
+        email: z.string().email(t("auth", "emailInvalid")),
+        password: z.string().min(8, t("auth", "passwordMinLength")),
+      }),
+    [t],
+  );
 
   const {
     register: registerField,
@@ -64,8 +75,8 @@ export default function RegisterPage() {
   const serverError =
     mutation.error instanceof AxiosError
       ? mutation.error.response?.status === 400
-        ? "اسم المستخدم أو الإيميل ده مستخدم قبل كده"
-        : "حصل خطأ، جرب تاني"
+        ? t("auth", "usernameOrEmailTaken")
+        : t("auth", "genericError")
       : undefined;
 
   return (
@@ -76,13 +87,13 @@ export default function RegisterPage() {
             <Search className="size-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-xl">SmartHunt</CardTitle>
-          <CardDescription>إنشاء حساب المالك</CardDescription>
+          <CardDescription>{t("auth", "registerTagline")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} noValidate>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="username">اسم المستخدم</FieldLabel>
+                <FieldLabel htmlFor="username">{t("auth", "username")}</FieldLabel>
                 <Input
                   id="username"
                   autoComplete="username"
@@ -93,7 +104,7 @@ export default function RegisterPage() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="email">الإيميل</FieldLabel>
+                <FieldLabel htmlFor="email">{t("auth", "email")}</FieldLabel>
                 <Input
                   id="email"
                   type="email"
@@ -104,7 +115,7 @@ export default function RegisterPage() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="password">كلمة المرور</FieldLabel>
+                <FieldLabel htmlFor="password">{t("auth", "password")}</FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -121,13 +132,15 @@ export default function RegisterPage() {
               )}
 
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "جاري الإنشاء..." : "إنشاء الحساب"}
+                {mutation.isPending
+                  ? t("auth", "creatingAccount")
+                  : t("auth", "createAccountButton")}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                عندك حساب بالفعل؟{" "}
+                {t("auth", "alreadyHaveAccount")}{" "}
                 <Link href="/login" className="underline">
-                  دخول
+                  {t("auth", "login")}
                 </Link>
               </p>
             </FieldGroup>

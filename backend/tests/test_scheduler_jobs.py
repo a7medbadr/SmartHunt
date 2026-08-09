@@ -5,7 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from smarthunt.discovery.service import DiscoveryService
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
-from smarthunt.scheduler.jobs import discover_linux, linkedin_session_healthcheck, recycle_browser
+from smarthunt.scheduler.jobs import (
+    TANQEEB_DAILY_PROVIDER,
+    discover_linux,
+    discover_tanqeeb_daily,
+    linkedin_session_healthcheck,
+    recycle_browser,
+)
 
 """Regression tests: the APScheduler-registered discover_* jobs called
 `async with track_scheduler_execution("...")`, but that function took a
@@ -60,6 +66,58 @@ async def test_discover_linux_records_failure_on_error(monkeypatch, db_session: 
     assert failed is not None
     assert failed.job_reference == "linux"
     assert "provider network error" in failed.last_error
+
+
+@pytest.mark.asyncio
+async def test_discover_tanqeeb_daily_sweeps_every_topic_and_records_summary(
+    monkeypatch, db_session: AsyncSession
+):
+    """discover_tanqeeb_daily should run one restricted discover() call
+    per TOPIC_QUERIES entry (mocked here rather than hitting the real
+    site 5x — Tanqeeb's own real-search behavior is already covered
+    elsewhere) and write one summary scheduler_history row under
+    TANQEEB_DAILY_PROVIDER for SchedulerService.catch_up_scheduled_jobs()
+    to key off of."""
+    calls = []
+
+    async def fake_discover(self, *, query, location=None, provider="manual-run", providers=None):
+        calls.append({"query": query, "providers": providers})
+        return {"providers": 1, "discovered": 0, "inserted": 2, "duplicates": 0}
+
+    monkeypatch.setattr(DiscoveryService, "discover", fake_discover)
+
+    await discover_tanqeeb_daily()
+
+    assert len(calls) == 5  # one per TOPIC_QUERIES entry
+    assert all(c["providers"] == ["tanqeeb"] for c in calls)
+
+    result = await db_session.execute(
+        select(SchedulerHistory).where(SchedulerHistory.provider == TANQEEB_DAILY_PROVIDER)
+    )
+    history = result.scalars().first()
+    assert history is not None
+    assert history.status == "completed"
+    assert history.jobs_found == 10  # 5 topics * 2 inserted each
+
+
+@pytest.mark.asyncio
+async def test_discover_tanqeeb_daily_continues_past_a_failing_topic(
+    monkeypatch, db_session: AsyncSession
+):
+    call_count = 0
+
+    async def fake_discover(self, *, query, location=None, provider="manual-run", providers=None):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("provider network error")
+        return {"providers": 1, "discovered": 0, "inserted": 0, "duplicates": 0}
+
+    monkeypatch.setattr(DiscoveryService, "discover", fake_discover)
+
+    # Must not raise, and must still attempt the remaining topics.
+    await discover_tanqeeb_daily()
+    assert call_count == 5
 
 
 """recycle_browser regression tests: added 2026-08-06 after a live incident

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
+import { useState } from "react";
 
 import {
   deleteNotification,
@@ -12,6 +13,7 @@ import {
 import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/lib/i18n/language-context";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ import { cn } from "@/lib/utils";
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   const { data, isPending } = useQuery({
     queryKey: ["notifications"],
@@ -59,7 +62,7 @@ export default function NotificationsPage() {
             onClick={() => markAllMutation.mutate()}
             disabled={markAllMutation.isPending}
           >
-            تعليم الكل كمقروء
+            {t("notifications", "markAllRead")}
           </Button>
         )}
       </div>
@@ -81,7 +84,7 @@ export default function NotificationsPage() {
                   <p className="font-medium">{notification.title}</p>
                   {!notification.read_at && (
                     <Badge variant="secondary" className="text-xs">
-                      جديد
+                      {t("notifications", "new")}
                     </Badge>
                   )}
                 </div>
@@ -97,23 +100,32 @@ export default function NotificationsPage() {
                     size="sm"
                     onClick={() => markReadMutation.mutate(notification.id)}
                   >
-                    قراءة
+                    {t("notifications", "markAsRead")}
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => deleteMutation.mutate(notification.id)}
+                  onClick={() => setDeleteTargetId(notification.id)}
                 >
-                  حذف
+                  {t("common", "delete")}
                 </Button>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">مفيش إشعارات لسه.</p>
+        <p className="text-sm text-muted-foreground">{t("notifications", "noNotificationsYet")}</p>
       )}
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+        isPending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTargetId !== null) deleteMutation.mutate(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+      />
     </div>
   );
 }

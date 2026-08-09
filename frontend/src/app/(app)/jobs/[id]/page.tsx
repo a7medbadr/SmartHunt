@@ -30,11 +30,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EstimatedProgressBar } from "@/components/ui/estimated-progress-bar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useEstimatedProgress } from "@/hooks/use-estimated-progress";
+import { useTranslation } from "@/lib/i18n/language-context";
 
 const EMAIL_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 
@@ -72,6 +74,9 @@ export default function JobDetailsPage() {
   const params = useParams<{ id: string }>();
   const jobId = Number(params.id);
   const queryClient = useQueryClient();
+  const { t, locale } = useTranslation();
+  const [deleteNoteId, setDeleteNoteId] = useState<number | null>(null);
+  const [deleteTagId, setDeleteTagId] = useState<number | null>(null);
 
   const jobQuery = useQuery({
     queryKey: ["job", jobId],
@@ -131,7 +136,7 @@ export default function JobDetailsPage() {
 
   const interviewPrepMutation = useMutation({
     mutationKey: AI_MUTATION_KEY,
-    mutationFn: () => generateInterviewPrep(resumeText, jobText()),
+    mutationFn: () => generateInterviewPrep(resumeText, jobText(), locale),
   });
   const interviewPrepProgress = useEstimatedProgress(interviewPrepMutation.isPending, 150000);
 
@@ -218,7 +223,7 @@ export default function JobDetailsPage() {
   }
 
   if (jobQuery.isError || !jobQuery.data) {
-    return <p className="text-sm text-destructive">الوظيفة دي مش موجودة.</p>;
+    return <p className="text-sm text-destructive">{t("jobDetail", "notFound")}</p>;
   }
 
   const job = jobQuery.data;
@@ -232,12 +237,12 @@ export default function JobDetailsPage() {
               <CardTitle className="text-xl">{job.title}</CardTitle>
               {job.no_sponsorship_signal && (
                 <Badge variant="destructive" className="text-xs">
-                  بدون رعاية تأشيرة
+                  {t("jobDetail", "noSponsorship")}
                 </Badge>
               )}
               {job.post_url && (
                 <Badge variant="outline" className="gap-1 text-xs text-sky-400">
-                  من بوست لينكدان
+                  {t("jobDetail", "fromLinkedinPost")}
                 </Badge>
               )}
             </div>
@@ -250,7 +255,7 @@ export default function JobDetailsPage() {
             size="icon"
             onClick={() => toggleFavorite.mutate()}
             disabled={toggleFavorite.isPending}
-            aria-label="مفضلة"
+            aria-label={t("jobDetail", "addToFavorites")}
           >
             <Star className={isFavorite ? "fill-current" : ""} />
           </Button>
@@ -263,13 +268,13 @@ export default function JobDetailsPage() {
               rel="noopener noreferrer"
               className="text-sm text-sky-400 underline"
             >
-              رابط البوست الأصلي على لينكدان
+              {t("jobDetail", "originalPostLink")}
             </a>
           )}
           {job.description && <p className="whitespace-pre-wrap">{job.description}</p>}
           {job.requirements && (
             <div>
-              <h3 className="mb-1 font-medium">المتطلبات</h3>
+              <h3 className="mb-1 font-medium">{t("jobDetail", "requirements")}</h3>
               <p className="whitespace-pre-wrap text-muted-foreground">
                 {job.requirements}
               </p>
@@ -282,7 +287,7 @@ export default function JobDetailsPage() {
               rel="noopener noreferrer"
               className="text-sm underline"
             >
-              رابط الوظيفة الأصلي
+              {t("jobDetail", "originalJobLink")}
             </a>
           )}
 
@@ -292,7 +297,7 @@ export default function JobDetailsPage() {
                 key={tag.id}
                 variant="secondary"
                 className="cursor-pointer"
-                onClick={() => removeTag.mutate(tag.id)}
+                onClick={() => setDeleteTagId(tag.id)}
               >
                 {tag.tag} ×
               </Badge>
@@ -306,13 +311,13 @@ export default function JobDetailsPage() {
             className="flex gap-2"
           >
             <Input
-              placeholder="ضيف Tag (مثلاً: Remote)"
+              placeholder={t("jobDetail", "addTagPlaceholder")}
               value={tagText}
               onChange={(e) => setTagText(e.target.value)}
               className="max-w-xs"
             />
             <Button type="submit" variant="secondary" disabled={addTag.isPending}>
-              إضافة
+              {t("jobDetail", "addTag")}
             </Button>
           </form>
         </CardContent>
@@ -322,13 +327,13 @@ export default function JobDetailsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4" />
-            تحليل عميق بالذكاء الاصطناعي
+            {t("jobDetail", "deepAiAnalysis")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {!resumeQuery.isPending && !resumeText && (
             <p className="text-sm text-destructive">
-              لسه مفيش سيرة ذاتية مرفوعة — ارفعها من صفحة السيرة الذاتية الأول.
+              {t("jobDetail", "noResumeUploaded")}
             </p>
           )}
           <div className="flex items-center gap-3">
@@ -337,36 +342,36 @@ export default function JobDetailsPage() {
               disabled={!resumeText.trim() || analyzeMutation.isPending || aiBusyElsewhere}
               className="self-start"
             >
-              {analyzeMutation.isPending ? "جاري التحليل..." : "ابدأ التحليل"}
+              {analyzeMutation.isPending ? t("jobDetail", "analyzing") : t("jobDetail", "startAnalysis")}
             </Button>
             {analyzeMutation.isPending && <EstimatedProgressBar percent={analyzeProgress} />}
           </div>
 
           {aiBusyElsewhere && !analyzeMutation.isPending && (
             <p className="text-xs text-muted-foreground">
-              في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+              {t("jobDetail", "aiBusyElsewhere")}
             </p>
           )}
           {analyzeMutation.isError && (
             <p className="text-sm text-destructive">
-              التحليل فشل — ممكن يكون النموذج مشغول، جرب تاني.
+              {t("jobDetail", "analysisFailed")}
             </p>
           )}
 
           {analyzeMutation.data && (
             <div className="flex flex-col gap-3 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">نسبة التطابق:</span>
+                <span className="text-sm text-muted-foreground">{t("jobDetail", "matchScore")}</span>
                 <Badge>{analyzeMutation.data.score}%</Badge>
                 {analyzeMutation.data.missing_skills.map((skill) => (
                   <Badge key={skill} variant="outline">
-                    ناقص: {skill}
+                    {t("jobDetail", "missingSkill").replace("{skill}", skill)}
                   </Badge>
                 ))}
               </div>
               {analyzeMutation.data.provider === "local" ? (
                 <p className="text-sm text-muted-foreground">
-                  الذكاء الاصطناعي كان مشغول وقت التحليل ده، جرب تاني بعد شوية.
+                  {t("jobDetail", "aiBusyDuringAnalysis")}
                 </p>
               ) : (
                 <AnalysisMarkdown text={analyzeMutation.data.ai_summary} />
@@ -380,7 +385,7 @@ export default function JobDetailsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <MessageCircleQuestion className="size-4" />
-            جهزني للمقابلة الشخصية
+            {t("jobDetail", "interviewPrepTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -390,7 +395,9 @@ export default function JobDetailsPage() {
               disabled={!resumeText.trim() || interviewPrepMutation.isPending || aiBusyElsewhere}
               className="self-start"
             >
-              {interviewPrepMutation.isPending ? "جاري التجهيز..." : "جهزلي أسئلة المقابلة"}
+              {interviewPrepMutation.isPending
+                ? t("jobDetail", "preparing")
+                : t("jobDetail", "prepareInterviewQuestions")}
             </Button>
             {interviewPrepMutation.isPending && (
               <EstimatedProgressBar percent={interviewPrepProgress} />
@@ -399,12 +406,12 @@ export default function JobDetailsPage() {
 
           {aiBusyElsewhere && !interviewPrepMutation.isPending && (
             <p className="text-xs text-muted-foreground">
-              في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+              {t("jobDetail", "aiBusyElsewhere")}
             </p>
           )}
           {interviewPrepMutation.isError && (
             <p className="text-sm text-destructive">
-              حصل خطأ — ممكن يكون النموذج مشغول، جرب تاني.
+              {t("jobDetail", "genericError")}
             </p>
           )}
 
@@ -420,15 +427,12 @@ export default function JobDetailsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <FileText className="size-4 text-violet-400" />
-            سيرة ذاتية مخصصة لهذه الوظيفة
+            {t("jobDetail", "tailoredResumeTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            بيحافظ على سيرتك الذاتية الأصلية زي ما هي (التواريخ والشركات والإنجازات)
-            ويضيف ملخص مهني مكتوب خصيصًا للوظيفة دي فوقها. النسخة دي هي اللي هتتستخدم
-            تلقائيًا لو قدّمنا على الوظيفة دي بالـ Auto Apply، وممكن كمان تنزّلها وتقدّم
-            بيها بنفسك.
+            {t("jobDetail", "tailoredResumeBody")}
           </p>
 
           <div className="flex items-center gap-3">
@@ -438,10 +442,10 @@ export default function JobDetailsPage() {
               className="self-start"
             >
               {tailorResumeMutation.isPending
-                ? "جاري الإنشاء..."
+                ? t("jobDetail", "generating")
                 : tailoredResumeQuery.data
-                  ? "أعد الإنشاء"
-                  : "أنشئ سيرة ذاتية مخصصة"}
+                  ? t("jobDetail", "regenerate")
+                  : t("jobDetail", "generateTailoredResume")}
             </Button>
             {tailorResumeMutation.isPending && (
               <EstimatedProgressBar percent={tailorResumeProgress} />
@@ -450,27 +454,27 @@ export default function JobDetailsPage() {
 
           {aiBusyElsewhere && !tailorResumeMutation.isPending && (
             <p className="text-xs text-muted-foreground">
-              في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+              {t("jobDetail", "aiBusyElsewhere")}
             </p>
           )}
           {tailorResumeMutation.isError && (
-            <p className="text-sm text-destructive">حصل خطأ، جرب تاني.</p>
+            <p className="text-sm text-destructive">{t("jobDetail", "simpleError")}</p>
           )}
 
           {(tailorResumeMutation.data ?? tailoredResumeQuery.data) && (
             <div className="flex flex-col gap-3 rounded-md border p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">نسبة التطابق:</span>
+                <span className="text-sm text-muted-foreground">{t("jobDetail", "matchScore")}</span>
                 <Badge>{(tailorResumeMutation.data ?? tailoredResumeQuery.data)?.score}%</Badge>
                 {(tailorResumeMutation.data ?? tailoredResumeQuery.data)?.missing_skills.map(
                   (skill) => (
                     <Badge key={skill} variant="outline">
-                      ناقص: {skill}
+                      {t("jobDetail", "missingSkill").replace("{skill}", skill)}
                     </Badge>
                   ),
                 )}
               </div>
-              <p className="text-sm font-medium">الملخص المضاف:</p>
+              <p className="text-sm font-medium">{t("jobDetail", "addedSummary")}</p>
               <p className="text-sm text-muted-foreground">
                 {(tailorResumeMutation.data ?? tailoredResumeQuery.data)?.summary}
               </p>
@@ -484,20 +488,19 @@ export default function JobDetailsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Mail className="size-4 text-cyan-400" />
-              التقديم بالإيميل
+              {t("jobDetail", "emailApplyTitle")}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              الوظيفة دي فيها إيميل للتواصل في الوصف — جهزلك إيميل تقديم، راجعه أو
-              عدّله زي ما تحب، وبعدين ابعته من هنا.
+              {t("jobDetail", "emailApplyBody")}
             </p>
 
             {emailSentApplicationId ? (
               <p className="text-sm text-primary">
-                تم إرسال الإيميل وتسجيل التقديم —{" "}
+                {t("jobDetail", "emailSentMessage")}{" "}
                 <Link href="/applications" className="underline">
-                  شوف حالته في التقديمات
+                  {t("jobDetail", "viewInApplications")}
                 </Link>
                 .
               </p>
@@ -509,7 +512,9 @@ export default function JobDetailsPage() {
                     disabled={!resumeText.trim() || draftEmailMutation.isPending || aiBusyElsewhere}
                     className="self-start"
                   >
-                    {draftEmailMutation.isPending ? "جاري التجهيز..." : "جهزلي الإيميل"}
+                    {draftEmailMutation.isPending
+                      ? t("jobDetail", "preparing")
+                      : t("jobDetail", "prepareEmail")}
                   </Button>
                   {draftEmailMutation.isPending && (
                     <EstimatedProgressBar percent={draftEmailProgress} />
@@ -518,18 +523,18 @@ export default function JobDetailsPage() {
 
           {aiBusyElsewhere && !draftEmailMutation.isPending && (
             <p className="text-xs text-muted-foreground">
-              في طلب ذكاء اصطناعي شغال دلوقتي في مكان تاني — استنى لحد ما يخلص.
+              {t("jobDetail", "aiBusyElsewhere")}
             </p>
           )}
                 {draftEmailMutation.isError && (
-                  <p className="text-sm text-destructive">حصل خطأ، جرب تاني.</p>
+                  <p className="text-sm text-destructive">{t("jobDetail", "simpleError")}</p>
                 )}
 
                 {emailDraft && (
                   <div className="flex flex-col gap-3 rounded-md border p-3">
                     <div>
                       <label className="mb-1 block text-sm text-muted-foreground">
-                        هيتبعت لـ
+                        {t("jobDetail", "sendTo")}
                       </label>
                       <Input
                         value={emailDraft.recipientEmail}
@@ -539,14 +544,14 @@ export default function JobDetailsPage() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm text-muted-foreground">الموضوع</label>
+                      <label className="mb-1 block text-sm text-muted-foreground">{t("jobDetail", "subject")}</label>
                       <Input
                         value={emailDraft.subject}
                         onChange={(e) => setEmailDraft({ ...emailDraft, subject: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-sm text-muted-foreground">النص</label>
+                      <label className="mb-1 block text-sm text-muted-foreground">{t("jobDetail", "body")}</label>
                       <Textarea
                         value={emailDraft.body}
                         onChange={(e) => setEmailDraft({ ...emailDraft, body: e.target.value })}
@@ -558,11 +563,11 @@ export default function JobDetailsPage() {
                       disabled={sendEmailMutation.isPending}
                       className="self-start"
                     >
-                      {sendEmailMutation.isPending ? "جاري الإرسال..." : "ابعته"}
+                      {sendEmailMutation.isPending ? t("jobDetail", "sending") : t("jobDetail", "sendIt")}
                     </Button>
                     {sendEmailMutation.isError && (
                       <p className="text-sm text-destructive">
-                        حصل خطأ أثناء الإرسال، جرب تاني.
+                        {t("jobDetail", "sendError")}
                       </p>
                     )}
                   </div>
@@ -575,7 +580,7 @@ export default function JobDetailsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">الملاحظات</CardTitle>
+          <CardTitle className="text-base">{t("jobDetail", "notes")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {notesQuery.data?.map((note) => (
@@ -584,9 +589,9 @@ export default function JobDetailsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => removeNote.mutate(note.id)}
+                onClick={() => setDeleteNoteId(note.id)}
               >
-                حذف
+                {t("common", "delete")}
               </Button>
             </div>
           ))}
@@ -599,16 +604,34 @@ export default function JobDetailsPage() {
             className="flex flex-col gap-2"
           >
             <Textarea
-              placeholder="اكتب ملاحظة..."
+              placeholder={t("jobDetail", "notePlaceholder")}
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
             />
             <Button type="submit" disabled={addNote.isPending} className="self-start">
-              حفظ الملاحظة
+              {t("jobDetail", "saveNote")}
             </Button>
           </form>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={deleteNoteId !== null}
+        onOpenChange={(open) => !open && setDeleteNoteId(null)}
+        isPending={removeNote.isPending}
+        onConfirm={() => {
+          if (deleteNoteId !== null) removeNote.mutate(deleteNoteId);
+          setDeleteNoteId(null);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteTagId !== null}
+        onOpenChange={(open) => !open && setDeleteTagId(null)}
+        isPending={removeTag.isPending}
+        onConfirm={() => {
+          if (deleteTagId !== null) removeTag.mutate(deleteTagId);
+          setDeleteTagId(null);
+        }}
+      />
     </div>
   );
 }

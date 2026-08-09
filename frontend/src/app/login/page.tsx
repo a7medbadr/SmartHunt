@@ -6,11 +6,13 @@ import { AxiosError } from "axios";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { login } from "@/lib/auth-api";
 import { setToken } from "@/lib/auth";
+import { useTranslation } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,15 +29,23 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "اكتب اسم المستخدم"),
-  password: z.string().min(1, "اكتب كلمة المرور"),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = {
+  username: string;
+  password: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        username: z.string().min(1, t("auth", "usernameRequired")),
+        password: z.string().min(1, t("auth", "passwordRequired")),
+      }),
+    [t],
+  );
 
   const {
     register,
@@ -60,8 +70,8 @@ export default function LoginPage() {
   const serverError =
     mutation.error instanceof AxiosError
       ? mutation.error.response?.status === 401
-        ? "اسم المستخدم أو كلمة المرور غلط"
-        : "حصل خطأ، جرب تاني"
+        ? t("auth", "invalidCredentials")
+        : t("auth", "genericError")
       : undefined;
 
   return (
@@ -72,13 +82,13 @@ export default function LoginPage() {
             <Search className="size-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-xl">SmartHunt</CardTitle>
-          <CardDescription>سجّل دخولك للمتابعة</CardDescription>
+          <CardDescription>{t("auth", "loginTagline")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} noValidate>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="username">اسم المستخدم</FieldLabel>
+                <FieldLabel htmlFor="username">{t("auth", "username")}</FieldLabel>
                 <Input
                   id="username"
                   autoComplete="username"
@@ -89,7 +99,7 @@ export default function LoginPage() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="password">كلمة المرور</FieldLabel>
+                <FieldLabel htmlFor="password">{t("auth", "password")}</FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -106,13 +116,13 @@ export default function LoginPage() {
               )}
 
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? "جاري الدخول..." : "دخول"}
+                {mutation.isPending ? t("auth", "loggingIn") : t("auth", "login")}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                لسه معملتش حساب؟{" "}
+                {t("auth", "noAccountYet")}{" "}
                 <Link href="/register" className="underline">
-                  إنشاء حساب
+                  {t("auth", "createAccount")}
                 </Link>
               </p>
             </FieldGroup>

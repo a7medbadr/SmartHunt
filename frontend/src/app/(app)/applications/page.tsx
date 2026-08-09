@@ -18,6 +18,7 @@ import { PageGlow } from "@/components/page-glow";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +59,7 @@ export default function ApplicationsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");
   const [url, setUrl] = useState("");
@@ -95,11 +97,11 @@ export default function ApplicationsPage() {
     onSuccess: (item) => {
       setQuickApplyResult(
         item.status === "SUCCESS"
-          ? "تم التقديم تلقائيًا بنجاح! هتوصلك رسالة تأكيد."
-          : `التقديم التلقائي فشل (الحالة: ${item.status}). ممكن الوظيفة محتاجة تدخل يدوي.`,
+          ? t("applications", "quickApplySuccess")
+          : t("applications", "quickApplyFailed").replace("{status}", item.status),
       );
     },
-    onError: () => setQuickApplyResult("حصل خطأ أثناء محاولة التقديم التلقائي."),
+    onError: () => setQuickApplyResult(t("applications", "quickApplyError")),
   });
 
   return (
@@ -118,10 +120,12 @@ export default function ApplicationsPage() {
             if (!open) setQuickApplyResult(null);
           }}
         >
-          <DialogTrigger className={buttonVariants()}>تقديم جديد</DialogTrigger>
+          <DialogTrigger className={buttonVariants()}>
+            {t("applications", "newApplication")}
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>إضافة تقديم</DialogTitle>
+              <DialogTitle>{t("applications", "addApplicationTitle")}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={(e) => {
@@ -135,25 +139,27 @@ export default function ApplicationsPage() {
               className="flex flex-col gap-3"
             >
               <Input
-                placeholder="المسمى الوظيفي"
+                placeholder={t("applications", "jobTitlePlaceholder")}
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 required
               />
               <Input
-                placeholder="الشركة"
+                placeholder={t("applications", "companyPlaceholder")}
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 required
               />
               <Input
-                placeholder="رابط الوظيفة (اختياري)"
+                placeholder={t("applications", "urlPlaceholder")}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
               <div className="flex gap-2">
                 <Button type="submit" disabled={createMutation.isPending} className="flex-1">
-                  {createMutation.isPending ? "جاري الحفظ..." : "حفظ فقط"}
+                  {createMutation.isPending
+                    ? t("applications", "saving")
+                    : t("applications", "saveOnly")}
                 </Button>
                 <Button
                   type="button"
@@ -165,7 +171,9 @@ export default function ApplicationsPage() {
                   }
                 >
                   <Zap className="size-4" />
-                  {quickApplyMutation.isPending ? "بيقدّم دلوقتي..." : "قدّم تلقائيًا الآن"}
+                  {quickApplyMutation.isPending
+                    ? t("applications", "quickApplying")
+                    : t("applications", "quickApplyNow")}
                 </Button>
               </div>
               {quickApplyResult && (
@@ -192,7 +200,7 @@ export default function ApplicationsPage() {
           })}
           <Card className="min-w-28">
             <CardContent className="flex flex-col gap-1 p-3">
-              <span className="text-xs text-muted-foreground">الإجمالي</span>
+              <span className="text-xs text-muted-foreground">{t("applications", "total")}</span>
               <span className="text-xl font-semibold">{data.length}</span>
             </CardContent>
           </Card>
@@ -205,10 +213,10 @@ export default function ApplicationsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>المسمى الوظيفي</TableHead>
-              <TableHead>الشركة</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>تاريخ التقديم</TableHead>
+              <TableHead>{t("applications", "jobTitleHeader")}</TableHead>
+              <TableHead>{t("applications", "companyHeader")}</TableHead>
+              <TableHead>{t("applications", "statusHeader")}</TableHead>
+              <TableHead>{t("applications", "appliedDateHeader")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -231,7 +239,10 @@ export default function ApplicationsPage() {
                     )}
                     {app.needs_follow_up && (
                       <Badge variant="secondary" className="text-xs">
-                        محتاج متابعة ({app.days_since_applied} يوم)
+                        {t("applications", "needsFollowUp").replace(
+                          "{days}",
+                          String(app.days_since_applied),
+                        )}
                       </Badge>
                     )}
                   </div>
@@ -267,14 +278,14 @@ export default function ApplicationsPage() {
                       href={`/applications/${app.id}`}
                       className={buttonVariants({ variant: "ghost", size: "sm" })}
                     >
-                      المحادثة
+                      {t("applications", "conversation")}
                     </Link>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(app.id)}
+                      onClick={() => setDeleteTargetId(app.id)}
                     >
-                      حذف
+                      {t("common", "delete")}
                     </Button>
                   </div>
                 </TableCell>
@@ -283,8 +294,17 @@ export default function ApplicationsPage() {
           </TableBody>
         </Table>
       ) : (
-        <p className="text-sm text-muted-foreground">لسه مفيش تقديمات مسجلة.</p>
+        <p className="text-sm text-muted-foreground">{t("applications", "noApplicationsYet")}</p>
       )}
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => !open && setDeleteTargetId(null)}
+        isPending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTargetId !== null) deleteMutation.mutate(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+      />
     </div>
   );
 }

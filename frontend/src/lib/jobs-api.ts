@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 
+export type ReviewStatus = "applied" | "not_suitable";
+
 export interface Job {
   id: number;
   title: string;
@@ -14,6 +16,7 @@ export interface Job {
   post_url?: string | null;
   score?: number | null;
   no_sponsorship_signal?: boolean;
+  review_status?: ReviewStatus | null;
 }
 
 export interface SearchResult {
@@ -27,6 +30,13 @@ export interface SearchParams {
   keyword?: string;
   location?: string;
   source?: string;
+  // Excludes exact source(s) from the results (comma-separated for more
+  // than one) — used to keep LinkedIn-post/WhatsApp-message-sourced jobs
+  // out of the job-sites tab, which each have their own separate tab.
+  excludeSource?: string;
+  // The owner's own triage: "applied" | "not_suitable" | "none"
+  // (unreviewed only). Omit for "all".
+  reviewStatus?: string;
   sort?: string;
   order?: "asc" | "desc";
   page?: number;
@@ -34,12 +44,31 @@ export interface SearchParams {
 }
 
 export async function searchJobs(params: SearchParams): Promise<SearchResult> {
-  const { data } = await apiClient.get<SearchResult>("/search/jobs", { params });
+  const { excludeSource, reviewStatus, ...rest } = params;
+  const { data } = await apiClient.get<SearchResult>("/search/jobs", {
+    params: { ...rest, exclude_source: excludeSource, review_status: reviewStatus },
+  });
   return data;
 }
 
 export async function getJob(id: number): Promise<Job> {
   const { data } = await apiClient.get<Job>(`/jobs/${id}`);
+  return data;
+}
+
+export async function deleteJob(id: number): Promise<void> {
+  await apiClient.delete(`/jobs/${id}`);
+}
+
+// Setting null clears the review status back to unreviewed — used to
+// toggle a status off (click "applied" again to un-mark it).
+export async function updateJobReviewStatus(
+  id: number,
+  reviewStatus: ReviewStatus | null,
+): Promise<Job> {
+  const { data } = await apiClient.patch<Job>(`/jobs/${id}/review-status`, {
+    review_status: reviewStatus,
+  });
   return data;
 }
 

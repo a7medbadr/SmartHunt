@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
+
 import pytest
 from httpx import AsyncClient
 from fastapi import status
 
+from smarthunt.database.models.application import Application
 from smarthunt.database.models.job import Job
 
 
@@ -14,6 +17,8 @@ async def test_get_dashboard_statistics_empty_db(client: AsyncClient):
     assert "applications" in data
     assert "favorites" in data
     assert "linkedin_posts" in data
+    assert "whatsapp_posts" in data
+    assert "job_sites" in data
     assert "providers" in data
     assert isinstance(data["jobs"], int)
 
@@ -41,10 +46,76 @@ async def test_dashboard_statistics_reflects_real_data(client: AsyncClient, db_s
             post_url="https://www.linkedin.com/feed/#dashboard-stats-test",
         )
     )
+    db_session.add(
+        Job(
+            title="Dashboard Stats WhatsApp Message Job",
+            company="WhatsApp Channel",
+            location="Saudi Arabia",
+            source="whatsapp_message",
+            url="https://whatsapp.com/channel/dashboard-stats-test#msg-1",
+            post_url="https://whatsapp.com/channel/dashboard-stats-test#msg-1",
+        )
+    )
     await db_session.commit()
 
     after = (await client.get("/api/v1/dashboard/statistics")).json()
 
-    assert after["jobs"] == before["jobs"] + 2
+    assert after["jobs"] == before["jobs"] + 3
     assert after["linkedin_posts"] == before["linkedin_posts"] + 1
+    assert after["whatsapp_posts"] == before["whatsapp_posts"] + 1
+    assert after["job_sites"] == before["job_sites"] + 1
     assert after["providers"] > 0
+
+
+@pytest.mark.asyncio
+async def test_get_dashboard_timeseries_default_range(client: AsyncClient):
+    response = await client.get("/api/v1/dashboard/timeseries")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data["points"]) == 14
+    today = data["points"][-1]
+    for key in ("date", "job_sites", "linkedin_posts", "whatsapp_posts", "applications"):
+        assert key in today
+
+
+@pytest.mark.asyncio
+async def test_dashboard_timeseries_reflects_todays_activity(client: AsyncClient, db_session):
+    before = (await client.get("/api/v1/dashboard/timeseries?days=7")).json()
+    before_today = before["points"][-1]
+
+    db_session.add(
+        Job(
+            title="Timeseries Test Job Site",
+            company="Acme",
+            location="Riyadh, Saudi Arabia",
+            source="linkedin",
+            url="https://example.com/jobs/timeseries-site-test",
+        )
+    )
+    db_session.add(
+        Job(
+            title="Timeseries Test LinkedIn Post",
+            company="LinkedIn Post",
+            location="Saudi Arabia",
+            source="linkedin_post",
+            url="https://example.com/jobs/timeseries-post-test",
+            post_url="https://www.linkedin.com/feed/#timeseries-test",
+        )
+    )
+    db_session.add(
+        Application(
+            job_title="Timeseries Test Application",
+            company="Acme",
+            status="APPLIED",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    await db_session.commit()
+
+    after = (await client.get("/api/v1/dashboard/timeseries?days=7")).json()
+    after_today = after["points"][-1]
+
+    assert after_today["date"] == before_today["date"]
+    assert after_today["job_sites"] == before_today["job_sites"] + 1
+    assert after_today["linkedin_posts"] == before_today["linkedin_posts"] + 1
+    assert after_today["applications"] == before_today["applications"] + 1
