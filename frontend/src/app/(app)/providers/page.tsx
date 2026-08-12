@@ -35,6 +35,10 @@ export default function ProvidersPage() {
     queryFn: listProviders,
   });
 
+  const sortedProviders = data
+    ? [...data].sort((a, b) => Number(b.real_discovery) - Number(a.real_discovery))
+    : data;
+
   const toggleMutation = useMutation({
     mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
       setProviderEnabled(name, enabled),
@@ -115,7 +119,7 @@ export default function ProvidersPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data?.map((provider) => (
+          {sortedProviders?.map((provider) => (
             <Card key={provider.name}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base capitalize">{provider.name}</CardTitle>

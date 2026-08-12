@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +42,15 @@ TOPIC_QUERIES = {
 # only, per the project owner's explicit requirement.
 DISCOVERY_LOCATION = "Saudi Arabia"
 
+# Kept in sync with scheduler/jobs.py's DISCOVERY_CALL_TIMEOUT_SECONDS
+# (same circular-import reason as DISCOVERY_LOCATION above) — see that
+# constant's own comment for why every discover() call here needs a
+# bound: an unbounded hang on one retried job would silently freeze this
+# whole 30-minute sweep (and every later FAILED job queued behind it)
+# forever, the exact bug this project has now hit on the scheduled
+# discovery jobs themselves.
+DISCOVERY_CALL_TIMEOUT_SECONDS = 300
+
 
 class SchedulerRetryWorker:
     """Actually retries FAILED scheduler jobs, up to MAX_RETRIES, instead
@@ -74,10 +85,13 @@ class SchedulerRetryWorker:
                     await failed_scheduler_job_service.mark_running(db, updated)
 
                     try:
-                        await DiscoveryService(db).discover(
-                            query=query,
-                            location=DISCOVERY_LOCATION,
-                            provider=updated.provider,
+                        await asyncio.wait_for(
+                            DiscoveryService(db).discover(
+                                query=query,
+                                location=DISCOVERY_LOCATION,
+                                provider=updated.provider,
+                            ),
+                            timeout=DISCOVERY_CALL_TIMEOUT_SECONDS,
                         )
                         updated = await failed_scheduler_job_service.mark_success(db, updated)
                     except Exception as exc:

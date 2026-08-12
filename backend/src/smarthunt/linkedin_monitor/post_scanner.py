@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+from datetime import date, datetime, timedelta, timezone
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -209,8 +210,74 @@ async def _expand_and_read_text(container) -> str:
     return (await container.inner_text()).strip()
 
 
+# LinkedIn never shows an exact date on a post older than a few hours —
+# only a rounded relative marker ("12m", "3h", "1d", "2w", "6mo")
+# immediately followed by a "•" (before "Following"/"Visible to anyone"/
+# a repost's connection-degree badge). Used to approximate a real
+# calendar date for a deep backfill's cutoff check — "mo" must be tried
+# before the single-letter alternatives so "6mo" doesn't get misread as
+# "6m" (6 minutes); the trailing "•" requirement keeps this from
+# accidentally matching an unrelated "10 years experience"-style number
+# inside a post's own body text, which has no bullet right after it.
+#
+# Deliberately has NO year-scale unit ("y"/"yr") at all — found live
+# 2026-08-11 running a real deep hashtag backfill: several different
+# hashtag scans each independently produced the exact same implausible
+# "~6 years old" reading on an otherwise-normal, newest-first-sorted
+# results page. Bounding the search window (an earlier attempted fix)
+# did not stop it recurring on a second run, and a targeted live replay
+# of the same scroll sequence couldn't reproduce a single year-scale
+# match either, which points to something transient in LinkedIn's own
+# markup for a small subset of cards rather than a fixable extraction
+# bug on this end. Every real use of this — the Jan-1-2026 backfill
+# cutoff was at most ~7.5 months away at the time this was built — only
+# ever needs to resolve up to "mo" scale, so rather than keep trusting a
+# unit that's demonstrably produced false positives with no identified
+# root cause, it's excluded outright: a post whose card actually reads
+# "N yr" simply yields no age signal (silently skipped for cutoff
+# purposes, same safe fallback as any other unrecognized marker) instead
+# of a wrong, unverifiable calendar date.
+_RELATIVE_AGE_PATTERN = re.compile(r"(\d+)\s*(mo|[mhdw])\s*•", re.IGNORECASE)
+_AGE_UNIT_TO_DAYS = {
+    "m": 1 / 1440,
+    "h": 1 / 24,
+    "d": 1.0,
+    "w": 7.0,
+    "mo": 30.0,
+}
+
+
+_RELATIVE_AGE_SEARCH_WINDOW = 500
+
+
+def _extract_relative_age_days(raw_text: str) -> float | None:
+    """Best-effort — returns None (never used for a cutoff decision) if no
+    marker is found rather than guessing. Only searches the first
+    _RELATIVE_AGE_SEARCH_WINDOW characters, since the real per-post marker
+    is always near the very start of a card's text (right after the
+    author name) — narrower and safer than searching the whole card,
+    especially for `_extract_new_feed_posts`'s post_card ancestor xpath,
+    which can fall back to matching a much broader (occasionally
+    page-wide) container when a post doesn't have the expected nearby
+    control-menu button."""
+    match = _RELATIVE_AGE_PATTERN.search(raw_text[:_RELATIVE_AGE_SEARCH_WINDOW])
+    if not match:
+        return None
+    per_unit = _AGE_UNIT_TO_DAYS.get(match.group(2).lower())
+    if per_unit is None:
+        return None
+    return int(match.group(1)) * per_unit
+
+
+def _post_date_from_age(age_days: float) -> date:
+    return datetime.now(timezone.utc).date() - timedelta(days=age_days)
+
+
 async def _extract_posts_from_page(page, limit: int) -> list[dict]:
-    """Profile "recent activity" pages — real data-urn-based permalinks."""
+    """Profile "recent activity" pages — real data-urn-based permalinks.
+    Returns posts in DOM order (newest first, matching how LinkedIn always
+    renders this page) — callers doing a cutoff-bounded deep scroll rely
+    on that ordering to treat the last item as the oldest scanned so far."""
     posts: list[dict] = []
 
     containers = page.locator(POST_CONTAINER_SELECTOR)
@@ -227,13 +294,21 @@ async def _extract_posts_from_page(page, limit: int) -> list[dict]:
                 continue
             seen_urns.add(urn)
 
-            text = _clean_post_text(await _expand_and_read_text(container))
+            raw_text = await _expand_and_read_text(container)
+            text = _clean_post_text(raw_text)
             if not text:
                 continue
 
             post_url = f"https://www.linkedin.com/feed/update/{urn}/"
 
-            posts.append({"urn": urn, "text": text, "post_url": post_url})
+            posts.append(
+                {
+                    "urn": urn,
+                    "text": text,
+                    "post_url": post_url,
+                    "age_days": _extract_relative_age_days(raw_text),
+                }
+            )
         except Exception:
             # A single malformed post shouldn't fail the whole scan.
             continue
@@ -287,7 +362,9 @@ async def _resolve_real_feed_post_url(page, post_container, fallback_url: str) -
     return fallback_url
 
 
-async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list[dict]:
+async def _extract_new_feed_posts(
+    page, seen_keys: set[str], limit: int, track_age: bool = False
+) -> list[dict]:
     """Extracts whatever FEED_POST_SELECTOR-matching posts are *currently*
     in the DOM that aren't already in `seen_keys` (mutated in place as new
     ones are found) — pulled out of the old single-shot
@@ -303,7 +380,12 @@ async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list
     that actually looks job-relevant, _resolve_real_feed_post_url
     upgrades that to the real permalink via the post's own "Copy link to
     post" menu action so clicking through from a saved job actually lands
-    on that specific post, not just the feed."""
+    on that specific post, not just the feed. track_age=True (opt-in,
+    only used by a cutoff-bounded deep scroll — see _scan_feed_style_page)
+    also fetches the post's own card ancestor for every post, not just
+    job-relevant ones, to read LinkedIn's rounded relative-age marker
+    ("3h", "2w", "6mo") off of it — an extra Playwright round-trip per
+    post, skipped entirely when no caller needs it."""
     posts: list[dict] = []
 
     containers = page.locator(FEED_POST_SELECTOR)
@@ -326,8 +408,10 @@ async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list
                 continue
 
             post_url = f"https://www.linkedin.com/feed/#{component_key}"
+            relevant = is_job_related_post(text)
+            age_days = None
 
-            if is_job_related_post(text):
+            if relevant or track_age:
                 # The post's own container isn't `container` itself (that's
                 # just the <p> holding the text) — the control menu button
                 # sits a few levels up, in the shared post card.
@@ -335,20 +419,54 @@ async def _extract_new_feed_posts(page, seen_keys: set[str], limit: int) -> list
                     "xpath=ancestor::*[.//button[starts-with(@aria-label,"
                     " 'Open control menu for post')]][1]"
                 )
-                post_url = await _resolve_real_feed_post_url(page, post_card, post_url)
+                if track_age:
+                    try:
+                        card_text = await post_card.inner_text()
+                        age_days = _extract_relative_age_days(card_text)
+                    except Exception:
+                        age_days = None
+                if relevant:
+                    post_url = await _resolve_real_feed_post_url(page, post_card, post_url)
 
-            posts.append({"urn": component_key, "text": text, "post_url": post_url})
+            posts.append(
+                {
+                    "urn": component_key,
+                    "text": text,
+                    "post_url": post_url,
+                    "age_days": age_days,
+                }
+            )
         except Exception:
             continue
 
     return posts
 
 
-async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
+async def scan_profile_posts(
+    profile_url: str,
+    limit: int = 50,
+    scroll_rounds: int = 0,
+    cutoff_date: date | None = None,
+) -> list[dict]:
     """Scans a specific LinkedIn profile's "recent activity" page for
     their own posts and reposts. Uses the persistent, authenticated
     "linkedin" browser context (same one login()/apply() use) since
-    viewing another member's activity requires being logged in."""
+    viewing another member's activity requires being logged in.
+
+    scroll_rounds/cutoff_date are opt-in (both default to "off", the
+    original single-pass/first-screen-only behavior every existing
+    caller — the manual scan button, the daily scheduled sweep — still
+    gets) — added 2026-08-11 for a real historical backfill request:
+    with scroll_rounds=0 this only ever reads whatever LinkedIn loaded
+    on first paint (~5 posts), which is fine for "did this account post
+    anything new since I last checked" but can't reach further back.
+    When scroll_rounds > 0, keeps scrolling (profile activity pages load
+    more posts as you go and, unlike the main feed, don't virtualize/
+    recycle old ones — confirmed live) until whichever comes first:
+    cutoff_date is reached (via each post's own rounded relative-age
+    marker, see _extract_relative_age_days), `limit` posts collected, 3
+    consecutive rounds add nothing new (genuinely reached the end of
+    this profile's activity history), or scroll_rounds is exhausted."""
     activity_url = profile_url.rstrip("/") + "/recent-activity/all/"
 
     if not browser_manager.is_running:
@@ -380,6 +498,24 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
             pass
 
         posts = await _extract_posts_from_page(page, limit)
+
+        stall_rounds = 0
+        for _ in range(scroll_rounds):
+            if len(posts) >= limit:
+                break
+            if cutoff_date is not None and posts and posts[-1]["age_days"] is not None:
+                if _post_date_from_age(posts[-1]["age_days"]) <= cutoff_date:
+                    break
+            await page.evaluate("() => window.scrollBy(0, 3000)")
+            await page.wait_for_timeout(2500)
+            new_posts = await _extract_posts_from_page(page, limit)
+            if len(new_posts) == len(posts):
+                stall_rounds += 1
+                if stall_rounds >= 3:
+                    break
+            else:
+                stall_rounds = 0
+            posts = new_posts
     except Exception as exc:
         logger.exception("linkedin_profile_scan_failed", extra={"profile_url": profile_url})
         raise LinkedInScanError(_classify_scan_error(exc)) from exc
@@ -394,14 +530,43 @@ async def scan_profile_posts(profile_url: str, limit: int = 50) -> list[dict]:
     return posts
 
 
-async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> list[dict]:
+def _feed_reached_cutoff(posts: list[dict], cutoff_date: date) -> bool:
+    """Looks at the age of the last few posts appended so far (not just
+    the very last one) since a virtualizing feed's extraction order isn't
+    perfectly chronological — the trailing window's oldest age is a
+    robust-enough signal of "how far back has this scroll actually
+    reached" for a stop decision."""
+    recent_ages = [p["age_days"] for p in posts[-10:] if p.get("age_days") is not None]
+    if not recent_ages:
+        return False
+    return _post_date_from_age(max(recent_ages)) <= cutoff_date
+
+
+async def _scan_feed_style_page(
+    url: str, limit: int, scroll_rounds: int, cutoff_date: date | None = None
+) -> list[dict]:
     """Shared navigate/scroll/extract flow for any page that renders the
     same obfuscated feed-post markup (`FEED_POST_SELECTOR`) — the home
     feed itself, and LinkedIn's hashtag pages, which found live
     2026-08-04 actually redirect to `/search/results/all?keywords=%23...`
     rather than staying on `/feed/hashtag/...`, but render posts with the
     exact same component, so the exact same extraction/relevance/real-
-    link-resolution logic applies unchanged."""
+    link-resolution logic applies unchanged.
+
+    cutoff_date (opt-in, added 2026-08-11 for a real historical backfill
+    request) stops scrolling once recently-extracted posts' own rounded
+    relative-age markers ("3h", "2w", "6mo") indicate we've scrolled
+    back past that date — best-effort given this page virtualizes/
+    recycles old post DOM nodes as new ones load (unlike profile
+    activity pages), so age is checked against a small trailing window
+    of the most recently appended posts rather than assuming strict
+    newest-to-oldest order. Also stops after 5 consecutive rounds add
+    zero new posts (genuinely exhausted whatever this search/feed has to
+    offer) — for a broad, high-volume hashtag this will hit `scroll_rounds`
+    long before either of those, which is an expected, honest outcome:
+    LinkedIn's real-time post volume under a term like #Hiring is high
+    enough that "scroll back to a date months ago" isn't reachable in a
+    single bounded session no matter how patient the caller is."""
     if not browser_manager.is_running:
         try:
             await browser_manager.launch()
@@ -453,15 +618,26 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
         # rounds so nothing gets double-counted. Also stops scrolling
         # early once `limit` unique posts have been found, instead of
         # always burning the full scroll_rounds budget regardless.
+        track_age = cutoff_date is not None
         seen_keys: set[str] = set()
-        posts = await _extract_new_feed_posts(page, seen_keys, limit)
+        posts = await _extract_new_feed_posts(page, seen_keys, limit, track_age)
 
+        stall_rounds = 0
         for _ in range(scroll_rounds):
             if len(seen_keys) >= limit:
                 break
+            if cutoff_date is not None and _feed_reached_cutoff(posts, cutoff_date):
+                break
             await page.evaluate("() => document.querySelector('main')?.scrollBy(0, 2000)")
             await page.wait_for_timeout(2500)
-            posts.extend(await _extract_new_feed_posts(page, seen_keys, limit))
+            new_batch = await _extract_new_feed_posts(page, seen_keys, limit, track_age)
+            if not new_batch:
+                stall_rounds += 1
+                if stall_rounds >= 5:
+                    break
+            else:
+                stall_rounds = 0
+            posts.extend(new_batch)
 
         return posts
     except LinkedInScanError:
@@ -472,16 +648,28 @@ async def _scan_feed_style_page(url: str, limit: int, scroll_rounds: int) -> lis
         _linkedin_page_lock.release()
 
 
-async def scan_hashtag_posts(hashtag: str, limit: int = 50, scroll_rounds: int = 40) -> list[dict]:
+async def scan_hashtag_posts(
+    hashtag: str, limit: int = 50, scroll_rounds: int = 40, cutoff_date: date | None = None
+) -> list[dict]:
     """Scans the first ~50 posts under a given LinkedIn hashtag (owner-
     supplied, e.g. "Hiring", "SaudiJobs") for job-relevant content — added
     2026-08-05 per explicit request, the hashtag-driven counterpart to
     scan_home_feed/scan_profile_posts. `hashtag` should be given without
-    the leading '#'."""
+    the leading '#'. Uses the "Content" search tab sorted by most-recent
+    (`sortBy=date_posted`) rather than the old bare `/feed/hashtag/...`
+    URL (which actually redirects to a mixed people/jobs/posts/companies
+    "All" results page, not reliably sorted) — found live 2026-08-11 while
+    building a date-bounded backfill: the sorted Content tab is both a
+    more focused post source and a prerequisite for cutoff_date to mean
+    anything (an unsorted mixed page has no consistent chronological
+    order to scroll through)."""
     clean_tag = hashtag.strip().lstrip("#")
     try:
         posts = await _scan_feed_style_page(
-            f"https://www.linkedin.com/feed/hashtag/{clean_tag}/", limit, scroll_rounds
+            f"https://www.linkedin.com/search/results/content/?keywords=%23{clean_tag}&sortBy=date_posted",
+            limit,
+            scroll_rounds,
+            cutoff_date,
         )
         logger.info(
             "linkedin_hashtag_scan_completed", extra={"hashtag": clean_tag, "found": len(posts)}

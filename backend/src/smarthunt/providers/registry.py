@@ -16,6 +16,7 @@ from smarthunt.providers.monstergulf.provider import MonstergulfProvider
 from smarthunt.providers.naukrigulf.provider import NaukrigulfProvider
 from smarthunt.providers.sabbar.provider import SabbarProvider
 from smarthunt.providers.tanqeeb.provider import TanqeebProvider
+from smarthunt.providers.workable.provider import WorkableProvider
 from smarthunt.providers.wuzzuf.provider import WuzzufProvider
 from smarthunt.providers.wzayef.provider import WzayefProvider
 
@@ -37,6 +38,7 @@ class ProviderRegistry:
             ForasnagulfProvider(),
             SabbarProvider(),
             BaaeedProvider(),
+            WorkableProvider(),
         ]
 
     def _normalize(self, item) -> DiscoveredJob:

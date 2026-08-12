@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:17
     container_name: smarthunt-postgres
-    restart: unless-stopped
+    restart: always
     network_mode: host
     environment:
       - POSTGRES_DB=smarthunt
@@ -14,7 +14,7 @@ services:
   valkey:
     image: valkey/valkey:8
     container_name: smarthunt-valkey
-    restart: unless-stopped
+    restart: always
     network_mode: host
 
   backend:
@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: smarthunt-backend-app
-    restart: unless-stopped
+    restart: always
     # Matches how postgres/valkey are actually deployed on this host (see
     # `docker inspect smarthunt-postgres` — they run with --network host,
     # not the compose bridge network below), so .env's `localhost` URLs

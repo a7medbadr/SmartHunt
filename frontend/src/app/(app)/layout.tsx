@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  Ban,
   Bell,
   BookOpen,
   Bot,
@@ -96,6 +97,13 @@ const NAV_LINKS: Array<NavLeaf | NavGroup> = [
     children: DISCOVERED_JOBS_CHILDREN("/job-search"),
   },
   { kind: "link", href: "/applications", key: "applications", icon: Briefcase, color: "text-orange-400" },
+  {
+    kind: "link",
+    href: "/not-suitable-jobs",
+    key: "notSuitableJobs",
+    icon: Ban,
+    color: "text-rose-400",
+  },
   { kind: "link", href: "/resume", key: "resume", icon: FileText, color: "text-violet-400" },
   { kind: "link", href: "/ai-assistant", key: "aiAssistant", icon: Bot, color: "text-fuchsia-400" },
   { kind: "link", href: "/providers", key: "providers", icon: Building2, color: "text-indigo-400" },

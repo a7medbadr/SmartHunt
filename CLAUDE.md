@@ -882,6 +882,46 @@ job URLs at `/jobs/<slug>-<id>`) is a reasonable starting point, but building it
 that currently has zero real Saudi inventory would just reintroduce fake/wrong-country data into a
 Saudi-only pipeline.
 
+**Local dev services didn't survive a host reboot despite `docker-compose.yml` saying
+`restart: unless-stopped` — found and fixed 2026-08-12.** The running `smarthunt-postgres`
+container's *actual* restart policy was `no`, not `unless-stopped` — `docker inspect` showed empty
+`Config.Labels` (`{}`), meaning that specific container was created by a plain `docker run` at some
+point in the past, never by `docker compose up`, so it never picked up the compose file's policy at
+all; editing `docker-compose.yml` alone does nothing to a container that already exists outside
+compose's management. Its real data also turned out to live in an **anonymous** volume
+(`/var/lib/docker/volumes/<hash>/_data`), not the named `postgres_data` volume the compose file
+declares — so the obvious-looking fix, `docker compose up -d` to recreate it, would have silently
+created a fresh *empty* named volume and made the DB look wiped. Fixed safely without recreating the
+container: `docker update --restart=always smarthunt-postgres smarthunt-valkey smarthunt-backend-app`
+(changes only the restart policy on the existing container/volume, in place) — `always` was used
+instead of matching compose's `unless-stopped`, deliberately: `unless-stopped` will *not* restart a
+container after a host reboot if it was ever manually `docker stop`ped before that reboot, which is
+plausibly how it ended up stopped in the first place. If a postgres/valkey/backend container is ever
+genuinely recreated from scratch (`docker compose up -d` when no container of that name already
+exists), double-check afterward with `docker inspect <name> --format '{{json .Mounts}}'` that it
+picked up the intended named volume, not a fresh anonymous one.
+
+Separately, the **frontend had no boot-start or crash-recovery mechanism at all** — it only ever ran
+as a bare `nohup npm run start & disown` process (see the frontend section above), so a reboot left
+it not running until someone manually relaunched it. Fixed by adding a real systemd unit,
+`/etc/systemd/system/smarthunt-frontend.service` (`WorkingDirectory=frontend`, `ExecStart=npm run
+start -- -p 3000`, `Restart=always`, `WantedBy=multi-user.target`, enabled) — `systemctl
+{start,stop,restart,status} smarthunt-frontend` now controls it instead of hunting for a
+`next-server` PID; logs go to `~/logs/smarthunt-frontend.log`. Also added
+`~/smarthunt-local-keepalive.sh` (cron, `*/5 * * * *`, alongside the pre-existing OpenShift
+`smarthunt-keepalive.sh`) as a second layer beyond systemd's own `Restart=always`: it checks that the
+three containers report `docker inspect`'s `State.Status == running`, and — more importantly, since a
+process can be "running" but wedged — that `GET /api/v1/health/ready` (proves real DB connectivity,
+not just process liveness) and `:3000` both actually respond, restarting whichever piece failed.
+Verified live end-to-end, not just read through: killed the frontend service outright, confirmed
+`:3000` was unreachable, ran the watchdog by hand, confirmed it detected the outage and had a real
+`200` back within ~13s. Log at `~/logs/smarthunt-local-keepalive.log`, rotated the same way as the
+OpenShift keepalive log (`~/.config/logrotate/smarthunt-local-keepalive.conf`). If the site is down
+after a future reboot again, check `systemctl status smarthunt-frontend` and
+`docker inspect <container> --format '{{.HostConfig.RestartPolicy.Name}}'` before assuming this setup
+regressed — a container recreated by some other means later (e.g. a fresh `docker compose up -d`)
+would silently get compose's `unless-stopped` back instead of the `always` set here.
+
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
 work — check current `git status` / `git log origin/master..master`, don't assume it's still true.

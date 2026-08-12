@@ -1,8 +1,12 @@
+import asyncio
+import time
+
 import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.discovery.service import DiscoveryService
+from smarthunt.scheduler import jobs as scheduler_jobs
 from smarthunt.scheduler.failed_job import FailedSchedulerJob
 from smarthunt.scheduler.history.models import SchedulerHistory
 from smarthunt.scheduler.jobs import (
@@ -66,6 +70,42 @@ async def test_discover_linux_records_failure_on_error(monkeypatch, db_session: 
     assert failed is not None
     assert failed.job_reference == "linux"
     assert "provider network error" in failed.last_error
+
+
+@pytest.mark.asyncio
+async def test_discover_linux_times_out_instead_of_hanging_forever(
+    monkeypatch, db_session: AsyncSession
+):
+    """Regression test for the real 2026-08-10 incident: every scheduled
+    discovery job silently stopped firing for 3+ hours (both locally and
+    on OpenShift) because a hung provider call inside discover() had no
+    outer bound at all — the job's coroutine just never completed, so
+    APScheduler's max_instances=1 default meant every later trigger for
+    that same job_id was silently skipped forever. Verifies a
+    never-returning discover() call is turned into a bounded TimeoutError
+    (caught and recorded the same way any other failure already is)
+    instead of hanging the test (and, in production, the scheduler)
+    indefinitely."""
+    monkeypatch.setattr(scheduler_jobs, "DISCOVERY_CALL_TIMEOUT_SECONDS", 0.05)
+
+    async def _hang(self, *args, **kwargs):
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(DiscoveryService, "discover", _hang)
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        await discover_linux()
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 5
+
+    result = await db_session.execute(
+        select(FailedSchedulerJob).where(FailedSchedulerJob.provider == "scheduler:linux")
+    )
+    failed = result.scalars().first()
+    assert failed is not None
+    assert failed.job_reference == "linux"
 
 
 @pytest.mark.asyncio

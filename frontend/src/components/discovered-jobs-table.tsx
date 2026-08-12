@@ -19,13 +19,6 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -89,15 +82,16 @@ function SortableHeader({
   );
 }
 
-const REVIEW_STATUS_ALL = "__all__";
-
-// This tab mixes jobs from several different job boards (LinkedIn, Tanqeeb,
-// Sabbar, Baaeed, ...), so it's the only one that needs its own "which site
-// did this come from" column — the LinkedIn-post and WhatsApp tabs already
-// imply a single source.
+// The job-sites tab and the Not Suitable Jobs page both mix jobs from
+// several different sources (job boards, LinkedIn posts, WhatsApp
+// messages), so they're the ones that pass showSource — the single-source
+// tabs (LinkedIn posts, WhatsApp) don't need it.
 const SOURCE_LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
+  linkedin_post: "LinkedIn Post",
+  whatsapp_message: "WhatsApp",
   tanqeeb: "Tanqeeb",
+  workable: "Workable",
   sabbar: "Sabbar",
   baaeed: "Baaeed",
   drjobs: "DrJobs",
@@ -132,6 +126,19 @@ export interface DiscoveredJobsTableProps {
   // don't share/clobber each other's cached results.
   queryKeySuffix: string;
   emptyMessage: string;
+  // Which review-status bucket this table shows. Fixed per page (not a
+  // user-facing filter anymore) — marking a job "applied" or "not
+  // suitable" now moves it out of the discovered-jobs view entirely (see
+  // the mutations below), so a single table only ever needs to render
+  // one bucket: "none" for the still-pending discovered-jobs pages, or a
+  // specific ReviewStatus for a single-status page like Not Suitable Jobs.
+  reviewStatus: "none" | ReviewStatus;
+  // "review" shows the mark-applied / mark-not-suitable icons (the
+  // discovered-jobs pages); "delete" shows a permanent-delete icon
+  // instead (the Not Suitable Jobs page — the only place a job can be
+  // removed for good, since discovered jobs should only ever be
+  // triaged away via the review actions, not deleted directly).
+  actions: "review" | "delete";
 }
 
 export function DiscoveredJobsTable({
@@ -140,6 +147,8 @@ export function DiscoveredJobsTable({
   showSource = false,
   queryKeySuffix,
   emptyMessage,
+  reviewStatus,
+  actions,
 }: DiscoveredJobsTableProps) {
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
@@ -147,7 +156,6 @@ export function DiscoveredJobsTable({
 
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("");
-  const [reviewStatusFilter, setReviewStatusFilter] = useState(REVIEW_STATUS_ALL);
   const [appliedFilters, setAppliedFilters] = useState({ keyword: "", location: "" });
   const [sortField, setSortField] = useState("created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -168,21 +176,14 @@ export function DiscoveredJobsTable({
   }
 
   const { data, isPending, isError } = useQuery({
-    queryKey: [
-      "search-jobs",
-      queryKeySuffix,
-      appliedFilters,
-      sortField,
-      sortOrder,
-      reviewStatusFilter,
-    ],
+    queryKey: ["search-jobs", queryKeySuffix, appliedFilters, sortField, sortOrder, reviewStatus],
     queryFn: () =>
       searchJobs({
         keyword: appliedFilters.keyword || undefined,
         location: appliedFilters.location || undefined,
         source,
         excludeSource,
-        reviewStatus: reviewStatusFilter === REVIEW_STATUS_ALL ? undefined : reviewStatusFilter,
+        reviewStatus,
         sort: sortField,
         order: sortOrder,
         limit: 50,
@@ -247,17 +248,6 @@ export function DiscoveredJobsTable({
           onChange={(e) => setLocation(e.target.value)}
           className="max-w-xs"
         />
-        <Select value={reviewStatusFilter} onValueChange={(v) => setReviewStatusFilter(v ?? REVIEW_STATUS_ALL)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={REVIEW_STATUS_ALL}>{t("discoveredJobs", "filterAll")}</SelectItem>
-            <SelectItem value="applied">{t("discoveredJobs", "filterApplied")}</SelectItem>
-            <SelectItem value="not_suitable">{t("discoveredJobs", "filterNotSuitable")}</SelectItem>
-            <SelectItem value="none">{t("discoveredJobs", "filterUnreviewed")}</SelectItem>
-          </SelectContent>
-        </Select>
         <Button type="submit">{t("jobsPage", "searchButton")}</Button>
       </form>
 
@@ -424,52 +414,45 @@ export function DiscoveredJobsTable({
                 </TableCell>
                 <TableCell className="px-1">
                   <div className="flex items-center justify-center gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={reviewStatusMutation.isPending}
-                      onClick={() => toggleReviewStatus(job.id, job.review_status, "applied")}
-                      aria-label={t("discoveredJobs", "markApplied")}
-                      title={t("discoveredJobs", "markApplied")}
-                    >
-                      <CheckCircle2
-                        className={cn(
-                          "size-4",
-                          job.review_status === "applied"
-                            ? "fill-emerald-400/20 text-emerald-400"
-                            : "text-muted-foreground hover:text-emerald-400",
-                        )}
-                      />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={reviewStatusMutation.isPending}
-                      onClick={() => toggleReviewStatus(job.id, job.review_status, "not_suitable")}
-                      aria-label={t("discoveredJobs", "markNotSuitable")}
-                      title={t("discoveredJobs", "markNotSuitable")}
-                    >
-                      <Ban
-                        className={cn(
-                          "size-4",
-                          job.review_status === "not_suitable"
-                            ? "fill-amber-400/20 text-amber-400"
-                            : "text-muted-foreground hover:text-amber-400",
-                        )}
-                      />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={() => setDeleteJobId(job.id)}
-                      aria-label={t("discoveredJobs", "deleteJob")}
-                      title={t("discoveredJobs", "deleteJob")}
-                    >
-                      <Trash2 className="size-4 text-destructive/70 hover:text-destructive" />
-                    </Button>
+                    {actions === "review" ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={reviewStatusMutation.isPending}
+                          onClick={() => toggleReviewStatus(job.id, job.review_status, "applied")}
+                          aria-label={t("discoveredJobs", "markApplied")}
+                          title={t("discoveredJobs", "markApplied")}
+                        >
+                          <CheckCircle2 className="size-4 text-emerald-400" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={reviewStatusMutation.isPending}
+                          onClick={() =>
+                            toggleReviewStatus(job.id, job.review_status, "not_suitable")
+                          }
+                          aria-label={t("discoveredJobs", "markNotSuitable")}
+                          title={t("discoveredJobs", "markNotSuitable")}
+                        >
+                          <Ban className="size-4 text-yellow-400" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => setDeleteJobId(job.id)}
+                        aria-label={t("discoveredJobs", "deleteJob")}
+                        title={t("discoveredJobs", "deleteJob")}
+                      >
+                        <Trash2 className="size-4 text-destructive/70 hover:text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

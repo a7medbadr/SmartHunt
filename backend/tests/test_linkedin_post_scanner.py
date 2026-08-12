@@ -391,7 +391,7 @@ async def test_scan_hashtag_posts_does_not_double_wrap_the_reason(monkeypatch):
     re-classified/mangled into a generic fallback message on the way out
     (the `except LinkedInScanError: raise` passthrough)."""
 
-    async def fake_scan_feed_style_page(url, limit, scroll_rounds):
+    async def fake_scan_feed_style_page(url, limit, scroll_rounds, cutoff_date=None):
         raise post_scanner.LinkedInScanError("سبب محدد جدًا للاختبار")
 
     monkeypatch.setattr(post_scanner, "_scan_feed_style_page", fake_scan_feed_style_page)

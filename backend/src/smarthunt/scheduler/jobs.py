@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from smarthunt.database.session import AsyncSessionLocal
@@ -10,6 +11,33 @@ logger = logging.getLogger("smarthunt.scheduler")
 # Saudi Arabia only, per the project owner's explicit requirement — see
 # CLAUDE.md's "Discovery scope" note before broadening this.
 DISCOVERY_LOCATION = "Saudi Arabia"
+
+# Found 2026-08-10: every real hourly/interval scheduled job silently
+# stopped firing for 3+ hours straight (both locally and on OpenShift)
+# with the pod itself still healthy the whole time — no crash, no OOM,
+# no restart, nothing in the logs. Root cause: none of the actual
+# browser/network calls these jobs make (DiscoveryService.discover(),
+# scan_profile_posts(), scan_hashtag_posts(), scan_chat(),
+# scan_home_feed()) had any outer bound on their own, so under the CPU
+# contention this host has repeatedly hit (see CLAUDE.md's Chromium
+# renderer-pool notes), one of them hanging forever left that job
+# "still running" in APScheduler's eyes permanently — and since every
+# job defaults to max_instances=1, every future trigger for that same
+# job_id was then silently skipped forever, with nothing logged at all
+# (a hang produces no exception to log). Wrapping each call in
+# asyncio.wait_for() guarantees the coroutine actually finishes (as a
+# TimeoutError, caught by the same `except Exception` blocks already
+# recording failures) within a bounded time, so the job always frees up
+# for its next scheduled trigger — this is the same asyncio.wait_for
+# pattern browser/playwright/manager.py's launch()/new_context() already
+# use, applied at the scheduler layer instead of the browser layer so it
+# also covers whatever future hang location isn't already protected
+# there. Generous relative to real observed durations (a full
+# multi-provider discover() normally takes 1-3 minutes; a single
+# hashtag/profile/chat scan 2-3 minutes per post_scanner.py's own
+# comments) but far below "hours."
+DISCOVERY_CALL_TIMEOUT_SECONDS = 300
+SCAN_ITEM_TIMEOUT_SECONDS = 300
 
 # scheduler_history provider labels for the three LinkedIn-monitor jobs
 # below — added 2026-08-05 alongside SchedulerService's startup catch-up
@@ -51,11 +79,14 @@ async def _run_scheduled_discovery(
 
     async with AsyncSessionLocal() as db:
         try:
-            result = await DiscoveryService(db).discover(
-                query=query,
-                location=DISCOVERY_LOCATION,
-                provider=provider_label,
-                providers=providers,
+            result = await asyncio.wait_for(
+                DiscoveryService(db).discover(
+                    query=query,
+                    location=DISCOVERY_LOCATION,
+                    provider=provider_label,
+                    providers=providers,
+                ),
+                timeout=DISCOVERY_CALL_TIMEOUT_SECONDS,
             )
             await db.commit()
             logger.info(
@@ -143,7 +174,7 @@ async def linkedin_session_healthcheck():
 
         try:
             page = await browser_manager.get_page("linkedin")
-            result = await linkedin_login(page)
+            result = await asyncio.wait_for(linkedin_login(page), timeout=SCAN_ITEM_TIMEOUT_SECONDS)
         finally:
             _linkedin_page_lock.release()
 
@@ -206,7 +237,7 @@ async def recycle_browser():
         return
 
     try:
-        await browser_manager.close()
+        await asyncio.wait_for(browser_manager.close(), timeout=SCAN_ITEM_TIMEOUT_SECONDS)
         logger.info("browser_recycle_completed")
     except Exception:
         logger.exception("browser_recycle_failed")
@@ -232,12 +263,16 @@ async def check_email_replies():
     from smarthunt.email_apply.service import check_for_replies
 
     async with AsyncSessionLocal() as db:
-        found = await check_for_replies(db)
-        await db.commit()
-        logger.info(
-            "email_reply_check_completed",
-            extra={"new_replies": len(found)},
-        )
+        try:
+            found = await asyncio.wait_for(check_for_replies(db), timeout=SCAN_ITEM_TIMEOUT_SECONDS)
+            await db.commit()
+            logger.info(
+                "email_reply_check_completed",
+                extra={"new_replies": len(found)},
+            )
+        except Exception:
+            logger.exception("email_reply_check_failed")
+            await db.rollback()
 
 
 async def scan_linkedin_home_feed_hourly():
@@ -253,7 +288,7 @@ async def scan_linkedin_home_feed_hourly():
 
     async with AsyncSessionLocal() as db:
         try:
-            posts = await scan_home_feed()
+            posts = await asyncio.wait_for(scan_home_feed(), timeout=SCAN_ITEM_TIMEOUT_SECONDS)
             saved = await linkedin_monitor_service.scan_and_save(db, posts)
             logger.info(
                 "scheduled_linkedin_feed_scan_completed",
@@ -324,11 +359,14 @@ async def discover_tanqeeb_daily():
     for topic, query in TOPIC_QUERIES.items():
         try:
             async with AsyncSessionLocal() as db:
-                result = await DiscoveryService(db).discover(
-                    query=query,
-                    location=DISCOVERY_LOCATION,
-                    provider=f"scheduler:tanqeeb-{topic}",
-                    providers=[TANQEEB_PROVIDER],
+                result = await asyncio.wait_for(
+                    DiscoveryService(db).discover(
+                        query=query,
+                        location=DISCOVERY_LOCATION,
+                        provider=f"scheduler:tanqeeb-{topic}",
+                        providers=[TANQEEB_PROVIDER],
+                    ),
+                    timeout=DISCOVERY_CALL_TIMEOUT_SECONDS,
                 )
                 total_inserted += result["inserted"]
         except Exception:
@@ -377,7 +415,9 @@ async def scan_all_linkedin_accounts_daily():
 
         async with AsyncSessionLocal() as db:
             try:
-                posts = await scan_profile_posts(account.profile_url)
+                posts = await asyncio.wait_for(
+                    scan_profile_posts(account.profile_url), timeout=SCAN_ITEM_TIMEOUT_SECONDS
+                )
                 saved = await linkedin_monitor_service.scan_and_save(db, posts)
                 await linkedin_monitor_service.mark_account_checked(db, account.id)
                 total_scanned += len(posts)
@@ -438,7 +478,9 @@ async def scan_hashtags_daily():
         scanned_count += 1
         async with AsyncSessionLocal() as db:
             try:
-                posts = await scan_hashtag_posts(hashtag.tag)
+                posts = await asyncio.wait_for(
+                    scan_hashtag_posts(hashtag.tag), timeout=SCAN_ITEM_TIMEOUT_SECONDS
+                )
                 saved = await linkedin_monitor_service.scan_and_save(db, posts)
                 await linkedin_monitor_service.mark_hashtag_checked(db, hashtag.id)
                 total_scanned += len(posts)
@@ -492,7 +534,10 @@ async def scan_whatsapp_chats():
         scanned_count += 1
         async with AsyncSessionLocal() as db:
             try:
-                messages = await scan_chat(chat.label, chat.chat_url, chat.chat_type)
+                messages = await asyncio.wait_for(
+                    scan_chat(chat.label, chat.chat_url, chat.chat_type),
+                    timeout=SCAN_ITEM_TIMEOUT_SECONDS,
+                )
                 saved = await whatsapp_monitor_service.scan_and_save(db, messages)
                 await whatsapp_monitor_service.mark_chat_checked(db, chat.id)
                 total_scanned += len(messages)

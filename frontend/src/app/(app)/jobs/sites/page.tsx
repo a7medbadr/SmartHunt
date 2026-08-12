@@ -24,6 +24,8 @@ export default function JobSitesPage() {
         showSource
         queryKeySuffix="sites"
         emptyMessage={t("jobsPage", "noResults")}
+        reviewStatus="none"
+        actions="review"
       />
     </div>
   );

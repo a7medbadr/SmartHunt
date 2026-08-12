@@ -21,6 +21,8 @@ export default function JobsLinkedinPage() {
         source="linkedin_post"
         queryKeySuffix="linkedin"
         emptyMessage={t("linkedinPostsPage", "noResults")}
+        reviewStatus="none"
+        actions="review"
       />
     </div>
   );
