@@ -23,11 +23,24 @@ class DashboardService:
         return result.scalar_one()
 
     async def get_statistics(self) -> DashboardStatisticsResponse:
+        # These three cards link straight to /jobs/sites, /jobs/linkedin,
+        # /jobs/whatsapp, whose tables all filter reviewStatus="none" (see
+        # DiscoveredJobsTable) — i.e. only jobs still pending the owner's
+        # triage. Found live 2026-08-12: without the same
+        # `review_status IS NULL` filter here, this count included every
+        # job ever discovered with that source regardless of having since
+        # been marked applied/not_suitable, so the LinkedIn card showed
+        # "61" while the actual tab (only 4 still-pending posts) showed 4
+        # — a real query mismatch, not a caching/staleness issue.
         linkedin_posts_result = await self.db.execute(
-            select(func.count()).select_from(Job).where(Job.source == "linkedin_post")
+            select(func.count())
+            .select_from(Job)
+            .where(Job.source == "linkedin_post", Job.review_status.is_(None))
         )
         whatsapp_posts_result = await self.db.execute(
-            select(func.count()).select_from(Job).where(Job.source == "whatsapp_message")
+            select(func.count())
+            .select_from(Job)
+            .where(Job.source == "whatsapp_message", Job.review_status.is_(None))
         )
         # NULL source counts as a "job site" job (e.g. manually created
         # via POST /jobs) — Job.source.notin_([...]) alone would silently
@@ -40,8 +53,15 @@ class DashboardService:
                 or_(
                     Job.source.is_(None),
                     Job.source.notin_(["linkedin_post", "whatsapp_message"]),
-                )
+                ),
+                Job.review_status.is_(None),
             )
+        )
+        # Mirrors not-suitable-jobs/page.tsx's own query exactly
+        # (reviewStatus="not_suitable", no source filter) so this card's
+        # count always matches what that tab actually shows.
+        not_suitable_jobs_result = await self.db.execute(
+            select(func.count()).select_from(Job).where(Job.review_status == "not_suitable")
         )
         return DashboardStatisticsResponse(
             jobs=await self._count(Job),
@@ -50,6 +70,7 @@ class DashboardService:
             linkedin_posts=linkedin_posts_result.scalar_one(),
             whatsapp_posts=whatsapp_posts_result.scalar_one(),
             job_sites=job_sites_result.scalar_one(),
+            not_suitable_jobs=not_suitable_jobs_result.scalar_one(),
             providers=len(provider_registry.providers()),
         )
 

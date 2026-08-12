@@ -101,6 +101,29 @@ def _split_hashtag_words(text: str) -> str:
     return _ACRONYM_BOUNDARY.sub(" ", text)
 
 
+# A recruiter blasting every possible tech+location hashtag to maximize
+# reach ("#Redhat #Openshift #Linux #Ansible #AWS ... #India #Mumbai
+# #Bangalore ... #USA #KSA #UAE #Paris #FRANCE ...", no other content) is
+# not a real, targeted Saudi Linux/OpenShift posting — found live
+# 2026-08-12 via a real saved "job" (title "Apply Now To know More
+# Details", no company/description of any actual role) that only passed
+# is_relevant_job_title because the technology names happened to appear
+# in this trailing hashtag dump, and only passed the Saudi-location check
+# because "#KSA" was one of dozens of unrelated country hashtags in the
+# same dump. A line consisting of nothing but 2+ hashtag tokens is almost
+# never real prose describing an actual role — strip such lines before
+# the tech-relevance check specifically (not the hiring/Saudi checks,
+# where a stray "#SaudiJobs" mixed into an otherwise-real post should
+# still count).
+_HASHTAG_WALL_LINE = re.compile(r"^(#\S+\s*){2,}$")
+
+
+def _strip_hashtag_walls(text: str) -> str:
+    lines = text.splitlines()
+    kept = [line for line in lines if not _HASHTAG_WALL_LINE.match(line.strip())]
+    return "\n".join(kept)
+
+
 def is_job_related_post(text: str) -> bool:
     """A post counts as a real, relevant job posting only if it (a)
     actually announces hiring/an opening, (b) names one of the owner's
@@ -120,7 +143,19 @@ def is_job_related_post(text: str) -> bool:
     has_hiring_signal = any(pattern.search(matchable_text) for pattern in _HIRING_SIGNAL_PATTERNS)
     has_saudi_signal = any(pattern.search(matchable_text) for pattern in _SAUDI_LOCATION_PATTERNS)
 
-    return has_hiring_signal and has_saudi_signal and is_relevant_job_title(matchable_text)
+    # Strip hashtag-wall lines from the ORIGINAL text first (so a glued
+    # camelCase tag like "#RedHatJobs" is still recognized as one hashtag
+    # token by _HASHTAG_WALL_LINE), then split whatever real prose
+    # remains for matching — falls back to the unstripped text if a post
+    # turns out to be nothing but hashtag walls, since a title/skills
+    # list packed as hashtags (e.g. "#Hiring #InfrastructureLead #Linux
+    # #RHEL...") with no separate prose at all is still a real signal in
+    # that specific case, just a weaker one worth keeping rather than
+    # rejecting outright.
+    prose_only = _strip_hashtag_walls(text)
+    relevance_text = _split_hashtag_words(prose_only) if prose_only.strip() else matchable_text
+
+    return has_hiring_signal and has_saudi_signal and is_relevant_job_title(relevance_text)
 
 
 # Profile-scan post text (post_scanner._clean_post_text) still legitimately
@@ -140,6 +175,19 @@ _NAME_LINE_PATTERN = re.compile(r"^[A-Z][a-zA-Z.'-]*(\s[A-Z][a-zA-Z.'-]*){0,3}(,
 # title on its own, unlike a real title line that happens to contain a
 # hashtag among other words.
 _LONE_HASHTAG_LINE_PATTERN = re.compile(r"^#\w+$")
+# LinkedIn's own repost-attribution chrome ("Mahmoud Badr reposted this",
+# "Jane Doe commented on this") and follower/connection-count chrome
+# ("26,266 followers", "500+ connections") — found live 2026-08-12 as the
+# single biggest source of useless saved titles (real production data:
+# several jobs literally titled "Mahmoud Badr reposted this" or "26,266
+# followers"). Neither matches _NAME_LINE_PATTERN (extra lowercase words
+# after the name) or _HEADLINE_LINE_PATTERN (no "|"), so both sailed
+# through as if they were real title candidates.
+_REPOST_ATTRIBUTION_PATTERN = re.compile(
+    r"^[A-Z][\w.'-]*(\s[A-Z][\w.'-]*){0,3}\s+(reposted|commented on|shared|liked)\s+this\b",
+    re.IGNORECASE,
+)
+_FOLLOWER_COUNT_PATTERN = re.compile(r"^[\d,]+\+?\s+(followers|connections)$", re.IGNORECASE)
 # A short leftover fragment (a stray connection-status word, an isolated
 # short token some cleanup pass missed) makes a useless title even if it
 # doesn't match a specific known-junk pattern above — real job-post
@@ -156,7 +204,9 @@ def synthesize_title(text: str, max_length: int = 90) -> str:
 
     for line in lines:
         if (
-            _HEADLINE_LINE_PATTERN.search(line)
+            _REPOST_ATTRIBUTION_PATTERN.match(line)
+            or _FOLLOWER_COUNT_PATTERN.match(line)
+            or _HEADLINE_LINE_PATTERN.search(line)
             or _NAME_LINE_PATTERN.match(line)
             or _LONE_HASHTAG_LINE_PATTERN.match(line)
             or len(line) < _MIN_TITLE_LINE_LENGTH

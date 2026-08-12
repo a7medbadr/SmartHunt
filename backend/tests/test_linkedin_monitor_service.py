@@ -70,6 +70,18 @@ async def test_save_post_as_job_stores_relevant_post(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_save_post_as_job_skips_relevant_post_with_unresolved_url(db_session: AsyncSession):
+    # Regression: a real saved job's post_url never resolved past the
+    # synthetic feed-fragment fallback and just redirected the owner back
+    # to their own home feed when clicked — found live 2026-08-12. A
+    # relevant post whose link never resolved should be skipped, not
+    # saved with a dead link.
+    post = dict(RELEVANT_POST, post_url="https://www.linkedin.com/feed/#feed-commentary_abc123")
+    job = await service.save_post_as_job(db_session, post)
+    assert job is None
+
+
+@pytest.mark.asyncio
 async def test_save_post_as_job_skips_irrelevant_post(db_session: AsyncSession):
     job = await service.save_post_as_job(db_session, IRRELEVANT_POST)
     assert job is None

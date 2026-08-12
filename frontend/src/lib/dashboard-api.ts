@@ -7,6 +7,7 @@ export interface DashboardStatistics {
   linkedin_posts: number;
   whatsapp_posts: number;
   job_sites: number;
+  not_suitable_jobs: number;
   providers: number;
 }
 

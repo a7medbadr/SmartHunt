@@ -722,9 +722,15 @@ not from any single run.
 /api/v1/discovery/search-provider`, `DiscoveryService.search_single_provider()`) 2026-08-04** — the
 Jobs page's provider dropdown now actually live-searches that one site's own real
 `search()` (respecting the enabled/disabled setting) and saves whatever it finds, instead of only
-ever filtering the local jobs table. Deliberately does *not* apply `discover()`'s Saudi-only
-location filter or strict title-relevance filter — the owner explicitly picked this one site and
-query and should see what's really there, not our own curated/filtered view of it. Verified live
+ever filtering the local jobs table. **Correction 2026-08-12** (this line was stale — an early
+version skipped the title-relevance filter too, but it was added back the same day: LinkedIn's own
+broadened search results, e.g. QA testers/product managers for a "Linux Administrator" query, landed
+in the same shared jobs list with misleadingly high scores, which was exactly the "jobs with no
+relation to my work" clutter the owner asked to have removed — see `search_single_provider()`'s own
+docstring). It deliberately still does *not* force `discover()`'s Saudi-only location filter — the
+owner typed a specific location (or none) for this specific search and that should be respected
+as-is, unlike the scheduled pipeline's fixed scope; only the location filter is skipped, not the
+title-relevance one. Verified live
 with LinkedIn: a real search for "Linux Administrator" in "Saudi Arabia" found 10 real jobs,
 inserted 6 new ones, in 43s. LinkedIn's own two-pass search (list page, then each job's own detail
 page for its description — see the provider's own file) costs roughly ~4.3s/job, which is why this
@@ -921,6 +927,59 @@ after a future reboot again, check `systemctl status smarthunt-frontend` and
 `docker inspect <container> --format '{{.HostConfig.RestartPolicy.Name}}'` before assuming this setup
 regressed — a container recreated by some other means later (e.g. a fresh `docker compose up -d`)
 would silently get compose's `unless-stopped` back instead of the `always` set here.
+
+**Dashboard stat-card counts didn't match what their linked tabs actually showed — found and fixed
+2026-08-12 via a real, specific report ("LinkedIn posts card says 61, the tab only has 4").** Root
+cause confirmed via direct DB inspection: `dashboard/service.py`'s `linkedin_posts`/`job_sites`/
+`whatsapp_posts` counts were a raw `COUNT(*) WHERE source = ...` with no `review_status` filter, but
+the three tabs each card links to (`/jobs/linkedin`, `/jobs/sites`, `/jobs/whatsapp`) all render
+`<DiscoveredJobsTable reviewStatus="none" .../>`, which only shows still-*pending* jobs
+(`review_status IS NULL`) — a genuinely different query, not a caching/staleness issue. Real numbers
+at the time: 61 total `linkedin_post` jobs = 4 pending + 16 already marked `applied` + 41 already
+marked `not_suitable`. Fixed by adding `Job.review_status.is_(None)` to all three counts so they
+always match their tab's real content, and added a **new "not suitable jobs" dashboard card**
+(between Applications and the active-job-sites/Providers card, per explicit request) counting
+`review_status == "not_suitable"` — mirrors `not-suitable-jobs/page.tsx`'s own query exactly. If a
+dashboard count ever looks off again, check whether the backend query's filter actually matches the
+linked page's filter before assuming it's a frontend bug — this has now been the real cause once.
+
+**Investigating why so much of that not-suitable bucket was obviously off-topic (dark-store pickers,
+generic recruiter spam) surfaced two more real, currently-live bugs in LinkedIn post scanning, both
+fixed the same day — verified against the actual real production post text, not synthetic
+examples.** (1) `synthesize_title()` (`linkedin_monitor/relevance.py`) had no skip pattern for
+LinkedIn's own repost-attribution chrome ("Mahmoud Badr reposted this") or follower/connection-count
+chrome ("26,266 followers") — neither matched the existing name-line/headline-line skip patterns
+(extra lowercase words after the name; no "|"), so several real saved jobs were literally titled
+exactly that. Added `_REPOST_ATTRIBUTION_PATTERN`/`_FOLLOWER_COUNT_PATTERN`. (2) `is_job_related_post()`
+checked the tech-relevance allowlist against the *entire* post body, including any trailing hashtag
+wall — a real saved "job" (title "Apply Now To know More Details", zero actual role description)
+only passed because Linux/OpenShift/RedHat happened to appear in a dump of 20+ unrelated tech and
+country hashtags (`#India #Mumbai #Bangalore ... #USA #KSA #UAE #Paris #FRANCE ...`), and only passed
+the Saudi-location check because "#KSA" was one of those dozens of country tags. Fixed by stripping
+hashtag-wall lines (2+ hashtag tokens, nothing else) before the tech-relevance check specifically —
+confirmed via direct testing against the real stored post text that this post now correctly fails,
+while a post whose *entire* content is a legitimately hashtag-packed title (e.g. "#Hiring
+#InfrastructureLead #Linux #RHEL...", no separate prose at all) still correctly passes (falls back to
+unstripped text when nothing survives stripping). Separately confirmed (also via direct testing
+against real stored data) that an off-topic post already in the DB (a Dark Store Picker/warehouse job)
+was saved by a *stale* local backend image before that day's rebuild — the current code already
+rejects it — a reminder that "is this row in the DB proof of a live bug" needs checking against
+current code, not assumed from data alone (see "Test-suite gotcha" note above about a related trap).
+
+**A subset of LinkedIn feed-sourced jobs' `post_url` never resolved past the synthetic
+`/feed/#componentkey` fallback and just redirected the owner back to their own home feed when
+clicked — found and fixed 2026-08-12, confirmed live: 7 of 61 `linkedin_post` rows had this exact
+symptom.** `_resolve_real_feed_post_url` (clicks the post's own "..." menu → "Copy link to post" →
+reads the clipboard) already existed and works for most posts (54/61 already had a real permalink),
+but silently fell back with no retry on any transient failure (feed reflow racing the click, a
+clipboard read landing before the write settles). Added one retry before giving up, and — more
+importantly — `save_post_as_job()` now **skips saving** a relevant post entirely if its URL still
+carries the synthetic `/feed/#` marker after that, rather than persisting a "job" the owner can't
+actually click through to (`is_unresolved_feed_post_url()`, `post_scanner.py`). Profile-scan posts
+always have a real `data-urn`-based URL and are unaffected. If feed-sourced dead links come back,
+check whether headless Chromium's clipboard-read permission grant
+(`page.context.grant_permissions(["clipboard-read","clipboard-write"])`) is silently failing in the
+container before assuming the UI-menu-click sequence itself broke again.
 
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2

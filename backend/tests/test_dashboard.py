@@ -19,6 +19,7 @@ async def test_get_dashboard_statistics_empty_db(client: AsyncClient):
     assert "linkedin_posts" in data
     assert "whatsapp_posts" in data
     assert "job_sites" in data
+    assert "not_suitable_jobs" in data
     assert "providers" in data
     assert isinstance(data["jobs"], int)
 
@@ -65,6 +66,47 @@ async def test_dashboard_statistics_reflects_real_data(client: AsyncClient, db_s
     assert after["whatsapp_posts"] == before["whatsapp_posts"] + 1
     assert after["job_sites"] == before["job_sites"] + 1
     assert after["providers"] > 0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_counts_exclude_already_reviewed_jobs(client: AsyncClient, db_session):
+    # Regression: the linkedin_posts/job_sites/whatsapp_posts cards used to
+    # count every job ever discovered with that source regardless of
+    # review_status, so the dashboard showed "61" for LinkedIn posts while
+    # the actual /jobs/linkedin tab (which only shows review_status IS
+    # NULL rows) showed 4 — found live 2026-08-12. A job already marked
+    # applied/not_suitable must not inflate these counts, and a
+    # not_suitable one must show up in not_suitable_jobs instead.
+    before = (await client.get("/api/v1/dashboard/statistics")).json()
+
+    db_session.add(
+        Job(
+            title="Reviewed LinkedIn Post Job",
+            company="LinkedIn Post",
+            location="Saudi Arabia",
+            source="linkedin_post",
+            url="https://example.com/jobs/reviewed-post-test",
+            post_url="https://www.linkedin.com/feed/#reviewed-post-test",
+            review_status="applied",
+        )
+    )
+    db_session.add(
+        Job(
+            title="Not Suitable LinkedIn Post Job",
+            company="LinkedIn Post",
+            location="Saudi Arabia",
+            source="linkedin_post",
+            url="https://example.com/jobs/not-suitable-post-test",
+            post_url="https://www.linkedin.com/feed/#not-suitable-post-test",
+            review_status="not_suitable",
+        )
+    )
+    await db_session.commit()
+
+    after = (await client.get("/api/v1/dashboard/statistics")).json()
+
+    assert after["linkedin_posts"] == before["linkedin_posts"]
+    assert after["not_suitable_jobs"] == before["not_suitable_jobs"] + 1
 
 
 @pytest.mark.asyncio

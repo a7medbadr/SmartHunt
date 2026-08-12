@@ -29,13 +29,22 @@ class DashboardStatisticsResponse(BaseModel):
     applications: int = Field(default=0, ge=0, description="Total job applications submitted")
     favorites: int = Field(default=0, ge=0, description="Total favorite jobs saved")
     linkedin_posts: int = Field(
-        default=0, ge=0, description="Total jobs found via LinkedIn post scanning"
+        default=0,
+        ge=0,
+        description="Jobs found via LinkedIn post scanning still pending review (matches the /jobs/linkedin tab)",
     )
     whatsapp_posts: int = Field(
-        default=0, ge=0, description="Total jobs found via WhatsApp channel/group scanning"
+        default=0,
+        ge=0,
+        description="Jobs found via WhatsApp channel/group scanning still pending review (matches the /jobs/whatsapp tab)",
     )
     job_sites: int = Field(
-        default=0, ge=0, description="Total jobs found via real job-site discovery (excludes posts)"
+        default=0,
+        ge=0,
+        description="Jobs found via real job-site discovery still pending review (matches the /jobs/sites tab)",
+    )
+    not_suitable_jobs: int = Field(
+        default=0, ge=0, description="Total jobs the owner has marked not suitable"
     )
     providers: int = Field(default=0, ge=0, description="Total active job providers")
 

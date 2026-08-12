@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.database.models.job import Job
 from smarthunt.linkedin_monitor.models import MonitoredHashtag, MonitoredLinkedInAccount
+from smarthunt.linkedin_monitor.post_scanner import is_unresolved_feed_post_url
 from smarthunt.linkedin_monitor.relevance import is_job_related_post, synthesize_title
 from smarthunt.logging.logger import logger
 
@@ -128,6 +129,18 @@ async def save_post_as_job(db: AsyncSession, post: dict) -> Job | None:
     text = post["text"]
 
     if not is_job_related_post(text):
+        return None
+
+    # A feed/hashtag post whose real permalink never resolved (see
+    # _resolve_real_feed_post_url) is still carrying the synthetic
+    # "/feed/#..." fallback here — found live 2026-08-12 via a real saved
+    # job whose link just redirected back to the owner's own home feed
+    # when clicked. A job the owner can't click through to is worse than
+    # no job at all, so skip saving it entirely rather than persist a
+    # dead link — profile-scan posts always have a real urn-based
+    # post_url and are unaffected by this check.
+    if is_unresolved_feed_post_url(post["post_url"]):
+        logger.warning(f"linkedin_post_skipped_unresolved_url post_url={post['post_url']}")
         return None
 
     existing = await db.execute(select(Job).where(Job.post_url == post["post_url"]))

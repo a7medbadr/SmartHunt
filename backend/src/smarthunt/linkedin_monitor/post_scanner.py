@@ -10,6 +10,24 @@ from smarthunt.linkedin_monitor.relevance import is_job_related_post
 
 logger = logging.getLogger("smarthunt.linkedin_monitor")
 
+# The synthetic fallback post_url _extract_new_feed_posts starts every
+# feed/hashtag post with, before _resolve_real_feed_post_url (if it runs
+# at all — only for posts that passed is_job_related_post) tries to
+# upgrade it to a real permalink. "/feed/#" (a bare URL fragment on the
+# feed page itself) is the distinguishing shape — a real resolved
+# permalink is always "/feed/update/urn:li:activity:.../" or
+# "/posts/<slug>-share-.../", neither of which contains "/feed/#". Used
+# by save_post_as_job to skip saving a post whose link never resolved to
+# something real, rather than persisting a "job" that just redirects the
+# owner back to their own home feed when clicked — see
+# _resolve_real_feed_post_url's docstring for why this can still happen
+# even with a retry.
+UNRESOLVED_FEED_POST_URL_MARKER = "/feed/#"
+
+
+def is_unresolved_feed_post_url(url: str) -> bool:
+    return UNRESOLVED_FEED_POST_URL_MARKER in url
+
 
 class LinkedInScanError(Exception):
     """Raised by scan_home_feed/scan_hashtag_posts/scan_profile_posts on
@@ -325,39 +343,52 @@ async def _resolve_real_feed_post_url(page, post_container, fallback_url: str) -
     landed back on the home feed instead of the actual post. Only called
     for posts that already passed is_job_related_post (see caller) —
     clicking through this UI costs a couple of real seconds per post, not
-    worth paying for the ~45 irrelevant posts in a typical 50-post scan."""
-    try:
-        menu_button = post_container.locator(
-            'button[aria-label^="Open control menu for post"]'
-        ).first
-        await menu_button.scroll_into_view_if_needed(timeout=8000)
-        # A hovering/animating feed reflows constantly, which Playwright's
-        # default actionability check (waiting for the element to be
-        # perfectly "stable") can fight forever against — force=True
-        # skips that check and just clicks at the element's current
-        # coordinates, which is fine here since we already confirmed the
-        # element exists and scrolled it into view.
-        await menu_button.click(timeout=8000, force=True)
-        await page.wait_for_timeout(400)
+    worth paying for the ~45 irrelevant posts in a typical 50-post scan.
 
-        copy_link_item = page.locator('[role="menuitem"]:has-text("Copy link to post")').first
-        await copy_link_item.click(timeout=8000, force=True)
-
-        real_url = await page.evaluate("() => navigator.clipboard.readText()")
-        if real_url and real_url.startswith("https://www.linkedin.com/"):
-            return real_url.split("?")[0]
-    except Exception:
-        logger.exception("linkedin_feed_post_url_resolve_failed")
-    finally:
-        # A left-open dropdown from this post's menu can overlap and
-        # block the click on the NEXT post's own menu button — found
-        # live 2026-08-04 (2 of 3 posts resolved correctly, the 3rd
-        # timed out on its click for exactly this reason). Escape is a
-        # no-op if nothing is open, so this is safe to always run.
+    Retries once on any failure before giving up — found live 2026-08-12
+    that a real, saved job's link led back to the account's own home feed
+    instead of the actual post; a transient failure (feed reflow racing
+    the click, clipboard read landing before the write settles) is a more
+    likely one-off than every such post being fundamentally unresolvable,
+    and the caller now skips saving the post entirely if this still
+    returns the synthetic fallback (see save_post_as_job), so a genuinely
+    dead link is dropped rather than silently redirecting the owner
+    somewhere useless."""
+    for attempt in range(2):
         try:
-            await page.keyboard.press("Escape")
+            menu_button = post_container.locator(
+                'button[aria-label^="Open control menu for post"]'
+            ).first
+            await menu_button.scroll_into_view_if_needed(timeout=8000)
+            # A hovering/animating feed reflows constantly, which Playwright's
+            # default actionability check (waiting for the element to be
+            # perfectly "stable") can fight forever against — force=True
+            # skips that check and just clicks at the element's current
+            # coordinates, which is fine here since we already confirmed the
+            # element exists and scrolled it into view.
+            await menu_button.click(timeout=8000, force=True)
+            await page.wait_for_timeout(400)
+
+            copy_link_item = page.locator('[role="menuitem"]:has-text("Copy link to post")').first
+            await copy_link_item.click(timeout=8000, force=True)
+
+            real_url = await page.evaluate("() => navigator.clipboard.readText()")
+            if real_url and real_url.startswith("https://www.linkedin.com/"):
+                return real_url.split("?")[0]
         except Exception:
-            pass
+            logger.exception(
+                "linkedin_feed_post_url_resolve_failed", extra={"attempt": attempt + 1}
+            )
+        finally:
+            # A left-open dropdown from this post's menu can overlap and
+            # block the click on the NEXT post's own menu button — found
+            # live 2026-08-04 (2 of 3 posts resolved correctly, the 3rd
+            # timed out on its click for exactly this reason). Escape is a
+            # no-op if nothing is open, so this is safe to always run.
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
 
     return fallback_url
 

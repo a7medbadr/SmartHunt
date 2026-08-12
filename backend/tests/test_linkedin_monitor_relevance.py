@@ -74,3 +74,68 @@ def test_synthesize_title_truncates_long_lines():
     text = "a" * 200
     title = synthesize_title(text, max_length=50)
     assert len(title) == 50
+
+
+def test_synthesize_title_skips_repost_attribution_line():
+    # Regression: real saved jobs were literally titled "Mahmoud Badr
+    # reposted this" — found live 2026-08-12, the single biggest source
+    # of useless titles in production data.
+    text = (
+        "Mahmoud Badr reposted this\n"
+        "Fircroft\n"
+        "51,303 followers\n"
+        "We're Hiring! Charging System Engineer in Riyadh, Saudi Arabia."
+    )
+    assert (
+        synthesize_title(text) == "We're Hiring! Charging System Engineer in Riyadh, Saudi Arabia."
+    )
+
+
+def test_synthesize_title_skips_follower_count_line():
+    text = "26,266 followers\nSystem Engineer opening in Jeddah, Saudi Arabia."
+    assert synthesize_title(text) == "System Engineer opening in Jeddah, Saudi Arabia."
+
+
+def test_synthesize_title_skips_connection_count_line():
+    text = "500+ connections\nHiring a Linux Administrator in Riyadh, Saudi Arabia."
+    assert synthesize_title(text) == "Hiring a Linux Administrator in Riyadh, Saudi Arabia."
+
+
+def test_is_job_related_post_rejects_hashtag_wall_spam():
+    # Regression: a real saved "job" (title "Apply Now To know More
+    # Details", no actual role description) only passed the tech-relevance
+    # check because Linux/OpenShift/RedHat happened to appear in a
+    # trailing wall of dozens of unrelated tech+country hashtags, and only
+    # passed the Saudi-location check because "#KSA" was one of many
+    # unrelated country hashtags in that same wall — found live 2026-08-12.
+    text = (
+        "Apply Now To know More Details\n"
+        "- https://lnkd.in/gCxFnVj9\n\n"
+        "#Redhat #Openshift #Linux #Ansible #AWS #openstack #SRE #Kubernetes "
+        "#CKA #CKAD #CKS #systemEngineer #LinuxAdministrator #consultant "
+        "#India #Mumbai #Bangalore #Delhi #Pune #Chennai #USA #KSA #UAE "
+        "#Paris #FRANCE #EUROPE #BRAZIL"
+    )
+    assert is_job_related_post(text) is False
+
+
+def test_is_job_related_post_accepts_hashtag_only_post_with_no_other_prose():
+    # A post whose entire content is a hashtag-packed title/skills list
+    # (no separate prose at all) should still count — hashtag-wall
+    # stripping must fall back to the unstripped text rather than reject
+    # everything just because every line happens to be hashtags.
+    text = (
+        "#Hiring #InfrastructureLead #Linux #RHEL #Ansible #Terraform "
+        "#Kubernetes #DevOps #SaudiArabiaJobs #RiyadhJobs #HiringNow"
+    )
+    assert is_job_related_post(text) is True
+
+
+def test_is_job_related_post_still_accepts_real_post_with_incidental_hashtags():
+    # A stray hashtag mixed into an otherwise-real sentence (not a whole
+    # hashtag-only line) must not be treated as a "wall" and stripped.
+    text = (
+        "We're hiring a Linux Administrator in Riyadh, Saudi Arabia #SaudiJobs. "
+        "Apply now, send your CV."
+    )
+    assert is_job_related_post(text) is True

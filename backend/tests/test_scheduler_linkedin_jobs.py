@@ -51,7 +51,13 @@ async def test_scan_linkedin_home_feed_hourly_saves_relevant_posts(
             {
                 "urn": "feed-commentary_test-1",
                 "text": "Hiring a Linux Administrator in Riyadh, Saudi Arabia.",
-                "post_url": "https://www.linkedin.com/feed/#feed-commentary_test-1",
+                # A real scan only ever hands save_post_as_job a synthetic
+                # "/feed/#..." URL if _resolve_real_feed_post_url couldn't
+                # get a real permalink — save_post_as_job now skips saving
+                # in that case (2026-08-12, see its own docstring), so this
+                # fixture uses a resolved-looking URL to model the normal
+                # case instead.
+                "post_url": "https://www.linkedin.com/feed/update/urn:li:activity:1234567890/",
             }
         ]
 
@@ -62,7 +68,7 @@ async def test_scan_linkedin_home_feed_hourly_saves_relevant_posts(
     result = await db_session.execute(select(Job).where(Job.source == "linkedin_post"))
     saved = result.scalars().all()
     assert len(saved) == 1
-    assert saved[0].post_url == "https://www.linkedin.com/feed/#feed-commentary_test-1"
+    assert saved[0].post_url == "https://www.linkedin.com/feed/update/urn:li:activity:1234567890/"
 
 
 @pytest.mark.asyncio

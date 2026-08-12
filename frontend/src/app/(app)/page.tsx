@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Ban,
   Briefcase,
   Building2,
   Home,
@@ -67,13 +68,21 @@ const TREND_CHARTS: Array<{
 
 // Order matters (explicit request): the 3 discovered-jobs pages first, in
 // the same order as their entries under the "Discovered Jobs" nav group
-// (/jobs/sites, /jobs/linkedin, /jobs/whatsapp), then applications and
-// providers. The old "favorites" card was dropped to make room for the
-// WhatsApp card without the grid growing further, per explicit request —
-// favorites are still one click away from any Jobs page.
+// (/jobs/sites, /jobs/linkedin, /jobs/whatsapp), then applications, then
+// not-suitable-jobs, then providers — "next to applications, before the
+// active job sites block" per explicit request 2026-08-12. The old
+// "favorites" card was dropped to make room for the WhatsApp card
+// without the grid growing further, per explicit request — favorites
+// are still one click away from any Jobs page.
 const STAT_CARDS: Array<{
   key: keyof Awaited<ReturnType<typeof getDashboardStatistics>>;
-  labelKey: "statJobSites" | "statLinkedinPosts" | "statWhatsappPosts" | "statApplications" | "statProviders";
+  labelKey:
+    | "statJobSites"
+    | "statLinkedinPosts"
+    | "statWhatsappPosts"
+    | "statApplications"
+    | "statNotSuitableJobs"
+    | "statProviders";
   href?: string;
   icon: LucideIcon;
   color: string;
@@ -105,6 +114,13 @@ const STAT_CARDS: Array<{
     href: "/applications",
     icon: Briefcase,
     color: "text-orange-400",
+  },
+  {
+    key: "not_suitable_jobs",
+    labelKey: "statNotSuitableJobs",
+    href: "/not-suitable-jobs",
+    icon: Ban,
+    color: "text-rose-400",
   },
   {
     key: "providers",
@@ -150,7 +166,7 @@ export default function DashboardPage() {
         <p className="text-sm text-destructive">{t("dashboard", "statsError")}</p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {STAT_CARDS.map((stat) => {
           const Icon = stat.icon;
           const card = (
