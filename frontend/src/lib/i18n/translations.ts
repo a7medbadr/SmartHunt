@@ -412,7 +412,7 @@ export const translations = {
       scanHomeFeedButton: "افحص الصفحة الرئيسية بتاعتي",
       foundPostsSaved: "لقينا {scanned} بوست، وحفظنا {saved} وظيفة مناسبة.",
       scanError: "حصل خطأ أثناء الفحص، جرب تاني.",
-      linkedinPostSearchTitle: "البحث في بوستات لينكدان",
+      linkedinPostSearchTitle: "البحث في اكونتات الاتش ار",
       linkedinPostSearchBody:
         "بعض فرص العمل بتتنشر كبوست عادي على لينكدان مش كوظيفة رسمية — سواء من حساب اتش آر بعينه، أو أي حد بيشير بوست وظيفة. ضيف هنا رابط بروفايل الشخص، وهيتفحص على طول ويدور على وظائف مرتبطة بيك في بوستاته — وبعد كده النظام بيعمله فحص يومي لوحده لآخر 24 ساعة.",
       profileUrlPlaceholder: "رابط بروفايل لينكدان (https://linkedin.com/in/...)",
@@ -911,7 +911,7 @@ Resume:
       scanHomeFeedButton: "Scan My Home Feed",
       foundPostsSaved: "Found {scanned} posts, saved {saved} matching jobs.",
       scanError: "An error occurred while scanning, try again.",
-      linkedinPostSearchTitle: "LinkedIn Post Search",
+      linkedinPostSearchTitle: "HR Account Search",
       linkedinPostSearchBody:
         "Some job opportunities get posted as a regular LinkedIn post instead of a formal listing — whether from a specific HR account or anyone sharing a job post. Add a person's profile link here, and it'll be scanned right away for job opportunities related to you in their posts — after that the system scans it daily on its own for the last 24 hours.",
       profileUrlPlaceholder: "LinkedIn profile URL (https://linkedin.com/in/...)",

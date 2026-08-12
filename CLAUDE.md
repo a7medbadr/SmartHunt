@@ -981,6 +981,14 @@ check whether headless Chromium's clipboard-read permission grant
 (`page.context.grant_permissions(["clipboard-read","clipboard-write"])`) is silently failing in the
 container before assuming the UI-menu-click sequence itself broke again.
 
+**The `/job-search/linkedin` page's monitored-accounts block was labeled "البحث في بوستات لينكدان"
+("LinkedIn Post Search") — renamed 2026-08-12 to "البحث في اكونتات الاتش ار" ("HR Account Search")
+per explicit request, since that's what the block actually is (add a specific person's profile —
+almost always an HR/recruiter account — and scan their posts), not a generic post search.
+`i18n/translations.ts`'s `jobSearch.linkedinPostSearchTitle` key, both locales; the key name itself
+was left as-is (only its displayed value changed) to avoid an unnecessary rename ripple through the
+one call site (`job-search/linkedin/page.tsx`).
+
 Git note: local `master` was significantly ahead of `origin/master` as of doc writing (99 commits);
 the doc recommends reviewing history and pushing/tagging a `v1.0.0` release before starting Phase 2
 work — check current `git status` / `git log origin/master..master`, don't assume it's still true.
