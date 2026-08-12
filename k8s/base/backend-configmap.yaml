@@ -31,3 +31,10 @@ data:
 
   RESUME_STORAGE_DIR: "/data/resumes"
   BROWSER_PROFILES_DIR: "/data/browser-profiles"
+
+  # In-cluster Service DNS name of the postgresql-persistent template's
+  # Service (see k8s/DISASTER_RECOVERY.md) — found live on the cluster
+  # 2026-08-12 but missing from this file (drift: live configmap had 13
+  # keys, this file only had 12), so a `oc apply -f` of this file alone
+  # would have silently dropped it from a real deployment.
+  POSTGRES_HOST: "smarthunt-postgres-internal"
