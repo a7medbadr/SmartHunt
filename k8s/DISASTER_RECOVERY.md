@@ -1,3 +1,7 @@
+**Executed for real 2026-08-23** when the sandbox from 2026-08-12 expired on schedule (~30 days) and
+the owner created a new sandbox account. Two real gaps found while following this doc, both fixed
+that day — see the addendum at the bottom before assuming the steps below are complete as written.
+
 # Disaster recovery: rebuilding SmartHunt on a fresh OpenShift sandbox
 
 Written 2026-08-12 because the current Red Hat Developer Sandbox account has ~3 days left before
@@ -221,3 +225,44 @@ curl -sS -o /dev/null -w '%{http_code}\n' "https://$FRONT"
 
 Then log in through the real UI and confirm the restored jobs/applications/resume actually show up —
 a 200 on the route proves the frontend is serving, not that the DB restore actually worked.
+
+## Addendum — real rebuild 2026-08-23, two gaps this doc didn't cover
+
+Executed against a genuinely fresh sandbox (project was ~40 min old, completely empty except
+sandbox-default ODH resources) using the exact `/home/badr/openshift-backup-2026-08-12/` backup and
+the steps above. Worth knowing before the next rebuild:
+
+- **The Red Hat Developer Sandbox reissued the identical namespace (`a-badr-dev`) and identical API
+  server/route hostname (`*.apps.rm3.7wse.p1.openshiftapps.com`)** as the expired account — it's the
+  same shared multi-tenant cluster, tenant naming is deterministic from the Red Hat account username,
+  not a genuinely different cluster each time. This meant `k8s/base/keepalive-cronjob.yaml`'s
+  hardcoded curl URL needed **no edit at all** this time (step 9's warning about editing it still
+  stands as a thing to check, just wasn't needed this cycle — verify the route host actually changed
+  before assuming a future rebuild also gets a free pass here).
+- **Step 2's `oc new-app postgresql-persistent` does not reliably auto-create the
+  `POSTGRESQL_DATABASE` database on first boot** — `psql -l` showed only `postgres`/`template0`/
+  `template1`, no `smarthunt` database, even though `POSTGRESQL_DATABASE=smarthunt` was set correctly
+  in the pod's own env and the dc had already restarted once. Step 3's restore will fail with
+  `FATAL: database "smarthunt" does not exist` until you run
+  `oc exec <pg-pod> -- psql -U postgres -c "CREATE DATABASE smarthunt OWNER postgres;"` first — add
+  this as an explicit step 2.5 rather than assuming the template's own bootstrap always handles it.
+- **`~/smarthunt-keepalive.sh` (the cron watchdog, step 9's whole reason for existing) had a real,
+  previously-undetected bug**: it hardcoded `oc get dc postgresql` / `oc scale dc postgresql` /
+  `oc rollout status dc/postgresql`, but step 2's own command (`DATABASE_SERVICE_NAME=
+  smarthunt-postgres-internal`) has always named the DeploymentConfig `smarthunt-postgres-internal`,
+  never plain `postgresql` — so every single run of this watchdog, on both the old cluster and this
+  rebuild until fixed, silently read `PG_READY=0` (the `oc get dc postgresql` lookup 404s) and issued
+  a no-op `oc scale dc postgresql` that also 404s, meaning **the postgres leg of this watchdog has
+  probably never actually worked**, only backend/frontend recovery did. Fixed in place 2026-08-23 by
+  changing all three `dc postgresql` references to `dc smarthunt-postgres-internal`; verified live by
+  running the script by hand before and after (before: `Error from server (NotFound): deploymentconfigs
+  ... "postgresql" not found`; after: `All good (postgresql=1, backend=1, frontend=1)`). If this
+  script is ever regenerated from scratch, use the DC name from step 2's own command, not the
+  template's generic default name.
+- Verified restore worked for real (not just clean exit codes): DB row counts checked directly via
+  `psql` post-restore (28 tables, 89 jobs/7 applications/2 resumes/5 users at time of this rebuild),
+  and — the strongest signal — the scheduler's own startup catch-up mechanism
+  (`SchedulerService.catch_up_scheduled_jobs()`) found every job's `scheduler_history` row ~11 days
+  stale (matching the 2026-08-12 backup date) and fired a real `linkedin_hashtag_scan_completed` using
+  the restored `linkedin.json` session file within seconds of the pod starting — proving the browser-
+  profile restore (step 8) produced a genuinely working, not just present, session file.
