@@ -101,37 +101,29 @@ def _split_hashtag_words(text: str) -> str:
     return _ACRONYM_BOUNDARY.sub(" ", text)
 
 
-# A recruiter blasting every possible tech+location hashtag to maximize
-# reach ("#Redhat #Openshift #Linux #Ansible #AWS ... #India #Mumbai
-# #Bangalore ... #USA #KSA #UAE #Paris #FRANCE ...", no other content) is
-# not a real, targeted Saudi Linux/OpenShift posting — found live
-# 2026-08-12 via a real saved "job" (title "Apply Now To know More
-# Details", no company/description of any actual role) that only passed
-# is_relevant_job_title because the technology names happened to appear
-# in this trailing hashtag dump, and only passed the Saudi-location check
-# because "#KSA" was one of dozens of unrelated country hashtags in the
-# same dump. A line consisting of nothing but 2+ hashtag tokens is almost
-# never real prose describing an actual role — strip such lines before
-# the tech-relevance check specifically (not the hiring/Saudi checks,
-# where a stray "#SaudiJobs" mixed into an otherwise-real post should
-# still count).
-_HASHTAG_WALL_LINE = re.compile(r"^(#\S+\s*){2,}$")
-
-
-def _strip_hashtag_walls(text: str) -> str:
-    lines = text.splitlines()
-    kept = [line for line in lines if not _HASHTAG_WALL_LINE.match(line.strip())]
-    return "\n".join(kept)
-
-
 def is_job_related_post(text: str) -> bool:
     """A post counts as a real, relevant job posting only if it (a)
-    actually announces hiring/an opening, (b) names one of the owner's
-    real technologies (and isn't excluded — Manager/Architect/Saudi-
-    national-only), and (c) mentions a Saudi location — the same
-    Saudi-Arabia-only scope the rest of discovery enforces. Requiring
-    all three keeps this from matching e.g. a random post that merely
-    mentions "Linux" in passing."""
+    actually announces hiring/an opening, (b) mentions a Saudi location —
+    the same Saudi-Arabia-only scope the rest of discovery enforces, and
+    (c) its own title (see synthesize_title — the same string the Jobs
+    tab displays) names one of the owner's real technologies and isn't
+    excluded (Manager/Architect/Saudi-national-only).
+
+    (c) used to check the technology-name pattern against the whole post
+    body instead of just the title — found live 2026-08-13 to be a real,
+    still-occurring false-positive source: a generic role (a Full Stack
+    Developer opening, an IT Application Support post) that merely lists
+    "Linux" once among many unrelated requirement bullets would still
+    pass, even though the actual role — what a human would call its
+    title — has nothing to do with the owner's Linux/storage/OpenShift
+    background. Checking the title only mirrors exactly what
+    discovery/service.py already does for every other provider's jobs
+    (its own comment: "the title itself must be" the relevance signal),
+    so a LinkedIn post now has to clear the same bar a real job listing
+    does. This also makes the old hashtag-wall-stripping workaround
+    unnecessary: a hashtag-dump post whose real title carries no tech
+    name (e.g. "Apply Now To know More Details") now fails on the title
+    alone, without needing to specifically strip the hashtags below it."""
     if not text:
         return False
 
@@ -143,19 +135,7 @@ def is_job_related_post(text: str) -> bool:
     has_hiring_signal = any(pattern.search(matchable_text) for pattern in _HIRING_SIGNAL_PATTERNS)
     has_saudi_signal = any(pattern.search(matchable_text) for pattern in _SAUDI_LOCATION_PATTERNS)
 
-    # Strip hashtag-wall lines from the ORIGINAL text first (so a glued
-    # camelCase tag like "#RedHatJobs" is still recognized as one hashtag
-    # token by _HASHTAG_WALL_LINE), then split whatever real prose
-    # remains for matching — falls back to the unstripped text if a post
-    # turns out to be nothing but hashtag walls, since a title/skills
-    # list packed as hashtags (e.g. "#Hiring #InfrastructureLead #Linux
-    # #RHEL...") with no separate prose at all is still a real signal in
-    # that specific case, just a weaker one worth keeping rather than
-    # rejecting outright.
-    prose_only = _strip_hashtag_walls(text)
-    relevance_text = _split_hashtag_words(prose_only) if prose_only.strip() else matchable_text
-
-    return has_hiring_signal and has_saudi_signal and is_relevant_job_title(relevance_text)
+    return has_hiring_signal and has_saudi_signal and is_relevant_job_title(synthesize_title(text))
 
 
 # Profile-scan post text (post_scanner._clean_post_text) still legitimately

@@ -112,10 +112,17 @@ async def test_search_single_provider_only_calls_the_named_provider(db_session, 
     force the Saudi-only location filter discover() uses — the owner
     typed this specific location (or none) for this specific search and
     that should be respected as-is."""
+    # Title/company deliberately distinct from other tests' generic
+    # "Linux Administrator"/"Acme" fixtures — JobRepository's cross-source
+    # dedup (2026-08-13) now matches on normalized title+company across
+    # the *entire* jobs table, not just same-source, so reusing that
+    # generic pair here would collide with another test's own
+    # directly-committed row (see the comment below) and get silently
+    # skipped as a "duplicate" instead of actually inserted.
     jobs = [
         DiscoveredJob(
-            title="Linux Administrator",
-            company="Acme",
+            title="Linux Administrator (Single-Provider Test Fixture)",
+            company="Acme Single-Provider Test Fixture Co",
             location="Cairo, Egypt",  # would fail a Saudi-only location filter
             source="linkedin",
             url="https://linkedin.com/jobs/1",

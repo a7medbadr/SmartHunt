@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from smarthunt.database.models.job import Job
+from smarthunt.database.repositories.job_repository import JobRepository
 from smarthunt.logging.logger import logger
 from smarthunt.whatsapp_monitor.message_parser import is_job_related_message, parse_job_message
 from smarthunt.whatsapp_monitor.models import MonitoredWhatsAppChat
@@ -104,15 +105,30 @@ async def save_message_as_job(db: AsyncSession, message: dict) -> Job | None:
     if existing.scalar_one_or_none() is not None:
         return None
 
+    # Compared against every job's description regardless of source (not
+    # just other whatsapp_message rows) — same rationale as
+    # linkedin_monitor/service.py's identical widening: the same opening
+    # can independently surface as a WhatsApp message AND a LinkedIn post
+    # (or vice versa), which a source-scoped check would never catch.
     fingerprint = _content_fingerprint(text)
-    existing_messages = await db.execute(
-        select(Job.description).where(Job.source == "whatsapp_message")
-    )
+    existing_messages = await db.execute(select(Job.description))
     for (existing_description,) in existing_messages:
         if existing_description and _content_fingerprint(existing_description) == fingerprint:
             return None
 
     parsed = parse_job_message(text)
+
+    # A structured "📌 Job Opportunity | ... / 🏢 ..." message carries a
+    # real title/company (unlike the "WhatsApp Channel" placeholder the
+    # unstructured fallback uses), which is exactly the same signal
+    # discovery-sourced jobs are deduped on — catches the same real
+    # opening being both scraped from e.g. Tanqeeb/Workable AND forwarded
+    # into a monitored WhatsApp channel, worded differently enough that
+    # the content fingerprint above wouldn't match.
+    if parsed.matched_structured_format:
+        if await JobRepository(db).is_duplicate(parsed.title, parsed.company):
+            return None
+
     job = Job(
         title=parsed.title,
         company=parsed.company,

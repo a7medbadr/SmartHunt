@@ -147,8 +147,14 @@ async def save_post_as_job(db: AsyncSession, post: dict) -> Job | None:
     if existing.scalar_one_or_none() is not None:
         return None
 
+    # Compared against every job's description regardless of source (not
+    # just other linkedin_post rows) — found 2026-08-13 that the same
+    # opening can independently surface as a LinkedIn post AND a
+    # WhatsApp-forwarded copy of that same post, which a source-scoped
+    # check would never catch since they're saved under different
+    # `source` values.
     fingerprint = _content_fingerprint(text)
-    existing_posts = await db.execute(select(Job.description).where(Job.source == "linkedin_post"))
+    existing_posts = await db.execute(select(Job.description))
     for (existing_description,) in existing_posts:
         if existing_description and _content_fingerprint(existing_description) == fingerprint:
             return None

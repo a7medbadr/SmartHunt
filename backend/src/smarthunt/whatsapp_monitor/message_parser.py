@@ -134,6 +134,12 @@ def is_job_related_message(text: str) -> bool:
 
     parsed = parse_job_message(text)
     if parsed.matched_structured_format:
-        return _has_saudi_signal(text) and is_relevant_job_title(text)
+        # Checked against the parsed title only, not the whole message —
+        # same rationale as linkedin_monitor/relevance.py's identical
+        # tightening: a structured message can legitimately list "Linux"
+        # somewhere in its requirements for a role whose real title has
+        # nothing to do with it, so the technology name has to appear in
+        # the title itself, same bar every other job source is held to.
+        return _has_saudi_signal(text) and is_relevant_job_title(parsed.title)
 
     return is_job_related_post(text)
